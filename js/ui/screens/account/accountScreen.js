@@ -100,5 +100,19 @@ export const AccountScreen = {
         this.signOut();
       }
     }
+  },
+
+  onPointerActivate(target) {
+    const actionTarget = target?.closest?.("[data-action]");
+    const action = String(actionTarget?.dataset?.action || "");
+    if (action === "signin") {
+      Router.navigate("authSignIn");
+      return true;
+    }
+    if (action === "logout") {
+      this.signOut();
+      return true;
+    }
+    return false;
   }
 };

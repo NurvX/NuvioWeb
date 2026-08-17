@@ -127,6 +127,49 @@ export const SyncCodeScreen = {
     }
   },
 
+  onPointerActivate(target) {
+    const actionTarget = target?.closest?.("[data-action]");
+    const action = String(actionTarget?.dataset?.action || "");
+    if (!action) {
+      return false;
+    }
+
+    if (this.textDialog) {
+      if (action === "cancelText") {
+        this.textDialog = false;
+        this.render();
+        return true;
+      }
+      if (action === "saveText") {
+        const input = this.container.querySelector("[data-action='textInput']");
+        LocalStore.set(KEY, String(input?.value || "").trim());
+        this.textDialog = false;
+        this.render();
+        return true;
+      }
+      // Tapping the text field itself is a tap-to-focus-and-type gesture, not a
+      // submit — unlike pressing OK on a remote while the field already has
+      // focus, which is the only way a D-pad user can reach it at all.
+      return false;
+    }
+
+    if (action === "setCode") {
+      this.textDialog = true;
+      this.render();
+      return true;
+    }
+    if (action === "clearCode") {
+      LocalStore.remove(KEY);
+      this.render();
+      return true;
+    }
+    if (action === "back") {
+      Router.back();
+      return true;
+    }
+    return false;
+  },
+
   consumeBackRequest() {
     if (!this.textDialog) {
       return false;
