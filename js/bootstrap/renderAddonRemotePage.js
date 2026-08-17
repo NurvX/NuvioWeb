@@ -56,6 +56,8 @@ function createShell() {
           background: #000;
           color: #fff;
           font-family: "Segoe UI", Arial, sans-serif;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
         }
         .addon-remote-shell {
           min-height: 100vh;
