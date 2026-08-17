@@ -493,6 +493,23 @@ export const CastDetailScreen = {
     }
   },
 
+  // A tap is treated as a single-activation gesture (open detail), matching
+  // the D-pad path's short-press behavior — the long-press poster-options
+  // menu is a D-pad-hold-specific affordance, not reproduced for touch here.
+  onPointerActivate(target) {
+    const actionTarget = target?.closest?.("[data-action]");
+    const action = String(actionTarget?.dataset?.action || "");
+    if (action === "back") {
+      Router.back();
+      return true;
+    }
+    if (action === "openDetail") {
+      this.openDetailFromNode(actionTarget);
+      return true;
+    }
+    return false;
+  },
+
   consumeBackRequest() {
     return this.closePosterOptionsMenu();
   },

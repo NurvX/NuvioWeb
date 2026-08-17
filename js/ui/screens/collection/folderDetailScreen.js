@@ -1898,6 +1898,49 @@ export const FolderDetailScreen = {
     HomeScreen.pendingCollectionRouteReturnAnimation = true;
   },
 
+  // The home-follow layout mode delegates rendering/navigation to HomeScreen's
+  // swipeable-row transform-positioning system, which touch support is
+  // explicitly deferred for (see the phone-touch-responsive spec's Out of
+  // Scope section). Only the TABBED_GRID / row-track layouts, which use plain
+  // native scroll, get touch activation here.
+  onPointerFocus(target) {
+    if (this.useHomeFollowLayout) {
+      return false;
+    }
+    return this.focusNode(target);
+  },
+
+  onPointerActivate(target) {
+    if (this.useHomeFollowLayout) {
+      return false;
+    }
+    const actionTarget = target?.closest?.("[data-action]");
+    const action = String(actionTarget?.dataset?.action || "");
+    if (action === "selectTab") {
+      this.selectedTabIndex = Math.max(0, Number(actionTarget.dataset.tabIndex || 0));
+      this.lastFocusedKey = `tab:${this.selectedTabIndex}`;
+      this.savedScrollTop = 0;
+      this.render();
+      return true;
+    }
+    if (action === "openDetail") {
+      this.lastFocusedKey = String(actionTarget.dataset.focusKey || this.lastFocusedKey || "");
+      Router.navigate("detail", {
+        itemId: actionTarget.dataset.itemId || "",
+        itemType: actionTarget.dataset.itemType || actionTarget.dataset.catalogType || "movie",
+        fallbackTitle: actionTarget.dataset.itemTitle || "Untitled",
+        fallbackPoster: actionTarget.dataset.posterSrc || "",
+        fallbackBackground: actionTarget.dataset.backdropSrc || "",
+        addonBaseUrl: actionTarget.dataset.addonBaseUrl || "",
+        addonId: actionTarget.dataset.addonId || "",
+        addonName: actionTarget.dataset.addonName || "",
+        catalogType: actionTarget.dataset.catalogType || actionTarget.dataset.itemType || "movie"
+      });
+      return true;
+    }
+    return false;
+  },
+
   consumeBackRequest() {
     if (this.useHomeFollowLayout) {
       if (this.continueWatchingMenu) {
