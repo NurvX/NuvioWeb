@@ -66,9 +66,11 @@ export const FocusEngine = {
     if (Platform.isWebOS()) {
       document.addEventListener("mousemove", this.boundHandlePointerMove, true);
       document.addEventListener("pointermove", this.boundHandlePointerMove, true);
-      document.addEventListener("click", this.boundHandlePointerClick, true);
       document.documentElement?.classList?.add("webos-pointer-remote");
       document.body?.classList?.add("webos-pointer-remote");
+    }
+    if (Platform.isWebOS() || Platform.isBrowser()) {
+      document.addEventListener("click", this.boundHandlePointerClick, true);
     }
   },
 
@@ -290,7 +292,7 @@ export const FocusEngine = {
   },
 
   async handlePointerClick(event) {
-    if (!Platform.isWebOS()) {
+    if (!Platform.isWebOS() && !Platform.isBrowser()) {
       return;
     }
     const target = this.getPointerFocusable(event);
