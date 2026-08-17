@@ -4,26 +4,28 @@ import { AuthManager } from "../../../core/auth/authManager.js";
 import { I18n } from "../../../i18n/index.js";
 
 function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 export const AuthSignInScreen = {
-    async mount() {
-          this.container = document.getElementById("account");
-          this.hasBackDestination = Router.stack.length > 0;
-          this.textDialog = null;
-          this.pendingEmail = "";
-          this.errorMessage = "";
-          ScreenUtils.show(this.container);
-          this.render();
-    },
+  async mount() {
+    this.container = document.getElementById("account");
+    this.hasBackDestination = Router.stack.length > 0;
+    this.textDialog = null;
+    this.pendingEmail = "";
+    this.errorMessage = "";
+    ScreenUtils.show(this.container);
+    this.render();
+    this.onClickBound = this.onClick.bind(this);
+    this.container.addEventListener("click", this.onClickBound);
+  },
 
-    render() {
-          this.container.innerHTML = `
+  render() {
+    this.container.innerHTML = `
                 <div class="auth-simple-shell">
                         <div class="auth-simple-hero">
                                   <h2 class="auth-simple-title">${I18n.t("auth.signIn.title")}</h2>
@@ -32,16 +34,18 @@ export const AuthSignInScreen = {
                                                             <div class="auth-simple-actions">
                                                                       <div class="auth-simple-card focusable" data-action="signIn">${I18n.t("auth.signIn.openQrLogin")}</div>
                                                                                 ${
-                                                                                              this.hasBackDestination
-                                                                                                ? `<div class="auth-simple-card focusable" data-action="back">${I18n.t("auth.signIn.back")}</div>`
-                                                                                                : ""
+                                                                                  this
+                                                                                    .hasBackDestination
+                                                                                    ? `<div class="auth-simple-card focusable" data-action="back">${I18n.t("auth.signIn.back")}</div>`
+                                                                                    : ""
                                                                                 }
                                                                                         </div>
                                                                                                 ${this.errorMessage ? `<p class="auth-simple-subtitle" style="color:#ff6b6b;">${escapeHtml(this.errorMessage)}</p>` : ""}
                                                                                                       </div>
                                                                                                             ${
-                                                                                                                      this.textDialog
-                                                                                                                        ? `
+                                                                                                              this
+                                                                                                                .textDialog
+                                                                                                                ? `
                                                                                                                                 <div class="settings-dialog-backdrop">
                                                                                                                                           <div class="settings-dialog settings-text-dialog">
                                                                                                                                                       <div class="settings-dialog-title">${escapeHtml(this.textDialog.title || "")}</div>
@@ -63,133 +67,160 @@ export const AuthSignInScreen = {
                                                                                                                                                                                                                                                                                                                                                                                                               </div>
                                                                                                                                                                                                                                                                                                                                                                                                                       </div>
                                                                                                                                                                                                                                                                                                                                                                                                                             `
-                                                                                                                        : ""
-                                                                                                              }
+                                                                                                                : ""
+                                                                                                            }
                                                                                                                   `;
 
-          ScreenUtils.indexFocusables(this.container);
-          if (this.textDialog) {
-                  const input = this.container.querySelector("[data-action='textInput']");
-                  input?.focus?.();
-                  input?.classList?.add("focused");
-          } else {
-                  ScreenUtils.setInitialFocus(this.container);
-          }
-    },
-
-    openEmailDialog() {
-          this.errorMessage = "";
-          this.textDialog = {
-                  step: "email",
-                  title: I18n.t("auth.signIn.emailPrompt"),
-                  value: this.pendingEmail || "",
-                  type: "text"
-          };
-          this.render();
-    },
-
-    openPasswordDialog(email) {
-          this.pendingEmail = String(email || "").trim();
-          this.textDialog = {
-                  step: "password",
-                  title: I18n.t("auth.signIn.passwordPrompt"),
-                  value: "",
-                  type: "password"
-          };
-          this.render();
-    },
-
-    async submitTextDialog() {
-          const input = this.container.querySelector("[data-action='textInput']");
-          const value = String(input?.value || "");
-          if (this.textDialog?.step === "email") {
-                  if (value.trim()) {
-                            this.openPasswordDialog(value);
-                  }
-                  return;
-          }
-          if (this.textDialog?.step === "password") {
-                  const email = String(this.pendingEmail || "").trim();
-                  const password = value;
-                  this.textDialog = null;
-                  this.pendingEmail = "";
-                  this.render();
-                  if (email && password) {
-                            try {
-                                        await AuthManager.signInWithEmail(email, password);
-                                        Router.navigate("profileSelection");
-                            } catch (error) {
-                                        console.error("SignIn failed", error);
-                                        this.errorMessage = I18n.t("auth.signIn.failed", {}, { fallback: "Sign in failed. Check your email and password." });
-                                        this.render();
-                            }
-                  }
-          }
-    },
-
-    async onKeyDown(event) {
-          if (this.textDialog) {
-                  if (event.keyCode === 27 || event.keyCode === 461) {
-                            this.textDialog = null;
-                            this.pendingEmail = "";
-                            this.render();
-                            return;
-                  }
-                  if (ScreenUtils.handleDpadNavigation(event, this.container)) {
-                            return;
-                  }
-                  if (event.keyCode !== 13) {
-                            return;
-                  }
-                  const current = this.container.querySelector(".focusable.focused");
-                  const action = current?.dataset?.action || "";
-                  if (action === "cancelText") {
-                            this.textDialog = null;
-                            this.pendingEmail = "";
-                            this.render();
-                            return;
-                  }
-                  if (action === "saveText" || action === "textInput") {
-                            await this.submitTextDialog();
-                  }
-                  return;
-          }
-
-          if (ScreenUtils.handleDpadNavigation(event, this.container)) {
-                  return;
-          }
-          if (event.keyCode !== 13) {
-                  return;
-          }
-
-          const current = this.container.querySelector(".focusable.focused");
-          if (!current) {
-                  return;
-          }
-          const action = current.dataset.action;
-          if (action === "signIn") {
-                  this.openEmailDialog();
-                  return;
-          }
-          if (action === "back") {
-                  Router.back();
-          }
-    },
-
-    consumeBackRequest() {
-          if (this.textDialog) {
-                  this.textDialog = null;
-                  this.pendingEmail = "";
-                  this.render();
-                  return true;
-          }
-          return false;
-    },
-
-    cleanup() {
-          this.textDialog = null;
-          this.pendingEmail = "";
-          ScreenUtils.hide(this.container);
+    ScreenUtils.indexFocusables(this.container);
+    if (this.textDialog) {
+      const input = this.container.querySelector("[data-action='textInput']");
+      input?.focus?.();
+      input?.classList?.add("focused");
+    } else {
+      ScreenUtils.setInitialFocus(this.container);
     }
-};
+  },
 
+  openEmailDialog() {
+    this.errorMessage = "";
+    this.textDialog = {
+      step: "email",
+      title: I18n.t("auth.signIn.emailPrompt"),
+      value: this.pendingEmail || "",
+      type: "text"
+    };
+    this.render();
+  },
+
+  openPasswordDialog(email) {
+    this.pendingEmail = String(email || "").trim();
+    this.textDialog = {
+      step: "password",
+      title: I18n.t("auth.signIn.passwordPrompt"),
+      value: "",
+      type: "password"
+    };
+    this.render();
+  },
+
+  async submitTextDialog() {
+    const input = this.container.querySelector("[data-action='textInput']");
+    const value = String(input?.value || "");
+    if (this.textDialog?.step === "email") {
+      if (value.trim()) {
+        this.openPasswordDialog(value);
+      }
+      return;
+    }
+    if (this.textDialog?.step === "password") {
+      const email = String(this.pendingEmail || "").trim();
+      const password = value;
+      this.textDialog = null;
+      this.pendingEmail = "";
+      this.render();
+      if (email && password) {
+        try {
+          await AuthManager.signInWithEmail(email, password);
+          Router.navigate("profileSelection");
+        } catch (error) {
+          console.error("SignIn failed", error);
+          this.errorMessage = I18n.t(
+            "auth.signIn.failed",
+            {},
+            { fallback: "Sign in failed. Check your email and password." }
+          );
+          this.render();
+        }
+      }
+    }
+  },
+
+  async onClick(event) {
+    const node = event.target.closest("[data-action]");
+    if (!node) return;
+    const action = node.dataset.action;
+    if (action === "signIn") {
+      this.openEmailDialog();
+      return;
+    }
+    if (action === "back") {
+      Router.back();
+      return;
+    }
+    if (action === "cancelText") {
+      this.textDialog = null;
+      this.pendingEmail = "";
+      this.render();
+      return;
+    }
+    if (action === "saveText") {
+      await this.submitTextDialog();
+    }
+  },
+
+  async onKeyDown(event) {
+    if (this.textDialog) {
+      if (event.keyCode === 27 || event.keyCode === 461) {
+        this.textDialog = null;
+        this.pendingEmail = "";
+        this.render();
+        return;
+      }
+      if (ScreenUtils.handleDpadNavigation(event, this.container)) {
+        return;
+      }
+      if (event.keyCode !== 13) {
+        return;
+      }
+      const current = this.container.querySelector(".focusable.focused");
+      const action = current?.dataset?.action || "";
+      if (action === "cancelText") {
+        this.textDialog = null;
+        this.pendingEmail = "";
+        this.render();
+        return;
+      }
+      if (action === "saveText" || action === "textInput") {
+        await this.submitTextDialog();
+      }
+      return;
+    }
+
+    if (ScreenUtils.handleDpadNavigation(event, this.container)) {
+      return;
+    }
+    if (event.keyCode !== 13) {
+      return;
+    }
+
+    const current = this.container.querySelector(".focusable.focused");
+    if (!current) {
+      return;
+    }
+    const action = current.dataset.action;
+    if (action === "signIn") {
+      this.openEmailDialog();
+      return;
+    }
+    if (action === "back") {
+      Router.back();
+    }
+  },
+
+  consumeBackRequest() {
+    if (this.textDialog) {
+      this.textDialog = null;
+      this.pendingEmail = "";
+      this.render();
+      return true;
+    }
+    return false;
+  },
+
+  cleanup() {
+    this.textDialog = null;
+    this.pendingEmail = "";
+    this.container?.removeEventListener("click", this.onClickBound);
+    ScreenUtils.hide(this.container);
+  }
+};
