@@ -50,6 +50,45 @@
   --tv-title-text: clamp(42px, 2.9vw, 60px);
 }
 
+/* Phone-oriented layout tokens. Mirrors the --tv-* token structure above (same names, "tv"
+   swapped for "phone"), but scaled for a phone-portrait canvas instead of the TV's 1920x1080 one.
+   This is shared Wave 2 infrastructure only — nothing in the app consumes these tokens yet; each
+   screen's responsive-reflow ticket opts in individually.
+
+   Single documented breakpoint: max-width 600px. Covers phones in portrait, including large
+   ones, while excluding small tablets. Every screen's Wave 2 reflow work should key off this same
+   max-width so the phone breakpoint stays consistent app-wide. */
+@media (max-width: 600px) {
+  :root {
+    --phone-safe-gutter: 16px;
+    --phone-safe-gutter: clamp(12px, 4vw, 20px);
+    --phone-safe-gutter-wide: 20px;
+    --phone-safe-gutter-wide: clamp(16px, 5vw, 24px);
+    --phone-card-radius: 12px;
+    --phone-card-radius: clamp(10px, 3vw, 14px);
+    --phone-card-gap: 10px;
+    --phone-card-gap: clamp(8px, 2.5vw, 12px);
+    --phone-button-height: 48px;
+    --phone-button-height: clamp(44px, 11vw, 52px);
+    --phone-button-padding-x: 16px;
+    --phone-button-padding-x: clamp(14px, 4vw, 20px);
+    --phone-control-size: 44px;
+    --phone-control-size: clamp(40px, 10vw, 48px);
+    --phone-control-icon-size: 22px;
+    --phone-control-icon-size: clamp(20px, 5vw, 24px);
+    --phone-caption-text: 12px;
+    --phone-caption-text: clamp(11px, 3vw, 13px);
+    --phone-secondary-text: 14px;
+    --phone-secondary-text: clamp(13px, 3.4vw, 15px);
+    --phone-body-text: 16px;
+    --phone-body-text: clamp(15px, 3.8vw, 17px);
+    --phone-subtitle-text: 20px;
+    --phone-subtitle-text: clamp(18px, 5vw, 22px);
+    --phone-title-text: 28px;
+    --phone-title-text: clamp(24px, 7vw, 32px);
+  }
+}
+
 html,
 body {
   width: 100%;
