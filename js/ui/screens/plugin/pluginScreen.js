@@ -29,6 +29,12 @@ const PHONE_MANAGER_URL = "https://nuvio.tv/account?tab=addons";
 const ADDONS_ROUTE_ENTER_DURATION_MS = 350;
 
 async function getPhoneManagerUrl() {
+  if (typeof window !== "undefined" && window.location) {
+    const protocol = String(window.location.protocol || "");
+    if (protocol === "http:" || protocol === "https:") {
+      return `${window.location.origin}/?addonsRemote=1`;
+    }
+  }
   return PHONE_MANAGER_URL;
 }
 
