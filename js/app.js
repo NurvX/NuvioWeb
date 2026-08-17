@@ -457,43 +457,12 @@ async function bootstrapApp() {
       StartupSyncService.stop();
       ProviderCredentialSyncService.cancelForegroundPull();
       hasSelectedProfileThisSession = false;
-      const shouldBypassQr = Boolean(LocalStore.get(GUEST_QR_BYPASS_KEY, false));
-      if (isSignedOutRouteAllowed()) {
-        return;
-      }
-      if (shouldBypassQr) {
-        // Honor "remember last profile" for guests too: skip the picker and go
-        // straight in with the last profile (guests have no PIN).
-        if (
-          ProfileManager.isRememberLastProfileEnabled() &&
-          ProfileManager.hasEverSelectedProfile()
-        ) {
-          enterWithLastProfile({ restoreWebOsRoute: true }).catch((error) => {
-            console.warn("Failed to enter with last profile", error);
-            ProfileManager.clearActiveProfile();
-            if (Router.getCurrent() !== "profileSelection") {
-              Router.navigate(
-                "profileSelection",
-                {},
-                { replaceHistory: true, skipStackPush: true }
-              );
+  // Guest/anonymous access has been disabled: signed-out users must sign in
+            // via the QR flow with the owner account. No bypass is honored anymore.
+            LocalStore.remove(GUEST_QR_BYPASS_KEY);
+            if (isSignedOutRouteAllowed()) {
+                      return;
             }
-          });
-          return;
-        }
-        ProfileManager.clearActiveProfile();
-        if (Router.getCurrent() !== "profileSelection") {
-          Router.navigate(
-            "profileSelection",
-            {},
-            {
-              replaceHistory: true,
-              skipStackPush: true
-            }
-          );
-        }
-        return;
-      }
       const hasSeenQr = LocalStore.get("hasSeenAuthQrOnFirstLaunch");
       Router.navigate("authQrSignIn", {
         onboardingMode: !hasSeenQr
