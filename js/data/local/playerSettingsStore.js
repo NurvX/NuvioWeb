@@ -63,8 +63,24 @@ const DEFAULTS = {
   streamAutoPlayReuseBingeGroup: true,
   streamReuseLastLinkEnabled: false,
   streamReuseLastLinkCacheHours: 24,
-  streamAutoPlayTimeoutSeconds: 3
+  streamAutoPlayTimeoutSeconds: 3,
+  // Phone-browser deep-link handoff. "disabled" keeps playback in-app; any
+  // other value routes playStream() to that app instead. Only meaningful on
+  // Environment.isBrowser() + a detected mobile OS — see externalPlayerLinks.js.
+  externalPlayerType: "disabled"
 };
+
+const EXTERNAL_PLAYER_TYPES = [
+  "disabled",
+  "choose",
+  "vlc",
+  "mxplayer",
+  "justplayer",
+  "outplayer",
+  "infuse",
+  "vidhub",
+  "m3u"
+];
 
 const STREAM_AUTO_PLAY_MODES = ["MANUAL", "FIRST_STREAM", "REGEX_MATCH"];
 const STREAM_AUTO_PLAY_SOURCES = ["ALL_SOURCES", "INSTALLED_ADDONS_ONLY", "ENABLED_PLUGINS_ONLY"];
@@ -133,6 +149,13 @@ function normalizeReuseLastLinkCacheHours(value) {
     return DEFAULTS.streamReuseLastLinkCacheHours;
   }
   return Math.min(168, Math.max(1, hours));
+}
+
+function normalizeExternalPlayerType(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  return EXTERNAL_PLAYER_TYPES.includes(normalized) ? normalized : DEFAULTS.externalPlayerType;
 }
 
 function normalizeNextEpisodeThresholdMode(value) {
@@ -256,13 +279,27 @@ export function normalizePlayerSettings(settings = {}) {
     ...DEFAULTS,
     ...persistentSettings,
     trailerAutoplay: persistentSettings.trailerAutoplay ?? DEFAULTS.trailerAutoplay,
-    trailerDelaySeconds: Math.min(15, Math.max(0, Math.trunc(Number(persistentSettings.trailerDelaySeconds ?? 7)) || 0)),
+    trailerDelaySeconds: Math.min(
+      15,
+      Math.max(0, Math.trunc(Number(persistentSettings.trailerDelaySeconds ?? 7)) || 0)
+    ),
     loadingOverlayEnabled: persistentSettings.loadingOverlayEnabled !== false,
     showPlayerLoadingStatus: persistentSettings.showPlayerLoadingStatus !== false,
     pauseOverlayEnabled: persistentSettings.pauseOverlayEnabled !== false,
     parentalGuideEnabled: persistentSettings.parentalGuideEnabled !== false,
-    autoSkipSegmentTypes: [...new Set((Array.isArray(persistentSettings.autoSkipSegmentTypes) ? persistentSettings.autoSkipSegmentTypes : []).map((entry) => String(entry).toLowerCase()).filter((entry) => ["intro", "recap", "outro"].includes(entry)))],
-    addonSubtitleStartupMode: ["FAST_STARTUP", "PREFERRED_ONLY", "ALL_SUBTITLES"].includes(String(persistentSettings.addonSubtitleStartupMode || "").toUpperCase())
+    autoSkipSegmentTypes: [
+      ...new Set(
+        (Array.isArray(persistentSettings.autoSkipSegmentTypes)
+          ? persistentSettings.autoSkipSegmentTypes
+          : []
+        )
+          .map((entry) => String(entry).toLowerCase())
+          .filter((entry) => ["intro", "recap", "outro"].includes(entry))
+      )
+    ],
+    addonSubtitleStartupMode: ["FAST_STARTUP", "PREFERRED_ONLY", "ALL_SUBTITLES"].includes(
+      String(persistentSettings.addonSubtitleStartupMode || "").toUpperCase()
+    )
       ? String(persistentSettings.addonSubtitleStartupMode).toUpperCase()
       : "ALL_SUBTITLES",
     addonSubtitleStartupModeAutoPreferred: Boolean(
@@ -297,6 +334,7 @@ export function normalizePlayerSettings(settings = {}) {
     streamAutoPlayTimeoutSeconds: normalizeStreamAutoPlayTimeout(
       persistentSettings.streamAutoPlayTimeoutSeconds
     ),
+    externalPlayerType: normalizeExternalPlayerType(persistentSettings.externalPlayerType),
     nextEpisodeThresholdMode: normalizeNextEpisodeThresholdMode(
       persistentSettings.nextEpisodeThresholdMode ?? DEFAULTS.nextEpisodeThresholdMode
     ),
@@ -317,9 +355,7 @@ export function normalizePlayerSettings(settings = {}) {
     stillWatchingEpisodeThreshold: normalizeStillWatchingThreshold(
       settings.stillWatchingEpisodeThreshold ?? DEFAULTS.stillWatchingEpisodeThreshold
     ),
-    osdClockEnabled: Boolean(
-      persistentSettings.osdClockEnabled ?? DEFAULTS.osdClockEnabled
-    ),
+    osdClockEnabled: Boolean(persistentSettings.osdClockEnabled ?? DEFAULTS.osdClockEnabled),
     subtitlesEnabled: true,
     secondaryPreferredAudioLanguage: (() => {
       const normalized = String(

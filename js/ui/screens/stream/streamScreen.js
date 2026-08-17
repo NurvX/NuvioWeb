@@ -13,6 +13,12 @@ import {
 import { buildStreamResumeIdentity } from "../../../core/streams/streamResumeIdentity.js";
 import { DirectDebridResolver } from "../../../core/debrid/directDebridResolver.js";
 import {
+  DISABLED_PLAYER_ID,
+  isExternalPlayerSelectable,
+  buildExternalPlayerLink,
+  buildMagnetFallback
+} from "../../../core/player/externalPlayerLinks.js";
+import {
   DirectDebridStreamPreparer,
   directDebridPreparationKey
 } from "../../../core/debrid/directDebridStreamPreparer.js";
@@ -2489,12 +2495,92 @@ export const StreamScreen = {
       });
   },
 
+  // Hands playback off to another app on this phone instead of the in-app
+  // player, when the profile has an external player configured. Returns
+  // true when it handled playback (caller should not also navigate to the
+  // in-app player screen).
+  async tryOpenInExternalPlayer(stream = {}) {
+    const mobileOs = Environment.getMobileOs();
+    if (!Environment.isBrowser() || mobileOs === "other") {
+      return false;
+    }
+    const playerType = PlayerSettingsStore.get().externalPlayerType;
+    if (
+      !playerType ||
+      playerType === DISABLED_PLAYER_ID ||
+      !isExternalPlayerSelectable(playerType, mobileOs)
+    ) {
+      return false;
+    }
+
+    const magnetFallback = buildMagnetFallback(stream);
+    const requestHeaders = this.getStreamRequestHeaders(stream);
+    if (Object.keys(requestHeaders).length) {
+      // No deep-link scheme can carry custom request headers, so a stream
+      // that needs them can't be handed off — same rule the (currently
+      // unused) webOS native-player path already applies.
+      if (magnetFallback) {
+        this.launchExternalPlayerHref(magnetFallback);
+        return true;
+      }
+      return false;
+    }
+
+    let streamUrl = stream?.url || stream?.externalUrl || "";
+    if (
+      !streamUrl &&
+      DirectDebridResolver.canResolveStream(stream, {
+        season: this.params?.season ?? null,
+        episode: this.params?.episode ?? null
+      })
+    ) {
+      const result = await DirectDebridResolver.resolve(stream, {
+        season: this.params?.season ?? null,
+        episode: this.params?.episode ?? null
+      }).catch(() => null);
+      if (result?.status === "success" && result.stream) {
+        streamUrl = result.stream.url || result.stream.externalUrl || "";
+      }
+    }
+
+    if (!streamUrl) {
+      if (magnetFallback) {
+        this.launchExternalPlayerHref(magnetFallback);
+        return true;
+      }
+      return false;
+    }
+
+    const link = buildExternalPlayerLink({ playerId: playerType, mobileOs, streamUrl });
+    if (!link) {
+      return false;
+    }
+    this.launchExternalPlayerHref(link.href, link.download);
+    return true;
+  },
+
+  launchExternalPlayerHref(href, download = null) {
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.rel = "noopener";
+    if (download) {
+      anchor.download = download;
+    }
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    this.showStreamToast(t("player_external_player_opened", {}, "Opened in external player"));
+  },
+
   async playStream(streamId) {
     this.cancelAutoPlayCountdown();
     this.cancelAutoPlaySelectionWait();
     const filtered = this.getFilteredStreams();
     const selected = filtered.find((stream) => stream.id === streamId) || filtered[0];
     if (!selected) {
+      return;
+    }
+    if (await this.tryOpenInExternalPlayer(selected)) {
       return;
     }
     const playerStreamCandidates = this.getFilteredStreams();

@@ -46,7 +46,9 @@ import { ProfileManager } from "../../../core/profile/profileManager.js";
 import { AuthManager } from "../../../core/auth/authManager.js";
 import { SupabaseApi } from "../../../data/remote/supabase/supabaseApi.js";
 import { Platform } from "../../../platform/index.js";
+import { Environment } from "../../../platform/environment.js";
 import { isFastHorizontalNavigationEnabled } from "../../../platform/sharedKeys.js";
+import { getExternalPlayerOptionsForMobileOs } from "../../../core/player/externalPlayerLinks.js";
 import { CW_DISPLAY_SNAPSHOT_KEY, CW_ENRICHMENT_CACHE_KEY } from "../home/homeConstants.js";
 import { I18n } from "../../../i18n/index.js";
 import { PluginManager } from "../../../core/player/pluginManager.js";
@@ -3290,6 +3292,25 @@ export const SettingsScreen = {
       LocalStore.remove(CW_DISPLAY_SNAPSHOT_KEY);
       this.advancedCacheCleared = true;
     });
+    const mobileOs = Environment.getMobileOs();
+    const showExternalPlayer = Environment.isBrowser() && mobileOs !== "other";
+    const externalPlayerOptions = showExternalPlayer
+      ? getExternalPlayerOptionsForMobileOs(mobileOs)
+      : [];
+    const selectedExternalPlayerOption = externalPlayerOptions.find(
+      (option) => option.id === PlayerSettingsStore.get().externalPlayerType
+    );
+    this.actionMap.set("advanced:externalPlayer", () => {
+      this.openOptionDialog({
+        title: t("advanced_external_player_dialog_title", {}, "Open Streams In"),
+        options: externalPlayerOptions,
+        selectedId: PlayerSettingsStore.get().externalPlayerType,
+        returnFocusKey: "advanced:externalPlayer",
+        onSelect: (option) => {
+          PlayerSettingsStore.set({ externalPlayerType: option.id });
+        }
+      });
+    });
 
     if (isEssential) {
       return `
@@ -3363,6 +3384,32 @@ export const SettingsScreen = {
           })}
         </div>
       </div>
+      ${
+        showExternalPlayer
+          ? `
+      <div class="settings-group-heading">
+        <div class="settings-group-title">${escapeHtml(t("advanced_section_external_player", {}, "External Player"))}</div>
+      </div>
+      <div class="settings-group-card">
+        <div class="settings-stack">
+          ${this.renderActionRow({
+            focusKey: "advanced:externalPlayer",
+            title: t("advanced_external_player", {}, "Open Streams In"),
+            subtitle: t(
+              "advanced_external_player_subtitle",
+              {},
+              "Hand playback off to another app installed on this phone instead of the built-in player."
+            ),
+            value: t(
+              selectedExternalPlayerOption?.labelKey || "external_player_disabled",
+              {},
+              selectedExternalPlayerOption?.label || "Disabled (play in app)"
+            )
+          })}
+        </div>
+      </div>`
+          : ""
+      }
     `;
   },
 
