@@ -1679,8 +1679,8 @@
     <string name="account_generate_sync_signed_in_desc">Create a code so other devices can sync with this account.</string>
     <string name="account_unknown_device">Unknown Device</string>
     <string name="auth_signin_title">Sign In</string>
-    <string name="auth_signin_tv_disabled">Email/password entry on TV is disabled. Continue with QR sign in.</string>
-    <string name="auth_signin_qr_btn">Continue with QR</string>
+    <string name="auth_signin_tv_disabled">Sign in with your email and password to continue.</string>
+    <string name="auth_signin_qr_btn">Sign In</string>
     <string name="auth_qr_title">Sign In With QR</string>
     <string name="auth_qr_account_login">Account Login</string>
     <string name="auth_qr_finishing">Finishing sign in\u2026</string>
