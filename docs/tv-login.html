@@ -1,0 +1,314 @@
+<!doctype html>
+  <html lang="en">
+  <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Approve TV Sign-In · Nuvio</title>
+  <script src="/nuvio.env.js"></script>
+  <style>
+  :root {
+  color-scheme: dark;
+--bg: #0d0d0d;
+--card: #1a1a1a;
+--field: #222;
+--text: #f5f5f5;
+  --muted: #a3a3a3;
+  --accent: #ffffff;
+  --error: #ff6b6b;
+  --success: #4ade80;
+}
+* {
+box-sizing: border-box;
+}
+body {
+  margin: 0;
+min-height: 100vh;
+display: flex;
+align-items: center;
+justify-content: center;
+background: var(--bg);
+color: var(--text);
+font-family:
+-apple-system,
+  BlinkMacSystemFont,
+  "Segoe UI",
+  Roboto,
+  sans-serif;
+padding: 24px;
+}
+.card {
+  width: 100%;
+max-width: 380px;
+background: var(--card);
+border-radius: 16px;
+padding: 28px 24px;
+text-align: center;
+}
+h1 {
+  font-size: 22px;
+margin: 0 0 6px;
+}
+p.sub {
+color: var(--muted);
+font-size: 14px;
+margin: 0 0 24px;
+}
+.code {
+  display: inline-block;
+background: var(--field);
+border-radius: 8px;
+padding: 6px 14px;
+font-weight: 600;
+letter-spacing: 2px;
+margin-bottom: 20px;
+}
+.tabs {
+  display: flex;
+gap: 8px;
+margin-bottom: 18px;
+background: var(--field);
+border-radius: 10px;
+padding: 4px;
+}
+.tab {
+  flex: 1;
+padding: 8px 0;
+border: none;
+background: transparent;
+color: var(--muted);
+border-radius: 8px;
+font-size: 14px;
+cursor: pointer;
+}
+.tab.active {
+background: var(--accent);
+color: #111;
+font-weight: 600;
+}
+input {
+  width: 100%;
+padding: 12px 14px;
+margin-bottom: 12px;
+border-radius: 8px;
+border: 1px solid #333;
+background: var(--field);
+color: var(--text);
+font-size: 15px;
+}
+input:focus {
+  outline: 1px solid var(--accent);
+}
+button.submit {
+width: 100%;
+padding: 13px 0;
+border-radius: 999px;
+border: none;
+background: var(--accent);
+color: #111;
+font-weight: 600;
+font-size: 15px;
+cursor: pointer;
+margin-top: 6px;
+}
+button.submit:disabled {
+  opacity: 0.6;
+cursor: default;
+}
+.msg {
+  margin-top: 16px;
+font-size: 13px;
+min-height: 18px;
+}
+.msg.error {
+color: var(--error);
+}
+.msg.success {
+color: var(--success);
+}
+.success-state h1 {
+  color: var(--success);
+}
+.hidden {
+display: none;
+}
+</style>
+  </head>
+  <body>
+  <div class="card" id="card">
+  <h1 id="title">Approve TV Sign-In</h1>
+  <p class="sub" id="subtitle">Sign in to link this account to your TV.</p>
+  <div id="codeBadge" class="code hidden"></div>
+
+  <div id="formArea">
+  <div class="tabs">
+  <button type="button" class="tab active" id="tabSignIn">Sign In</button>
+  <button type="button" class="tab" id="tabSignUp">Sign Up</button>
+  </div>
+  <form id="authForm">
+  <input type="email" id="email" placeholder="Email" autocomplete="email" required />
+  <input
+  type="password"
+  id="password"
+  placeholder="Password"
+  autocomplete="current-password"
+  required
+  />
+  <button type="submit" class="submit" id="submitBtn">Sign In &amp; Approve</button>
+  </form>
+  </div>
+
+  <div id="msg" class="msg"></div>
+  </div>
+
+  <script>
+  (function () {
+  const env = (window.__NUVIO_ENV__ || {});
+const SUPABASE_URL = String(env.NUVIO_SUPABASE_URL || "").trim();
+const SUPABASE_ANON_KEY = String(env.NUVIO_SUPABASE_ANON_KEY || "").trim();
+
+const card = document.getElementById("card");
+const title = document.getElementById("title");
+const subtitle = document.getElementById("subtitle");
+const codeBadge = document.getElementById("codeBadge");
+const formArea = document.getElementById("formArea");
+const authForm = document.getElementById("authForm");
+const tabSignIn = document.getElementById("tabSignIn");
+const tabSignUp = document.getElementById("tabSignUp");
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const submitBtn = document.getElementById("submitBtn");
+const msg = document.getElementById("msg");
+
+let mode = "signin";
+
+function setMsg(text, kind) {
+  msg.textContent = text || "";
+msg.className = "msg" + (kind ? " " + kind : "");
+}
+
+function setMode(next) {
+  mode = next;
+tabSignIn.classList.toggle("active", mode === "signin");
+tabSignUp.classList.toggle("active", mode === "signup");
+submitBtn.textContent =
+  mode === "signin" ? "Sign In & Approve" : "Sign Up & Approve";
+setMsg("");
+}
+
+tabSignIn.addEventListener("click", () => setMode("signin"));
+tabSignUp.addEventListener("click", () => setMode("signup"));
+
+const params = new URLSearchParams(window.location.search);
+const code = String(params.get("code") || "").trim();
+
+function showSuccess() {
+  formArea.classList.add("hidden");
+card.classList.add("success-state");
+title.textContent = "You're signed in";
+subtitle.textContent = "Go back to your TV — it should sign in automatically.";
+codeBadge.classList.add("hidden");
+setMsg("");
+}
+
+function fatal(text) {
+  formArea.classList.add("hidden");
+title.textContent = "Can't approve sign-in";
+subtitle.textContent = "";
+codeBadge.classList.add("hidden");
+setMsg(text, "error");
+}
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+fatal("This app isn't configured for account sign-in yet.");
+return;
+}
+
+if (!code) {
+fatal("Missing sign-in code. Scan the QR code shown on your TV again.");
+return;
+}
+
+codeBadge.textContent = code;
+codeBadge.classList.remove("hidden");
+
+async function parseError(response) {
+try {
+const data = await response.json();
+return data.msg || data.message || data.error_description || data.error || `HTTP ${response.status}`;
+} catch {
+return `HTTP ${response.status}`;
+}
+}
+
+async function signInOrSignUp(email, password) {
+const endpoint =
+mode === "signin"
+? "/auth/v1/token?grant_type=password"
+: "/auth/v1/signup";
+const response = await fetch(SUPABASE_URL + endpoint, {
+method: "POST",
+  headers: {
+"Content-Type": "application/json",
+  apikey: SUPABASE_ANON_KEY
+  },
+  body: JSON.stringify({ email, password })
+    });
+if (!response.ok) {
+throw new Error(await parseError(response));
+}
+const data = await response.json();
+const accessToken = data.access_token || data?.session?.access_token;
+const refreshToken = data.refresh_token || data?.session?.refresh_token;
+if (!accessToken || !refreshToken) {
+if (mode === "signup") {
+throw new Error("Check your email to confirm your account, then sign in.");
+}
+throw new Error("Sign-in did not return a session.");
+}
+return { accessToken, refreshToken };
+}
+
+async function approveSession(accessToken, refreshToken) {
+const response = await fetch(SUPABASE_URL + "/rest/v1/rpc/approve_tv_login_session", {
+method: "POST",
+headers: {
+"Content-Type": "application/json",
+apikey: SUPABASE_ANON_KEY,
+Authorization: "Bearer " + accessToken
+},
+body: JSON.stringify({
+p_code: code,
+p_access_token: accessToken,
+p_refresh_token: refreshToken
+})
+});
+if (!response.ok) {
+throw new Error(await parseError(response));
+}
+}
+
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+const email = emailInput.value.trim();
+const password = passwordInput.value;
+if (!email || !password) {
+return;
+}
+submitBtn.disabled = true;
+setMsg("Signing in…");
+try {
+const { accessToken, refreshToken } = await signInOrSignUp(email, password);
+setMsg("Approving your TV…");
+await approveSession(accessToken, refreshToken);
+showSuccess();
+} catch (error) {
+setMsg(String(error && error.message ? error.message : error), "error");
+} finally {
+  submitBtn.disabled = false;
+}
+});
+})();
+</script>
+  </body>
+  </html>
+  
