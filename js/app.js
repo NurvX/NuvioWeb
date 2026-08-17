@@ -458,16 +458,14 @@ async function bootstrapApp() {
       ProviderCredentialSyncService.cancelForegroundPull();
       hasSelectedProfileThisSession = false;
   // Guest/anonymous access has been disabled: signed-out users must sign in
-            // via the QR flow with the owner account. No bypass is honored anymore.
+            // with the owner account via the simple email/password screen. No bypass
+            // and no QR code flow anymore.
             LocalStore.remove(GUEST_QR_BYPASS_KEY);
             if (isSignedOutRouteAllowed()) {
                       return;
             }
-      const hasSeenQr = LocalStore.get("hasSeenAuthQrOnFirstLaunch");
-      Router.navigate("authQrSignIn", {
-        onboardingMode: !hasSeenQr
-      });
-    }
+            Router.navigate("authSignIn");
+        }
 
     if (state === AuthState.AUTHENTICATED) {
       markBootStage("Loading profiles");
