@@ -3038,7 +3038,7 @@ export const SettingsScreen = {
   renderAccountSection(model) {
     const signedIn = model.authState === "authenticated";
     const loading = model.authState === "loading";
-    this.actionMap.set("account:signin", () => Router.navigate("authQrSignIn"));
+    this.actionMap.set("account:signin", () => Router.navigate("authSignIn"));
     this.actionMap.set("account:signout", async () => {
       await AuthManager.signOut();
       this.accountSyncOverview = null;
