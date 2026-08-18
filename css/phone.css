@@ -1223,4 +1223,281 @@
     background: var(--phone-accent-secondary);
     color: var(--phone-accent-white-on-secondary, #111111);
   }
+
+  /* Search screen (js/ui/screens/search/searchScreenPhone.js, ticket 03-01): a sticky header
+     (title + rounded search input) inside the same scroll container as the body, so no
+     separate scroll-listener-driven fixed header is needed the way the Detail screen's
+     floating header is — `position: sticky` handles it. Body is either the empty-query
+     Recent Searches + Discover sections, or (query length >= 2) grouped phoneShelf.js result
+     rows / phoneSkeleton.js loading rows / a title+message empty-state card. */
+  .phone-search-scroll {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    background: var(--phone-accent-bg);
+  }
+
+  .phone-search-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-12);
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-screen-h)
+      var(--phone-space-14);
+    background: var(--phone-accent-bg);
+    transition: background-color var(--phone-motion-normal) var(--phone-ease-standard);
+  }
+
+  .phone-search-header.scrolled {
+    background: rgba(20, 20, 22, 0.86);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .phone-search-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-8);
+    background: var(--phone-accent-bg-elevated);
+    border-radius: var(--phone-radius-full);
+    padding: 0 var(--phone-space-14);
+    height: 44px;
+  }
+
+  .phone-search-input-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: var(--phone-text-muted);
+  }
+
+  .phone-search-input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: none;
+    background: none;
+    outline: none;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-lg-size);
+    line-height: var(--phone-type-body-lg-line);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-search-input::placeholder {
+    color: var(--phone-text-muted);
+  }
+
+  .phone-search-clear-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: var(--phone-radius-full);
+    background: rgb(255 255 255 / 0.12);
+    color: var(--phone-text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-search-clear-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .phone-search-input-wrap.has-value .phone-search-clear-btn {
+    display: flex;
+  }
+
+  .phone-search-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-section-gap);
+    padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-96));
+  }
+
+  .phone-search-section-header {
+    padding: 0 var(--phone-space-screen-h);
+  }
+
+  .phone-search-section-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-sm-size);
+    line-height: var(--phone-type-title-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  /* Recent searches — a tappable-row list (tap re-runs the search, trailing icon removes). */
+  .phone-search-recent-list {
+    display: flex;
+    flex-direction: column;
+    padding: var(--phone-space-8) var(--phone-space-screen-h) 0;
+  }
+
+  .phone-search-recent-row {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-12);
+    padding: var(--phone-space-10) 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-search-recent-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: var(--phone-text-muted);
+  }
+
+  .phone-search-recent-term {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: left;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-lg-size);
+    line-height: var(--phone-type-body-lg-line);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-search-recent-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: var(--phone-radius-full);
+    background: none;
+    color: var(--phone-text-muted);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-search-recent-remove svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Discover — horizontally-scrolling filter chips, then a responsive infinite-scroll poster
+     grid built from bare posterCard.js instances (not phoneShelf.js — this is a wrapping grid,
+     not a single-row shelf). */
+  .phone-search-filter-row {
+    display: flex;
+    gap: var(--phone-space-8);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: var(--phone-space-8) var(--phone-space-screen-h) 0;
+    scrollbar-width: none;
+  }
+
+  .phone-search-filter-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .phone-search-filter-chip {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: var(--phone-space-6);
+    background: var(--phone-accent-bg-elevated);
+    border: none;
+    border-radius: var(--phone-radius-full);
+    padding: var(--phone-space-8) var(--phone-space-14);
+    font-family: var(--phone-font-family);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-search-filter-chip-label {
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+    font-weight: var(--phone-font-weight-regular);
+    color: var(--phone-text-muted);
+  }
+
+  .phone-search-filter-chip-value {
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-search-filter-chip-caret {
+    width: 14px;
+    height: 14px;
+    color: var(--phone-text-muted);
+  }
+
+  .phone-search-discover-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: var(--phone-space-12) var(--phone-space-10);
+    padding: var(--phone-space-12) var(--phone-space-screen-h) 0;
+  }
+
+  .phone-search-discover-grid .phone-poster {
+    width: 100%;
+  }
+
+  /* Results shelves (typed-query state) — a plain vertical stack of phoneShelf.js rows. */
+  .phone-search-results-shelves {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-section-gap);
+    padding-top: var(--phone-space-8);
+  }
+
+  /* Shared title+message empty/error/offline state card, used by both the typed-query results
+     area and the Discover section. */
+  .phone-search-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--phone-space-8);
+    padding: var(--phone-space-40) var(--phone-space-screen-h);
+  }
+
+  .phone-search-empty-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-sm-size);
+    line-height: var(--phone-type-title-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-search-empty-message {
+    margin: 0;
+    max-width: 280px;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+  }
 }
