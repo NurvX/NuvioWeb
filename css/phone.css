@@ -341,4 +341,85 @@
     font-weight: var(--phone-font-weight-regular);
     color: var(--phone-text-muted);
   }
+
+  /* Shelf/row (js/ui/components/phoneShelf.js) — a section title + optional "view all"
+     chevron pill, then a horizontally-scrolling row of posterCard.js instances. Reused
+     verbatim by Home catalog/collection rows, Detail related-content rows, Library
+     horizontal mode, and Folder rows-mode (see ticket 00-05). Scrolling is native browser
+     scroll — no custom snap/virtualization, and no port of the TV home screen's
+     manual-transform row positioning. */
+  .phone-shelf {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-12);
+  }
+
+  .phone-shelf-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--phone-space-12);
+    padding: 0 var(--phone-space-screen-h);
+  }
+
+  .phone-shelf-title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-shelf-view-all {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: var(--phone-space-4);
+    background: var(--phone-accent-bg-elevated);
+    border: none;
+    border-radius: var(--phone-radius-full);
+    padding: var(--phone-space-6) var(--phone-space-12);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-shelf-view-all-chevron {
+    width: 14px;
+    height: 14px;
+  }
+
+  .phone-shelf-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--phone-space-10);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 var(--phone-space-screen-h) var(--phone-space-4);
+    scrollbar-width: none;
+  }
+
+  .phone-shelf-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .phone-shelf-row > .phone-poster {
+    flex: 0 0 auto;
+  }
+
+  /* Continue-watching-style variant: larger landscape cards instead of the standard
+     126px-wide portrait poster. */
+  .phone-shelf-continuous .phone-shelf-row > .phone-poster {
+    width: 220px;
+  }
 }
