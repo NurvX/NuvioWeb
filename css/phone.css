@@ -422,4 +422,45 @@
   .phone-shelf-continuous .phone-shelf-row > .phone-poster {
     width: 220px;
   }
+
+  /* Skeleton/shimmer loading placeholders (js/ui/components/phoneSkeleton.js), ported from
+     NuvioMobile's shimmer loading system. `.phone-skeleton` is a flat base fill; the shimmer
+     sweep itself is a `::after` pseudo-element so every skeleton shape (block, poster card,
+     shelf row) gets the same continuously-looping animated gradient without each helper
+     needing to duplicate it. */
+  .phone-skeleton {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    background: var(--phone-accent-bg-elevated);
+  }
+
+  .phone-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0) 0%,
+      rgb(255 255 255 / 0.06) 20%,
+      rgb(255 255 255 / 0.1) 50%,
+      rgb(255 255 255 / 0.06) 80%,
+      rgb(255 255 255 / 0) 100%
+    );
+    animation: phone-skeleton-shimmer 1.6s linear infinite;
+  }
+
+  @keyframes phone-skeleton-shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .phone-skeleton-poster .phone-poster-card {
+    background: var(--phone-accent-bg-elevated);
+  }
 }
