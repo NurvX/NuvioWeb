@@ -2297,4 +2297,493 @@
     flex-direction: column;
     gap: var(--phone-space-section-gap);
   }
+
+  /* Streams (source picker) screen (js/ui/screens/stream/streamScreenPhone.js, ticket 04-01):
+     a full-bleed blurred/dimmed backdrop of the item's artwork behind a scrollable panel —
+     hero block, an optional "Resume from…" pill, a horizontally-scrolling filter-chip row
+     (refresh + All + one per addon), then a vertical list grouped by addon (and, when an
+     addon reports more than one distinct `sourceProviderId`, by source within it). Reuses
+     `.stream-route-card-badges`/`.stream-route-stream-badge` (components.css) as-is for badge
+     chips via `streamScreen.js`'s own exported `renderStreamBadges` — only their sizing is
+     rescaled here for phone density, not their color/matching logic. */
+  .phone-stream-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    overflow: hidden;
+    background: var(--phone-accent-bg);
+  }
+
+  .phone-stream-backdrop {
+    position: absolute;
+    inset: 0;
+    background: var(--phone-accent-bg) center center / cover no-repeat;
+    filter: blur(22px);
+    transform: scale(1.1);
+  }
+
+  .phone-stream-backdrop-dim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 0.55) 0%,
+      rgb(0 0 0 / 0.72) 40%,
+      var(--phone-accent-bg) 100%
+    );
+  }
+
+  .phone-stream-scroll {
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .phone-stream-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-12)) var(--phone-space-screen-h)
+      0;
+  }
+
+  .phone-stream-back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: var(--phone-radius-full);
+    background: rgba(255 255 255 / 0.14);
+    color: var(--phone-text-primary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-stream-back-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Hero — episode thumbnail + SxxEyy badge + titles for episodes, or a centered logo/title
+     for movies (`.phone-stream-hero-movie`). */
+  .phone-stream-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--phone-space-8);
+    padding: var(--phone-space-20) var(--phone-space-screen-h) 0;
+  }
+
+  .phone-stream-hero-movie {
+    align-items: center;
+    text-align: center;
+  }
+
+  .phone-stream-hero-thumb,
+  .phone-stream-hero-thumb-empty {
+    width: 100%;
+    max-width: 320px;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--phone-radius-lg);
+    object-fit: cover;
+    background: var(--phone-accent-bg-elevated);
+    box-shadow: 0 12px 30px rgb(0 0 0 / 0.4);
+  }
+
+  .phone-stream-hero-badge {
+    padding: var(--phone-space-4) var(--phone-space-10);
+    border-radius: var(--phone-radius-full);
+    background: rgba(255 255 255 / 0.14);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-stream-hero-logo {
+    max-width: 68%;
+    max-height: 90px;
+    object-fit: contain;
+  }
+
+  .phone-stream-hero-title {
+    margin: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-md-size);
+    line-height: var(--phone-type-title-md-line);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-stream-hero-title.centered {
+    text-align: center;
+  }
+
+  .phone-stream-hero-subtitle,
+  .phone-stream-hero-meta {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
+  /* Optional "Resume from…" pill, shown only when the route carries an in-progress resume
+     position (see `renderResumePill` in streamScreenPhone.js). */
+  .phone-stream-resume-pill {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-8);
+    align-self: flex-start;
+    margin: var(--phone-space-14) var(--phone-space-screen-h) 0;
+    padding: var(--phone-space-8) var(--phone-space-16) var(--phone-space-8) var(--phone-space-12);
+    border: none;
+    border-radius: var(--phone-radius-full);
+    background: var(--phone-accent-secondary);
+    color: var(--phone-accent-white-on-secondary, #111111);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-stream-resume-pill svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Filter chip row — refresh + All + one chip per addon/source, reusing `sourceChips`/
+     `addonFilter` state `streamScreen.js` already tracks. */
+  .phone-stream-chip-row-wrap {
+    margin-top: var(--phone-space-20);
+  }
+
+  .phone-stream-chip-row {
+    display: flex;
+    gap: var(--phone-space-8);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 var(--phone-space-screen-h);
+    scrollbar-width: none;
+  }
+
+  .phone-stream-chip-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .phone-stream-chip {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: var(--phone-space-6);
+    border: none;
+    border-radius: var(--phone-radius-full);
+    padding: var(--phone-space-8) var(--phone-space-16);
+    background: rgba(255 255 255 / 0.1);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-stream-chip.selected {
+    background: var(--phone-accent-secondary);
+    color: var(--phone-accent-white-on-secondary, #111111);
+  }
+
+  .phone-stream-chip.error {
+    color: var(--phone-danger);
+  }
+
+  .phone-stream-chip-refresh {
+    padding: var(--phone-space-8);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-stream-chip-refresh svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .phone-stream-chip-spinner {
+    width: 14px;
+    height: 14px;
+    color: inherit;
+  }
+
+  /* Grouped result list. */
+  .phone-stream-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-section-gap);
+    padding: var(--phone-space-20) 0 calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-40));
+  }
+
+  .phone-stream-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-8);
+    padding: 0 var(--phone-space-screen-h);
+  }
+
+  .phone-stream-group-header {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-8);
+  }
+
+  .phone-stream-group-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: var(--phone-radius-sm);
+    background: rgba(255 255 255 / 0.1);
+    overflow: hidden;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-xs-size);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-stream-group-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .phone-stream-group-name {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .phone-stream-group-spinner-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--phone-text-muted);
+  }
+
+  .phone-stream-group-status {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    color: var(--phone-text-muted);
+  }
+
+  .phone-stream-subgroup-header {
+    margin-top: var(--phone-space-4);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+    color: var(--phone-text-muted);
+  }
+
+  .phone-stream-row {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-12);
+    width: 100%;
+    margin-top: var(--phone-space-8);
+    border: 1px solid transparent;
+    border-radius: var(--phone-radius-card);
+    padding: var(--phone-space-12) var(--phone-space-14);
+    background: var(--phone-accent-bg-elevated);
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-stream-row.selected {
+    border-color: var(--phone-accent-secondary);
+    background: var(--phone-accent-bg-card);
+  }
+
+  .phone-stream-row-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .phone-stream-row-heading {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-stream-row-quality {
+    margin-top: var(--phone-space-4);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-stream-row-line {
+    margin-top: var(--phone-space-4);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-stream-row-line.secondary {
+    color: var(--phone-text-muted);
+  }
+
+  /* Reused TV badge markup (components.css) rescaled to phone density. */
+  .phone-stream-row .stream-route-card-badges {
+    margin: var(--phone-space-8) 0 0;
+    gap: var(--phone-space-4);
+  }
+
+  .phone-stream-row .stream-route-stream-badge {
+    min-height: 22px;
+    padding: 0 var(--phone-space-6);
+    border-radius: var(--phone-radius-xs);
+    font-size: var(--phone-type-label-xs-size);
+  }
+
+  .phone-stream-row .stream-route-stream-badge.image {
+    padding: 2px var(--phone-space-4);
+    min-width: 32px;
+    max-width: 88px;
+  }
+
+  .phone-stream-row .stream-route-stream-badge.image img {
+    max-height: 16px;
+    max-width: 80px;
+  }
+
+  .phone-stream-row-side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    gap: var(--phone-space-4);
+    width: 52px;
+  }
+
+  .phone-stream-row-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--phone-radius-sm);
+    background: rgba(255 255 255 / 0.1);
+    overflow: hidden;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-xs-size);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-stream-row-badge img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .phone-stream-row-addon-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-xs-size);
+    line-height: var(--phone-type-label-xs-line);
+    color: var(--phone-text-muted);
+  }
+
+  /* Loading / empty states. */
+  .phone-stream-full-spinner,
+  .phone-stream-footer-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--phone-space-12);
+    padding: var(--phone-space-40) var(--phone-space-screen-h);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-stream-footer-spinner {
+    padding: var(--phone-space-20) var(--phone-space-screen-h);
+  }
+
+  .phone-stream-full-spinner-icon {
+    width: 36px;
+    height: 36px;
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-stream-footer-spinner-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--phone-text-muted);
+  }
+
+  .phone-stream-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--phone-space-8);
+    padding: var(--phone-space-40) var(--phone-space-screen-h);
+  }
+
+  .phone-stream-empty-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-sm-size);
+    line-height: var(--phone-type-title-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-stream-empty-message {
+    margin: 0;
+    max-width: 280px;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+  }
 }

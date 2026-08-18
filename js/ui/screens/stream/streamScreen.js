@@ -45,6 +45,7 @@ import {
   resolveAddonLogo
 } from "../../../core/media/addonLogoCache.js";
 import { Environment } from "../../../platform/environment.js";
+import { Platform } from "../../../platform/index.js";
 import { WebOsLunaService } from "../../../platform/webos/webosLunaService.js";
 import { I18n } from "../../../i18n/index.js";
 import {
@@ -54,6 +55,12 @@ import {
 } from "../../../core/streams/streamBadgeRules.js";
 import { normalizeMathematicalAlphanumericSymbols } from "../../../core/streams/streamDisplayText.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
+import {
+  renderStreamScreenPhone,
+  mountStreamScreenPhone,
+  cleanupStreamScreenPhone,
+  handlePhoneStreamPointerActivate
+} from "./streamScreenPhone.js";
 
 const STREAM_BADGE_LIMIT = 9;
 // Number of rows on each side of the focused source to keep badge-hydrated.
@@ -406,7 +413,10 @@ function mergeStreamItems(existing = [], incoming = []) {
   return order.map((key) => byKey.get(key));
 }
 
-function getAddonBadgeLabel(name = "") {
+// Exported for js/ui/screens/stream/streamScreenPhone.js (ticket 04-01): the phone streams
+// screen's addon avatar (group header + per-row trailing column) reuses the exact same
+// initials-fallback logic TV's addon logo chip already uses, rather than reimplementing it.
+export function getAddonBadgeLabel(name = "") {
   const cleaned = String(name || "").trim();
   if (!cleaned) {
     return "A";
@@ -466,7 +476,10 @@ async function preloadMatchedStreamBadgeImages(
   await preloadAddonLogoUrls(urls);
 }
 
-function getStreamHeadline(stream = {}) {
+// Exported for js/ui/screens/stream/streamScreenPhone.js (ticket 04-01) — the phone streams
+// screen's row markup reuses this exact headline/quality/description text derivation rather
+// than reimplementing it.
+export function getStreamHeadline(stream = {}) {
   const primary = [stream.name, stream.title, stream.description].find((value) =>
     String(value || "").trim()
   );
@@ -480,7 +493,7 @@ function getStreamHeadline(stream = {}) {
   return displayLine || stream.addonName || "Unknown source";
 }
 
-function getStreamQuality(stream = {}) {
+export function getStreamQuality(stream = {}) {
   const qualityLines = [];
   [stream.name, stream.title, stream.description].forEach((value) => {
     String(value || "")
@@ -509,7 +522,7 @@ function getStreamQuality(stream = {}) {
   );
 }
 
-function getStreamDescriptionLines(stream = {}) {
+export function getStreamDescriptionLines(stream = {}) {
   const displayDescription = String(stream.description || stream.title || "").trim();
   const displayName = String(stream.name || stream.title || stream.description || "").trim();
   if (!displayDescription || displayDescription === displayName) {
@@ -586,7 +599,7 @@ function renderImportedStreamBadgeChips(stream = {}, badges = [], showFileSizeBa
     : "";
 }
 
-function renderStreamBadges(stream = {}, enabled = true, badgeSettings = null) {
+export function renderStreamBadges(stream = {}, enabled = true, badgeSettings = null) {
   if (!enabled) {
     return "";
   }
@@ -627,7 +640,7 @@ function renderStreamBadgeContents(stream = {}, enabled = true, badgeSettings = 
   );
 }
 
-function resolveStreamBadgePlacement(badgeSettings = null) {
+export function resolveStreamBadgePlacement(badgeSettings = null) {
   const placement = String(
     (badgeSettings || StreamBadgeSettingsStore.snapshot()).badgePlacement || "BOTTOM"
   )
@@ -931,6 +944,10 @@ export const StreamScreen = {
 
   async mount(params = {}, navigationContext = {}) {
     this.container = document.getElementById("stream");
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.requestRender());
     ScreenUtils.show(this.container);
     this.params = params || {};
     this.loadToken = (this.loadToken || 0) + 1;
@@ -1950,6 +1967,37 @@ export const StreamScreen = {
     return requestHeaders && typeof requestHeaders === "object" ? { ...requestHeaders } : {};
   },
 
+  // Extracted verbatim from tryOpenInExternalPlayer's body (mobile-parity ticket 04-01) so the
+  // phone streams screen's long-press action menu (streamScreenPhone.js) can resolve a
+  // direct/copyable/downloadable URL for Copy Link / Download without duplicating the
+  // header-check -> stream.url/externalUrl -> DirectDebridResolver fallback chain. No logic
+  // changed from the original inline body other than returning `null` instead of the caller
+  // handling a magnet-fallback branch itself — magnet fallback is a `tryOpenInExternalPlayer`
+  // and `downloadStream`/`copyStreamLink` deep-link concern, not part of "resolve a direct URL".
+  async resolveDirectStreamUrl(stream = {}) {
+    const requestHeaders = this.getStreamRequestHeaders(stream);
+    if (Object.keys(requestHeaders).length) {
+      return null;
+    }
+    let streamUrl = stream?.url || stream?.externalUrl || "";
+    if (
+      !streamUrl &&
+      DirectDebridResolver.canResolveStream(stream, {
+        season: this.params?.season ?? null,
+        episode: this.params?.episode ?? null
+      })
+    ) {
+      const result = await DirectDebridResolver.resolve(stream, {
+        season: this.params?.season ?? null,
+        episode: this.params?.episode ?? null
+      }).catch(() => null);
+      if (result?.status === "success" && result.stream) {
+        streamUrl = result.stream.url || result.stream.externalUrl || "";
+      }
+    }
+    return streamUrl || null;
+  },
+
   resolveStreamMimeType(stream = {}, fallbackUrl = "") {
     const raw = stream?.raw || stream || {};
     const candidates = [
@@ -2159,6 +2207,21 @@ export const StreamScreen = {
     }
   },
 
+  // Phone render path (ticket 04-01, mobile-parity epic) — all markup/interaction logic lives
+  // in js/ui/screens/stream/streamScreenPhone.js; this just hands it the screen instance so it
+  // can read this.streams/this.sourceChips/this.addonFilter/this.params/this.loading/this.error
+  // (already populated by mount()'s/loadStreams()'s existing data flow) and call this screen's
+  // own methods (playStream/playStreamInternal/tryOpenInExternalPlayer/setAddonFilter/
+  // loadStreams/navigateBackFromStream/getFilteredStreams/getOrderedFilterNames/
+  // hasPendingSourceLoads/showStreamToast/launchExternalPlayerHref) directly.
+  renderPhone() {
+    if (!this.container) {
+      return;
+    }
+    this.container.innerHTML = renderStreamScreenPhone(this);
+    mountStreamScreenPhone(this, this.container);
+  },
+
   renderChip(name, selected, status) {
     const chipStatus = String(status || "success");
     const classes = [
@@ -2257,6 +2320,9 @@ export const StreamScreen = {
   },
 
   render() {
+    if (Platform.isPhoneViewport()) {
+      return this.renderPhone();
+    }
     this.cancelScheduledRender();
     // Rebuilt markup means the memoised filtered-stream list may be stale.
     this._filteredStreamsCache = null;
@@ -2514,34 +2580,11 @@ export const StreamScreen = {
     }
 
     const magnetFallback = buildMagnetFallback(stream);
-    const requestHeaders = this.getStreamRequestHeaders(stream);
-    if (Object.keys(requestHeaders).length) {
-      // No deep-link scheme can carry custom request headers, so a stream
-      // that needs them can't be handed off — same rule the (currently
-      // unused) webOS native-player path already applies.
-      if (magnetFallback) {
-        this.launchExternalPlayerHref(magnetFallback);
-        return true;
-      }
-      return false;
-    }
-
-    let streamUrl = stream?.url || stream?.externalUrl || "";
-    if (
-      !streamUrl &&
-      DirectDebridResolver.canResolveStream(stream, {
-        season: this.params?.season ?? null,
-        episode: this.params?.episode ?? null
-      })
-    ) {
-      const result = await DirectDebridResolver.resolve(stream, {
-        season: this.params?.season ?? null,
-        episode: this.params?.episode ?? null
-      }).catch(() => null);
-      if (result?.status === "success" && result.stream) {
-        streamUrl = result.stream.url || result.stream.externalUrl || "";
-      }
-    }
+    // resolveDirectStreamUrl() returns null both when the stream needs custom request headers
+    // (no deep-link scheme can carry those — same rule the (currently unused) webOS
+    // native-player path already applies) and when nothing resolvable was found, so both of
+    // the original two "fall back to magnet, else bail" branches collapse into this one check.
+    const streamUrl = await this.resolveDirectStreamUrl(stream);
 
     if (!streamUrl) {
       if (magnetFallback) {
@@ -2559,7 +2602,11 @@ export const StreamScreen = {
     return true;
   },
 
-  launchExternalPlayerHref(href, download = null) {
+  launchExternalPlayerHref(
+    href,
+    download = null,
+    toastMessage = t("player_external_player_opened", {}, "Opened in external player")
+  ) {
     const anchor = document.createElement("a");
     anchor.href = href;
     anchor.rel = "noopener";
@@ -2569,7 +2616,9 @@ export const StreamScreen = {
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-    this.showStreamToast(t("player_external_player_opened", {}, "Opened in external player"));
+    if (toastMessage) {
+      this.showStreamToast(toastMessage);
+    }
   },
 
   async playStream(streamId) {
@@ -2583,6 +2632,16 @@ export const StreamScreen = {
     if (await this.tryOpenInExternalPlayer(selected)) {
       return;
     }
+    return this.playStreamInternal(selected);
+  },
+
+  // Extracted verbatim from playStream's body (mobile-parity ticket 04-01) so the phone
+  // streams screen's long-press action menu (streamScreenPhone.js) can offer an explicit
+  // "Open in internal player" action that navigates straight to the in-app player for an
+  // already-resolved stream, bypassing the external-player handoff `tryOpenInExternalPlayer`
+  // performs for the normal tap flow. No logic changed from the original inline body; `selected`
+  // is the same already-resolved stream object `playStream` used to pass through unchanged.
+  async playStreamInternal(selected) {
     const playerStreamCandidates = this.getFilteredStreams();
     const itemType = normalizeType(this.params?.itemType);
     const startFromBeginning = Boolean(this.params?.startFromBeginning);
@@ -2698,6 +2757,9 @@ export const StreamScreen = {
   },
 
   onPointerActivate(target) {
+    if (Platform.isPhoneViewport()) {
+      return handlePhoneStreamPointerActivate(this, target);
+    }
     if (!target || !this.container?.contains(target)) {
       return false;
     }
@@ -2879,6 +2941,9 @@ export const StreamScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
+    cleanupStreamScreenPhone(this);
     this.cancelAutoPlayCountdown();
     this.cancelAutoPlaySelectionWait();
     this.loadToken = (this.loadToken || 0) + 1;
