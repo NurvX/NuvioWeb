@@ -1,6 +1,7 @@
 import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { Environment } from "../../../platform/environment.js";
+import { Platform } from "../../../platform/index.js";
 import { addonRepository } from "../../../data/repository/addonRepository.js";
 import { catalogRepository } from "../../../data/repository/catalogRepository.js";
 import { watchedItemsRepository } from "../../../data/repository/watchedItemsRepository.js";
@@ -29,6 +30,12 @@ import {
   renderTitleWatchedBadge
 } from "../../components/watchedTitleBadge.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
+import {
+  renderFolderDetailScreenPhone,
+  mountFolderDetailScreenPhone,
+  cleanupFolderDetailScreenPhone,
+  handleFolderDetailPhonePointerActivate
+} from "./folderDetailScreenPhone.js";
 
 const TMDB_API_URL = "https://api.themoviedb.org/3";
 const TMDB_POSTER_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w342";
@@ -199,7 +206,7 @@ function sourceType(source = {}) {
   return rawType === "tv" ? "series" : rawType;
 }
 
-function buildFolderSourceRows(tabs = []) {
+export function buildFolderSourceRows(tabs = []) {
   return tabs
     .filter((tab) => !tab.isAllTab)
     .map((tab, index) => {
@@ -839,6 +846,10 @@ export const FolderDetailScreen = {
   async mount(params = {}, navigationContext = {}) {
     this.container = document.getElementById("folderDetail");
     ScreenUtils.show(this.container);
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render());
     this.params = params || {};
     this.layoutPrefs = LayoutPreferences.get();
     this.collection =
@@ -1241,6 +1252,9 @@ export const FolderDetailScreen = {
       this.renderFollowLayout();
       return;
     }
+    if (Platform.isPhoneViewport()) {
+      return this.renderPhone();
+    }
     const enterClass = this.folderRouteEnterPending ? " nuvio-route-slide-enter" : "";
     this.folderRouteEnterPending = false;
     const sourceRows =
@@ -1424,6 +1438,21 @@ export const FolderDetailScreen = {
     this.buildNavigationModel();
     this.restoreFocus();
     this.applyHeroToDom();
+  },
+
+  // Phone render path (ticket 03-04, mobile-parity epic) — only reached for the TABBED_GRID /
+  // row-track view modes (see the `render()` guard above); all markup/interaction logic lives
+  // in js/ui/screens/collection/folderDetailScreenPhone.js, this just hands it the screen
+  // instance so it can read this.folder/this.collection/this.tabs/this.sourceTabs/
+  // this.selectedTabIndex/this.viewMode/this.watchedTitleIds/this.layoutPrefs (already
+  // populated by mount()'s/loadTab()'s existing data flow) and call this.loadTab(...) (the TV
+  // screen's own existing async method) directly for TABBED_GRID's infinite scroll.
+  renderPhone() {
+    if (!this.container) {
+      return;
+    }
+    this.container.innerHTML = renderFolderDetailScreenPhone(this);
+    mountFolderDetailScreenPhone(this, this.container);
   },
 
   renderFollowLayout() {
@@ -1904,15 +1933,22 @@ export const FolderDetailScreen = {
   // Scope section). Only the TABBED_GRID / row-track layouts, which use plain
   // native scroll, get touch activation here.
   onPointerFocus(target) {
-    if (this.useHomeFollowLayout) {
+    if (this.useHomeFollowLayout || Platform.isPhoneViewport()) {
       return false;
     }
     return this.focusNode(target);
   },
 
+  // Phone dispatch (ticket 03-04, mobile-parity epic): delegates to
+  // folderDetailScreenPhone.js's own handler, which understands that module's own markup
+  // (data-action via posterCard.js/its own chrome, not the TV `.seeall-card`/
+  // `.folder-detail-tab` dataset convention below).
   onPointerActivate(target) {
     if (this.useHomeFollowLayout) {
       return false;
+    }
+    if (Platform.isPhoneViewport()) {
+      return handleFolderDetailPhonePointerActivate(this, target);
     }
     const actionTarget = target?.closest?.("[data-action]");
     const action = String(actionTarget?.dataset?.action || "");
@@ -1957,6 +1993,9 @@ export const FolderDetailScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
+    cleanupFolderDetailScreenPhone(this);
     if (this.useHomeFollowLayout) {
       HomeScreen.cancelModernCameraFollow.call(this, { stopAnimations: true });
       HomeScreen.stopHeroRotation.call(this);
