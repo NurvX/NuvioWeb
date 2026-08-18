@@ -50,42 +50,202 @@
   --tv-title-text: clamp(42px, 2.9vw, 60px);
 }
 
-/* Phone-oriented layout tokens. Mirrors the --tv-* token structure above (same names, "tv"
-   swapped for "phone"), but scaled for a phone-portrait canvas instead of the TV's 1920x1080 one.
-   This is shared Wave 2 infrastructure only — nothing in the app consumes these tokens yet; each
-   screen's responsive-reflow ticket opts in individually.
+/* Phone-oriented design tokens, ported 1:1 from NuvioMobile's Compose design system
+   (composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/{Tokens,ThemeColors,TypeScale}.kt
+   in https://github.com/NuvioMedia/NuvioMobile) as part of the mobile-parity effort — see
+   .scratch/mobile-parity/spec.md. This is shared infrastructure only; nothing in the app
+   consumes these tokens yet, each screen's phone-rebuild ticket opts in individually.
 
-   Single documented breakpoint: max-width 600px. Covers phones in portrait, including large
-   ones, while excluding small tablets. Every screen's Wave 2 reflow work should key off this same
-   max-width so the phone breakpoint stays consistent app-wide. */
+   Unlike the --tv-* tokens above (clamp()-based, fluid-scaled against a 1920x1080 canvas),
+   these are fixed values — NuvioMobile's dp-based design system doesn't fluidly rescale
+   either, phone viewports don't span the huge size range TVs do, and mapping Compose dp to
+   CSS px 1:1 is the simplest faithful port.
+
+   Single documented breakpoint: max-width 600px, matching the --tv-*-adjacent tokens'
+   sibling block above and every other phone-mode CSS in this codebase. */
 @media (max-width: 600px) {
   :root {
-    --phone-safe-gutter: 16px;
-    --phone-safe-gutter: clamp(12px, 4vw, 20px);
-    --phone-safe-gutter-wide: 20px;
-    --phone-safe-gutter-wide: clamp(16px, 5vw, 24px);
-    --phone-card-radius: 12px;
-    --phone-card-radius: clamp(10px, 3vw, 14px);
-    --phone-card-gap: 10px;
-    --phone-card-gap: clamp(8px, 2.5vw, 12px);
-    --phone-button-height: 48px;
-    --phone-button-height: clamp(44px, 11vw, 52px);
-    --phone-button-padding-x: 16px;
-    --phone-button-padding-x: clamp(14px, 4vw, 20px);
-    --phone-control-size: 44px;
-    --phone-control-size: clamp(40px, 10vw, 48px);
-    --phone-control-icon-size: 22px;
-    --phone-control-icon-size: clamp(20px, 5vw, 24px);
-    --phone-caption-text: 12px;
-    --phone-caption-text: clamp(11px, 3vw, 13px);
-    --phone-secondary-text: 14px;
-    --phone-secondary-text: clamp(13px, 3.4vw, 15px);
-    --phone-body-text: 16px;
-    --phone-body-text: clamp(15px, 3.8vw, 17px);
-    --phone-subtitle-text: 20px;
-    --phone-subtitle-text: clamp(18px, 5vw, 22px);
-    --phone-title-text: 28px;
-    --phone-title-text: clamp(24px, 7vw, 32px);
+    /* Shared (theme-independent) color tokens. */
+    --phone-text-primary: #f5f7f8;
+    --phone-text-secondary: #b8bec5;
+    --phone-text-muted: #969ca3;
+    --phone-border-default: #252a2a;
+    --phone-success: #66bb6a;
+    --phone-warning: #ffc857;
+    --phone-danger: #e36a8a;
+    --phone-info: #42a5f5;
+    --phone-overlay-scrim: rgba(0, 0, 0, 0.56);
+
+    /* Accent presets — NuvioMobile ships 7 selectable app themes, each defining its own
+       secondary/variant/background/elevated/card/focus-ring set. All 7 are ported as
+       tokens now so a future theme picker has real values to switch between; only Crimson
+       (the first-declared entry in NuvioMobile's AppTheme enum, and its apparent default)
+       is aliased as "active" below until a theme-selection feature exists to override it. */
+    --phone-accent-crimson-secondary: #e53935;
+    --phone-accent-crimson-variant: #c62828;
+    --phone-accent-crimson-bg: #0d0d0d;
+    --phone-accent-crimson-bg-elevated: #1a1a1a;
+    --phone-accent-crimson-bg-card: #241a1a;
+    --phone-accent-crimson-focus-ring: #ff5252;
+
+    --phone-accent-ocean-secondary: #1e88e5;
+    --phone-accent-ocean-variant: #1565c0;
+    --phone-accent-ocean-bg: #0d0d0f;
+    --phone-accent-ocean-bg-elevated: #1a1a1e;
+    --phone-accent-ocean-bg-card: #1a1f24;
+    --phone-accent-ocean-focus-ring: #42a5f5;
+
+    --phone-accent-violet-secondary: #8e24aa;
+    --phone-accent-violet-variant: #6a1b9a;
+    --phone-accent-violet-bg: #0d0d0f;
+    --phone-accent-violet-bg-elevated: #1a1a1e;
+    --phone-accent-violet-bg-card: #1f1a24;
+    --phone-accent-violet-focus-ring: #ab47bc;
+
+    --phone-accent-emerald-secondary: #43a047;
+    --phone-accent-emerald-variant: #2e7d32;
+    --phone-accent-emerald-bg: #0d0d0d;
+    --phone-accent-emerald-bg-elevated: #1a1a1a;
+    --phone-accent-emerald-bg-card: #1a241a;
+    --phone-accent-emerald-focus-ring: #66bb6a;
+
+    --phone-accent-amber-secondary: #fb8c00;
+    --phone-accent-amber-variant: #ef6c00;
+    --phone-accent-amber-bg: #0f0d0d;
+    --phone-accent-amber-bg-elevated: #1e1a1a;
+    --phone-accent-amber-bg-card: #24201a;
+    --phone-accent-amber-focus-ring: #ffa726;
+
+    --phone-accent-rose-secondary: #d81b60;
+    --phone-accent-rose-variant: #c2185b;
+    --phone-accent-rose-bg: #0d0d0d;
+    --phone-accent-rose-bg-elevated: #1a1a1a;
+    --phone-accent-rose-bg-card: #241a1f;
+    --phone-accent-rose-focus-ring: #ec407a;
+
+    /* White is the only preset with an on-secondary value in the source — its secondary
+       color is near-white and needs inverted (dark) text, unlike the other 6 presets'
+       darker/saturated secondaries, which already read fine against light text. */
+    --phone-accent-white-secondary: #f5f5f5;
+    --phone-accent-white-on-secondary: #111111;
+    --phone-accent-white-variant: #e0e0e0;
+    --phone-accent-white-bg: #0d0d0d;
+    --phone-accent-white-bg-elevated: #1a1a1a;
+    --phone-accent-white-bg-card: #222222;
+    --phone-accent-white-focus-ring: #ffffff;
+
+    /* Active accent alias — swap these to a different --phone-accent-<name>-* set (or wire
+       up to a settings-backed class) when a theme picker ships; nothing does yet. */
+    --phone-accent-secondary: var(--phone-accent-crimson-secondary);
+    --phone-accent-variant: var(--phone-accent-crimson-variant);
+    --phone-accent-bg: var(--phone-accent-crimson-bg);
+    --phone-accent-bg-elevated: var(--phone-accent-crimson-bg-elevated);
+    --phone-accent-bg-card: var(--phone-accent-crimson-bg-card);
+    --phone-accent-focus-ring: var(--phone-accent-crimson-focus-ring);
+
+    /* Typography. NuvioMobile uses JetBrains Sans (Bold/SemiBold/Regular only); this repo
+       doesn't load that family yet (only DM Sans/Inter/Open Sans, per the @import block at
+       the top of this file) — --phone-font-family aliases the existing --app-font-family
+       (Inter) as a safe fallback until JetBrains Sans is added as a follow-up, if pixel-exact
+       font matching turns out to matter. Sizes/line-heights below are mapped 1:1 from sp to
+       px (NuvioMobile doesn't fluidly rescale these either). */
+    --phone-font-family: var(--app-font-family);
+    --phone-font-weight-regular: 400;
+    --phone-font-weight-semibold: 600;
+    --phone-font-weight-bold: 700;
+
+    --phone-type-label-xs-size: 11px;
+    --phone-type-label-xs-line: 14px;
+    --phone-type-label-sm-size: 12px;
+    --phone-type-label-sm-line: 15px;
+    --phone-type-body-sm-size: 13px;
+    --phone-type-body-sm-line: 18px;
+    --phone-type-body-md-size: 14px;
+    --phone-type-body-md-line: 20px;
+    --phone-type-body-app-size: 15px;
+    --phone-type-body-app-line: 22px;
+    --phone-type-body-lg-size: 16px;
+    --phone-type-body-lg-line: 22px;
+    --phone-type-title-sm-size: 18px;
+    --phone-type-title-sm-line: 22px;
+    --phone-type-title-md-size: 22px;
+    --phone-type-title-md-line: 26px;
+    --phone-type-headline-size: 26px;
+    --phone-type-headline-line: 30px;
+    --phone-type-headline-tracking: -0.8px;
+    --phone-type-title-lg-size: 28px;
+    --phone-type-title-lg-line: 32px;
+    --phone-type-display-sm-size: 32px;
+    --phone-type-display-sm-line: 36px;
+    --phone-type-page-display-size: 38px;
+    --phone-type-page-display-line: 42px;
+    --phone-type-page-display-tracking: -1.2px;
+    --phone-type-display-md-size: 48px;
+    --phone-type-display-md-line: 52px;
+
+    /* Spacing scale (px), 1:1 from NuvioMobile's dp scale. */
+    --phone-space-1: 1px;
+    --phone-space-2: 2px;
+    --phone-space-3: 3px;
+    --phone-space-4: 4px;
+    --phone-space-5: 5px;
+    --phone-space-6: 6px;
+    --phone-space-7: 7px;
+    --phone-space-8: 8px;
+    --phone-space-10: 10px;
+    --phone-space-12: 12px;
+    --phone-space-14: 14px;
+    --phone-space-16: 16px;
+    --phone-space-18: 18px;
+    --phone-space-20: 20px;
+    --phone-space-22: 22px;
+    --phone-space-24: 24px;
+    --phone-space-28: 28px;
+    --phone-space-32: 32px;
+    --phone-space-36: 36px;
+    --phone-space-40: 40px;
+    --phone-space-48: 48px;
+    --phone-space-56: 56px;
+    --phone-space-64: 64px;
+    --phone-space-72: 72px;
+    --phone-space-80: 80px;
+    --phone-space-96: 96px;
+
+    /* Semantic spacing aliases. */
+    --phone-space-screen-h: var(--phone-space-16);
+    --phone-space-section-gap: var(--phone-space-24);
+    --phone-space-list-gap: var(--phone-space-12);
+    --phone-space-rail-gap: var(--phone-space-14);
+    --phone-space-card-padding: var(--phone-space-18);
+    --phone-space-sheet-padding: var(--phone-space-20);
+
+    /* Radius scale + semantic aliases. */
+    --phone-radius-xs: 4px;
+    --phone-radius-sm: 6px;
+    --phone-radius-md: 8px;
+    --phone-radius-lg: 12px;
+    --phone-radius-xl: 16px;
+    --phone-radius-xxl: 24px;
+    --phone-radius-full: 999px;
+    --phone-radius-card: var(--phone-radius-xxl);
+    --phone-radius-poster: var(--phone-radius-lg);
+    --phone-radius-sheet: var(--phone-radius-xxl);
+    --phone-radius-button: var(--phone-radius-xl);
+
+    /* Motion durations (ms, used with JS-driven transitions/animations) and easings. */
+    --phone-motion-instant: 0ms;
+    --phone-motion-fast: 150ms;
+    --phone-motion-normal: 220ms;
+    --phone-motion-sheet-enter: 300ms;
+    --phone-motion-sheet-exit: 250ms;
+    --phone-motion-slow: 400ms;
+    --phone-motion-cinematic: 700ms;
+    /* standard and emphasized are byte-identical in the source — its simplified token set
+       aliases "emphasized" to the same curve as "standard", not a copy-paste mistake here. */
+    --phone-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --phone-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+    --phone-ease-decelerate: cubic-bezier(0, 0, 0, 1);
+    --phone-ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
   }
 }
 
