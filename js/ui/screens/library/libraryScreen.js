@@ -30,6 +30,12 @@ import {
   setLegacySidebarExpanded
 } from "../../components/sidebarNavigation.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
+import {
+  renderLibraryScreenPhone,
+  mountLibraryScreenPhone,
+  cleanupLibraryScreenPhone,
+  handleLibraryPhonePointerActivate
+} from "./libraryScreenPhone.js";
 
 const POSTER_HOLD_DELAY_MS = 650;
 const PICKER_MENU_EXIT_MS = 160;
@@ -227,6 +233,10 @@ export const LibraryScreen = {
   async mount() {
     this.container = document.getElementById("library");
     ScreenUtils.show(this.container);
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.requestRender());
     const controller = new LibraryController((state, change) =>
       this.handleControllerChange(state, change)
     );
@@ -372,14 +382,14 @@ export const LibraryScreen = {
         : picker === "cloud_type"
           ? state.selectedCloudType || "__all__"
           : picker === "list"
-        ? state.selectedListKey
-        : picker === "type"
-          ? state.selectedTypeKey
-          : picker === "genre"
-            ? state.selectedGenre || "__all__"
-            : picker === "year"
-              ? state.selectedYear || "__all__"
-              : state.selectedSortKey;
+            ? state.selectedListKey
+            : picker === "type"
+              ? state.selectedTypeKey
+              : picker === "genre"
+                ? state.selectedGenre || "__all__"
+                : picker === "year"
+                  ? state.selectedYear || "__all__"
+                  : state.selectedSortKey;
     const selectedIndex = Math.max(
       0,
       options.findIndex((option) => option.value === currentValue)
@@ -1015,6 +1025,9 @@ export const LibraryScreen = {
   },
 
   render() {
+    if (Platform.isPhoneViewport()) {
+      return this.renderPhone();
+    }
     this.cancelScheduledRender();
     this.layoutPrefs = LayoutPreferences.get();
     this.sidebarExpanded = Boolean(this.layoutPrefs?.modernSidebar && this.sidebarExpanded);
@@ -1074,6 +1087,30 @@ export const LibraryScreen = {
       return;
     }
     this.restoreFocus();
+  },
+
+  // Phone render path (ticket 03-02, mobile-parity epic) — all markup/interaction logic lives
+  // in js/ui/screens/library/libraryScreenPhone.js; this just hands it the screen instance so
+  // it can read this.controller/this.sidebarProfile (already populated by mount()'s existing
+  // data flow) and call this.playCloudFile(item, file) (the TV screen's own existing async
+  // method) directly for cloud playback resolution + navigation.
+  renderPhone() {
+    if (!this.container) {
+      return;
+    }
+    this.container.innerHTML = renderLibraryScreenPhone(this);
+    mountLibraryScreenPhone(this, this.container);
+  },
+
+  // Delegates tap navigation for the phone library screen's markup (data-action via
+  // libraryScreenPhone.js) through the shared onPointerActivate contract FocusEngine's global
+  // click dispatch already calls. Returns false (a no-op) outside phone mode so TV's own click
+  // handling — which never went through this contract — is unaffected.
+  onPointerActivate(target) {
+    if (!Platform.isPhoneViewport()) {
+      return false;
+    }
+    return handleLibraryPhonePointerActivate(this, target);
   },
 
   isPosterHoldTarget(node) {
@@ -2242,6 +2279,9 @@ export const LibraryScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
+    cleanupLibraryScreenPhone(this);
     this.cancelScheduledRender();
     this.clearClosingPicker();
     this.lastRenderedExpandedPicker = null;

@@ -1500,4 +1500,450 @@
     line-height: var(--phone-type-body-sm-line);
     color: var(--phone-text-secondary);
   }
+
+  /* Library screen (js/ui/screens/library/libraryScreenPhone.js, ticket 03-02) — a sticky
+     header (title + Saved-mode grid/shelf layout toggle) and a Saved/Cloud tab row, then
+     either Saved mode (filter chips + per-type phoneShelf.js rows or a responsive posterCard.js
+     grid) or Cloud mode (provider/type filter chips + a text-search row, then a vertical list
+     of file rows). */
+  .phone-library-scroll {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .phone-library-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-12);
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-screen-h)
+      var(--phone-space-12);
+    background: var(--phone-accent-bg);
+  }
+
+  .phone-library-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--phone-space-12);
+  }
+
+  .phone-library-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-library-layout-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: var(--phone-radius-full);
+    background: var(--phone-accent-bg-elevated);
+    color: var(--phone-text-primary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-library-layout-toggle svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .phone-library-tabs {
+    display: flex;
+    gap: var(--phone-space-8);
+  }
+
+  .phone-library-tab {
+    border: none;
+    border-radius: var(--phone-radius-full);
+    padding: var(--phone-space-8) var(--phone-space-16);
+    background: var(--phone-accent-bg-elevated);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-library-tab.selected {
+    background: var(--phone-accent-secondary);
+    color: var(--phone-accent-white-on-secondary, #111111);
+  }
+
+  .phone-library-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-12);
+    padding-bottom: var(--phone-space-40);
+  }
+
+  .phone-library-filter-row {
+    display: flex;
+    gap: var(--phone-space-8);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 var(--phone-space-screen-h);
+    scrollbar-width: none;
+  }
+
+  .phone-library-filter-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .phone-library-filter-chip {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: var(--phone-space-6);
+    background: var(--phone-accent-bg-elevated);
+    border: none;
+    border-radius: var(--phone-radius-full);
+    padding: var(--phone-space-8) var(--phone-space-14);
+    font-family: var(--phone-font-family);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-library-filter-chip-label {
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+    font-weight: var(--phone-font-weight-regular);
+    color: var(--phone-text-muted);
+  }
+
+  .phone-library-filter-chip-value {
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-library-filter-chip-caret {
+    width: 14px;
+    height: 14px;
+    color: var(--phone-text-muted);
+  }
+
+  .phone-library-body {
+    padding: 0 var(--phone-space-screen-h);
+  }
+
+  .phone-library-shelves {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-section-gap);
+    margin: 0 calc(-1 * var(--phone-space-screen-h));
+  }
+
+  .phone-library-shelves .phone-shelf {
+    padding: 0;
+  }
+
+  /* Saved-mode vertical grid — a responsive 3-7 column wrap of bare posterCard.js instances
+     (not phoneShelf.js, which is a single horizontally-scrolling row). */
+  .phone-library-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: var(--phone-space-12) var(--phone-space-10);
+  }
+
+  .phone-library-grid .phone-poster {
+    width: 100%;
+  }
+
+  /* Saved-item removal reuses the same fade+scale+collapse `.phone-poster-removing`
+     substitute-transition ticket 01-01 established for Continue Watching (see
+     css/phone.css's own comment on that rule) — this just opts our own shelf/grid contexts
+     into the same transition properties. */
+  .phone-library-shelves .phone-shelf-row > .phone-poster,
+  .phone-library-grid .phone-poster {
+    transition:
+      width var(--phone-motion-slow) var(--phone-ease-emphasized),
+      opacity var(--phone-motion-slow) var(--phone-ease-emphasized),
+      transform var(--phone-motion-slow) var(--phone-ease-emphasized);
+  }
+
+  .phone-library-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--phone-space-8);
+    padding: var(--phone-space-40) var(--phone-space-screen-h);
+  }
+
+  .phone-library-empty-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-sm-size);
+    line-height: var(--phone-type-title-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-library-empty-message {
+    margin: 0;
+    max-width: 280px;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
+  /* Cloud mode — text search + a vertical list of file rows (name, subtitle, status, an
+     optional download-progress bar, and a play icon when at least one file is playable). */
+  .phone-library-cloud-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-8);
+    margin: 0 var(--phone-space-screen-h);
+    padding: var(--phone-space-10) var(--phone-space-14);
+    background: var(--phone-accent-bg-elevated);
+    border-radius: var(--phone-radius-full);
+  }
+
+  .phone-library-cloud-search-icon {
+    display: flex;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: var(--phone-text-muted);
+  }
+
+  .phone-library-cloud-search-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .phone-library-cloud-search-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-library-cloud-search-input::placeholder {
+    color: var(--phone-text-muted);
+  }
+
+  .phone-library-cloud-clear-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: var(--phone-radius-full);
+    background: none;
+    color: var(--phone-text-muted);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-library-cloud-clear-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .phone-library-cloud-search-wrap.has-value .phone-library-cloud-clear-btn {
+    display: flex;
+  }
+
+  .phone-library-cloud-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-8);
+  }
+
+  .phone-library-cloud-row {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-12);
+    width: 100%;
+    border: none;
+    border-radius: var(--phone-radius-card);
+    padding: var(--phone-space-12) var(--phone-space-14);
+    background: var(--phone-accent-bg-elevated);
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-library-cloud-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-4);
+  }
+
+  .phone-library-cloud-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-library-cloud-row-subtitle,
+  .phone-library-cloud-row-status {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-library-cloud-row.playable .phone-library-cloud-row-status {
+    color: var(--phone-accent-secondary);
+  }
+
+  .phone-library-cloud-progress-track {
+    display: block;
+    width: 100%;
+    height: 4px;
+    margin-top: var(--phone-space-4);
+    border-radius: var(--phone-radius-full);
+    background: rgb(255 255 255 / 0.12);
+    overflow: hidden;
+  }
+
+  .phone-library-cloud-progress-fill {
+    display: block;
+    height: 100%;
+    background: var(--phone-accent-secondary);
+  }
+
+  .phone-library-cloud-play {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: var(--phone-radius-full);
+    background: var(--phone-accent-secondary);
+    color: var(--phone-accent-white-on-secondary, #111111);
+  }
+
+  .phone-library-cloud-play svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Multi-file cloud item — an inline sub-view (not a modal) that replaces the cloud list body
+     in place when a multi-file item is tapped. */
+  .phone-library-filepicker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-8);
+  }
+
+  .phone-library-filepicker-header {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-12);
+    padding-bottom: var(--phone-space-8);
+  }
+
+  .phone-library-filepicker-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: var(--phone-radius-full);
+    background: var(--phone-accent-bg-elevated);
+    color: var(--phone-text-primary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-library-filepicker-back svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .phone-library-filepicker-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-sm-size);
+    line-height: var(--phone-type-title-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-library-filepicker-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-8);
+  }
+
+  .phone-library-filepicker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--phone-space-12);
+    width: 100%;
+    border: none;
+    border-radius: var(--phone-radius-card);
+    padding: var(--phone-space-12) var(--phone-space-14);
+    background: var(--phone-accent-bg-elevated);
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-library-filepicker-row[disabled] {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .phone-library-filepicker-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-library-filepicker-row-size {
+    flex-shrink: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-muted);
+  }
 }

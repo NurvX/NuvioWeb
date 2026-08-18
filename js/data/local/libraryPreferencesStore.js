@@ -9,8 +9,13 @@ function normalizeProfileId(profileId = null) {
 
 function normalizeState(value = {}) {
   const lastSelectedListKey = String(value?.lastSelectedListKey || "").trim();
+  const phoneLayoutMode = String(value?.phoneLayoutMode || "").trim();
   return {
-    lastSelectedListKey: lastSelectedListKey || null
+    lastSelectedListKey: lastSelectedListKey || null,
+    // Phone-only (mobile-parity ticket 03-02): whether the Saved-mode phone library grid
+    // renders as per-type horizontal shelves ("horizontal") or a single scrolling poster
+    // grid ("vertical"). Unrelated to any TV layout preference.
+    phoneLayoutMode: phoneLayoutMode === "vertical" ? "vertical" : "horizontal"
   };
 }
 
@@ -31,7 +36,24 @@ export const LibraryPreferencesStore = {
     }
     const normalizedProfileId = normalizeProfileId(profileId);
     const all = readAll();
-    all[normalizedProfileId] = normalizeState({ lastSelectedListKey: normalizedListKey });
+    all[normalizedProfileId] = normalizeState({
+      ...all[normalizedProfileId],
+      lastSelectedListKey: normalizedListKey
+    });
+    LocalStore.set(KEY, all);
+  },
+
+  getPhoneLayoutMode(profileId = null) {
+    return normalizeState(readAll()[normalizeProfileId(profileId)]).phoneLayoutMode;
+  },
+
+  setPhoneLayoutMode(mode, profileId = null) {
+    const normalizedProfileId = normalizeProfileId(profileId);
+    const all = readAll();
+    all[normalizedProfileId] = normalizeState({
+      ...all[normalizedProfileId],
+      phoneLayoutMode: mode === "vertical" ? "vertical" : "horizontal"
+    });
     LocalStore.set(KEY, all);
   }
 };
