@@ -82,6 +82,7 @@
        (the first-declared entry in NuvioMobile's AppTheme enum, and its apparent default)
        is aliased as "active" below until a theme-selection feature exists to override it. */
     --phone-accent-crimson-secondary: #e53935;
+    --phone-accent-crimson-secondary-rgb: 229 57 53;
     --phone-accent-crimson-variant: #c62828;
     --phone-accent-crimson-bg: #0d0d0d;
     --phone-accent-crimson-bg-elevated: #1a1a1a;
@@ -89,6 +90,7 @@
     --phone-accent-crimson-focus-ring: #ff5252;
 
     --phone-accent-ocean-secondary: #1e88e5;
+    --phone-accent-ocean-secondary-rgb: 30 136 229;
     --phone-accent-ocean-variant: #1565c0;
     --phone-accent-ocean-bg: #0d0d0f;
     --phone-accent-ocean-bg-elevated: #1a1a1e;
@@ -96,6 +98,7 @@
     --phone-accent-ocean-focus-ring: #42a5f5;
 
     --phone-accent-violet-secondary: #8e24aa;
+    --phone-accent-violet-secondary-rgb: 142 36 170;
     --phone-accent-violet-variant: #6a1b9a;
     --phone-accent-violet-bg: #0d0d0f;
     --phone-accent-violet-bg-elevated: #1a1a1e;
@@ -103,6 +106,7 @@
     --phone-accent-violet-focus-ring: #ab47bc;
 
     --phone-accent-emerald-secondary: #43a047;
+    --phone-accent-emerald-secondary-rgb: 67 160 71;
     --phone-accent-emerald-variant: #2e7d32;
     --phone-accent-emerald-bg: #0d0d0d;
     --phone-accent-emerald-bg-elevated: #1a1a1a;
@@ -110,6 +114,7 @@
     --phone-accent-emerald-focus-ring: #66bb6a;
 
     --phone-accent-amber-secondary: #fb8c00;
+    --phone-accent-amber-secondary-rgb: 251 140 0;
     --phone-accent-amber-variant: #ef6c00;
     --phone-accent-amber-bg: #0f0d0d;
     --phone-accent-amber-bg-elevated: #1e1a1a;
@@ -117,6 +122,7 @@
     --phone-accent-amber-focus-ring: #ffa726;
 
     --phone-accent-rose-secondary: #d81b60;
+    --phone-accent-rose-secondary-rgb: 216 27 96;
     --phone-accent-rose-variant: #c2185b;
     --phone-accent-rose-bg: #0d0d0d;
     --phone-accent-rose-bg-elevated: #1a1a1a;
@@ -127,6 +133,7 @@
        color is near-white and needs inverted (dark) text, unlike the other 6 presets'
        darker/saturated secondaries, which already read fine against light text. */
     --phone-accent-white-secondary: #f5f5f5;
+    --phone-accent-white-secondary-rgb: 245 245 245;
     --phone-accent-white-on-secondary: #111111;
     --phone-accent-white-variant: #e0e0e0;
     --phone-accent-white-bg: #0d0d0d;
@@ -137,6 +144,7 @@
     /* Active accent alias — swap these to a different --phone-accent-<name>-* set (or wire
        up to a settings-backed class) when a theme picker ships; nothing does yet. */
     --phone-accent-secondary: var(--phone-accent-crimson-secondary);
+    --phone-accent-secondary-rgb: var(--phone-accent-crimson-secondary-rgb);
     --phone-accent-variant: var(--phone-accent-crimson-variant);
     --phone-accent-bg: var(--phone-accent-crimson-bg);
     --phone-accent-bg-elevated: var(--phone-accent-crimson-bg-elevated);

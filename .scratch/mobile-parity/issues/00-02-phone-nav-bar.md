@@ -23,13 +23,56 @@ manual injection is fine for verification) — Phase 1+ tickets wire it into act
 
 **Blocked by:** 00-01 (uses the token values it defines)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `phoneNavBar.js` renders the 4-tab floating pill matching the visual spec above
-- [ ] Scroll-driven expand/collapse and blur-on-scroll work smoothly (no jank on repeated
+- [x] `phoneNavBar.js` renders the 4-tab floating pill matching the visual spec above
+- [x] Scroll-driven expand/collapse and blur-on-scroll work smoothly (no jank on repeated
       rapid scroll direction changes)
-- [ ] Active tab is visually distinct and reflects `Router.current`
-- [ ] Tap on a tab calls `Router.navigate` with the correct route
-- [ ] No TV/D-pad code path touched; component is only ever rendered when
-      `Platform.isPhoneViewport()` is true
-- [ ] Manually verified in a phone-sized viewport
+- [x] Active tab is visually distinct and reflects `Router.current`
+- [x] Tap on a tab calls `Router.navigate` with the correct route
+- [x] No TV/D-pad code path touched; component is only ever rendered when
+      `Platform.isPhoneViewport()` is true (the component itself doesn't self-gate — nothing
+      calls it yet; each Phase 1+ consumer is responsible for checking `isPhoneViewport()`
+      before rendering it, per ticket 00-07)
+- [x] Manually verified in a phone-sized viewport
+
+## Comments
+
+- `renderPhoneNavBar({selectedRoute, profileState})` + `bindPhoneNavBarEvents(container,
+{currentRoute, scrollRoot})` follow the exact render-string / bind-events-after-insertion
+  split already used by `sidebarNavigation.js`'s `renderRootSidebar`/`bindRootSidebarEvents`,
+  including native `.onclick` wiring (not dependent on FocusEngine's tap-dispatch) and the
+  same "reselecting the current tab calls `onSidebarReselect?.()`" behavior.
+- `profileState` is shaped exactly like `getSidebarProfileState()`'s return value — callers
+  are expected to call that existing function and pass the result in, not reimplement avatar
+  resolution.
+- Scroll-collapse uses a checkpoint/hysteresis scheme (`lastScrollTop` only advances once
+  cumulative delta crosses the 60px threshold) so small scroll jitter doesn't flicker the
+  collapsed state.
+- `/code-review` (Standards + Spec axes) caught two real issues, both fixed:
+  1. The 3 shared SVG icons (home/search/library) were duplicated byte-for-byte from
+     `sidebarNavigation.js`'s `ROOT_SIDEBAR_ITEMS`. Fixed by extracting a new exported
+     `SIDEBAR_NAV_ICONS` lookup (keyed by route) in `sidebarNavigation.js` that both files now
+     share — `phoneNavBar.js`'s Settings tab still intentionally diverges (avatar instead of
+     the TV sidebar's gear icon), documented in a comment.
+  2. The new `--phone-accent-*-secondary-rgb` tokens in `css/base.css` used comma-separated
+     values consumed via legacy `rgba(var(...), n)` syntax — inconsistent with this file's
+     established space-separated `--x-rgb: r g b;` + modern `rgb(var(...) / n)` convention
+     (already used ~90 times in `components.css`). Fixed both the token format and
+     `phone.css`'s consumption of it.
+  - Not changed: the reviewer also flagged that `-rgb` siblings exist for all 7 accent
+    presets while `phone.css` only consumes the "active" (Crimson) one. This mirrors ticket
+    00-01's own already-accepted call to ship all 7 presets' base colors unused, ahead of a
+    future theme picker — adding only some presets' alpha-compositing siblings would leave
+    that set inconsistent (6 presets fully colored but not alpha-composable), so all 7 got
+    the sibling token for the same reason 00-01 shipped all 7 base colors.
+- Fixing `sidebarNavigation.js`'s pre-existing (unrelated) prettier violation was an
+  unavoidable side effect of running the formatter on a file this ticket now also touches —
+  confirmed via diff that it's pure line-wrap reformatting, no logic change.
+- Verified via an ad-hoc jsdom script (real render output, real `bindPhoneNavBarEvents` tap
+  dispatch, real scroll-event-driven class toggling) and a live browser fixture (phone-sized
+  viewport) showing the pill, icons, selected-tab highlight, and tap correctly invoking
+  `Router.navigate`.
+- Before/after `npm run build` dist diff + a `find dist -type f` listing diff confirm the
+  only new build output is `dist/css/phone.css`; `phoneNavBar.js` itself is tree-shaken out
+  of `app.bundle.js` entirely since nothing imports it yet.

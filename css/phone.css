@@ -1,0 +1,138 @@
+/* Phone-only UI — the mobile-parity effort's new component styles. Every rule here is
+   scoped to the same max-width: 600px breakpoint as the --phone-* tokens in base.css, and
+   every class is prefixed "phone-" so nothing can collide with the existing TV class names
+   in components.css. See .scratch/mobile-parity/spec.md. */
+
+@media (max-width: 600px) {
+  /* Floating-pill bottom tab bar (js/ui/components/phoneNavBar.js), ported from
+     NuvioMobile's NuvioNavigationBar. */
+  .phone-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-8));
+    display: flex;
+    justify-content: center;
+    z-index: 40;
+    pointer-events: none;
+  }
+
+  .phone-tabbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+    gap: var(--phone-space-4);
+    background: rgba(28, 28, 30, 0.82);
+    border-radius: var(--phone-radius-full);
+    padding: var(--phone-space-6) var(--phone-space-28);
+    pointer-events: auto;
+    transition:
+      padding var(--phone-motion-normal) var(--phone-ease-standard),
+      background-color var(--phone-motion-normal) var(--phone-ease-standard);
+  }
+
+  .phone-tabbar.blurred .phone-tabbar-row {
+    background: rgba(28, 28, 30, 0.55);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+
+  .phone-tabbar.collapsed .phone-tabbar-row {
+    padding-left: 58px;
+    padding-right: 58px;
+  }
+
+  .phone-tabbar-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    padding: var(--phone-space-4) var(--phone-space-10);
+    border-radius: var(--phone-radius-full);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-tabbar-item-highlight {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgb(var(--phone-accent-secondary-rgb) / 0.15);
+    opacity: 0;
+    transition: opacity var(--phone-motion-fast) var(--phone-ease-standard);
+  }
+
+  .phone-tabbar-item.selected .phone-tabbar-item-highlight {
+    opacity: 1;
+  }
+
+  .phone-tabbar-icon,
+  .phone-tabbar-avatar {
+    position: relative;
+    z-index: 1;
+    width: 28px;
+    height: 28px;
+  }
+
+  .phone-tabbar-icon {
+    fill: var(--phone-text-muted);
+    transition: fill var(--phone-motion-fast) var(--phone-ease-standard);
+  }
+
+  .phone-tabbar-item.selected .phone-tabbar-icon {
+    fill: var(--phone-accent-secondary);
+  }
+
+  .phone-tabbar-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--phone-radius-full);
+    overflow: hidden;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-tabbar-item.selected .phone-tabbar-avatar {
+    box-shadow: 0 0 0 2px var(--phone-accent-secondary);
+  }
+
+  .phone-tabbar-avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .phone-tabbar-label {
+    position: relative;
+    z-index: 1;
+    max-width: 60px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-xs-size);
+    line-height: var(--phone-type-label-xs-line);
+    font-weight: var(--phone-font-weight-regular);
+    color: var(--phone-text-muted);
+    transition:
+      opacity var(--phone-motion-normal) var(--phone-ease-standard),
+      max-height var(--phone-motion-normal) var(--phone-ease-standard);
+  }
+
+  .phone-tabbar-item.selected .phone-tabbar-label {
+    color: var(--phone-accent-secondary);
+    font-weight: var(--phone-font-weight-semibold);
+  }
+
+  .phone-tabbar.collapsed .phone-tabbar-label {
+    max-height: 0;
+    opacity: 0;
+  }
+}

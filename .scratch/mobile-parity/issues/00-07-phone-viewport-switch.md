@@ -19,12 +19,27 @@ unit test of the predicate logic itself.
 
 **Blocked by:** None — can run in parallel with the rest of Phase 0.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `Platform.isPhoneViewport()` correctly reflects `Platform.isBrowser() &&
-      matchMedia("(max-width: 600px)")`, returns `false` on Tizen/webOS unconditionally
-- [ ] `watchPhoneViewport()` (or equivalent) correctly fires its callback on viewport
+- [x] `Platform.isPhoneViewport()` correctly reflects `Platform.isBrowser() &&
+matchMedia("(max-width: 600px)")`, returns `false` on Tizen/webOS unconditionally
+- [x] `watchPhoneViewport()` (or equivalent) correctly fires its callback on viewport
       crossing 600px in either direction, and can be torn down cleanly
-- [ ] `Router.routes` is untouched — confirm no screen's route registration changed
-- [ ] No TV/D-pad code path touched
-- [ ] `npm test` covers the predicate/listener logic where practical
+- [x] `Router.routes` is untouched — confirm no screen's route registration changed
+- [x] No TV/D-pad code path touched
+- [x] `npm test` covers the predicate/listener logic where practical
+
+## Comments
+
+- Added `Platform.isPhoneViewport()` and `Platform.watchPhoneViewport(callback)` directly to
+  the existing `Platform` object in `js/platform/index.js` (no new module — two small methods
+  didn't warrant one), sharing a single `PHONE_VIEWPORT_QUERY` constant with a comment noting
+  it must stay in sync with `--phone-*` tokens' `@media` scoping in `css/base.css`.
+- `watchPhoneViewport` uses `addEventListener("change", ...)` with an `addListener` fallback
+  for older WebKit, and is a no-op (returns a no-op unsubscribe) off the browser platform, so
+  Tizen/webOS never register a listener at all.
+- `js/platform/index.test.mjs`: new test file covering both methods with a fake
+  `MediaQueryList` (jsdom's own `matchMedia` isn't reliably mockable app-side, so the test
+  substitutes `globalThis.matchMedia`) — 4 tests: browser-platform reflection, off-browser
+  short-circuit, fire-on-change + clean unsubscribe, and off-browser no-op registration.
+- `Router.routes` confirmed untouched via `git diff`.

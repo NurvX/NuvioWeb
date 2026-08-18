@@ -8,6 +8,10 @@ const ADAPTERS = {
   tizen: tizenAdapter
 };
 
+// Single documented phone breakpoint, matching the --phone-* CSS tokens' own
+// @media (max-width: 600px) scoping in css/base.css — keep these in sync.
+const PHONE_VIEWPORT_QUERY = "(max-width: 600px)";
+
 function parseWebOsMajorVersion() {
   const candidates = [
     String(globalThis.PalmSystem?.deviceInfo || ""),
@@ -119,6 +123,38 @@ export const Platform = {
 
   isBrowser() {
     return this.getName() === "browser";
+  },
+
+  // True only for a plain-browser session at a phone-width viewport — the switch a
+  // phone-mode screen render checks to decide whether to render its phone layout instead
+  // of the TV one. Tizen/webOS never hit this, since they're never `isBrowser()`.
+  isPhoneViewport() {
+    if (!this.isBrowser() || typeof globalThis.matchMedia !== "function") {
+      return false;
+    }
+    return globalThis.matchMedia(PHONE_VIEWPORT_QUERY).matches;
+  },
+
+  // Calls `callback(isPhoneViewport)` whenever the viewport crosses the phone breakpoint in
+  // either direction, so a screen can re-render live as its window is resized. Returns an
+  // unsubscribe function. No-op (returns a no-op unsubscribe) outside the browser platform.
+  watchPhoneViewport(callback) {
+    if (
+      typeof callback !== "function" ||
+      !this.isBrowser() ||
+      typeof globalThis.matchMedia !== "function"
+    ) {
+      return () => {};
+    }
+    const mediaQueryList = globalThis.matchMedia(PHONE_VIEWPORT_QUERY);
+    const handleChange = () => callback(mediaQueryList.matches);
+    if (typeof mediaQueryList.addEventListener === "function") {
+      mediaQueryList.addEventListener("change", handleChange);
+      return () => mediaQueryList.removeEventListener("change", handleChange);
+    }
+    // Safari <14 / older WebKit fallback.
+    mediaQueryList.addListener(handleChange);
+    return () => mediaQueryList.removeListener(handleChange);
   },
 
   exitApp() {

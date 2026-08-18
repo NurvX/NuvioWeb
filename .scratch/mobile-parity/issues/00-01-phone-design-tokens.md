@@ -10,7 +10,7 @@
   `--phone-warning #FFC857`, `--phone-danger #E36A8A`, `--phone-info #42A5F5`,
   `--phone-overlay-scrim rgba(0,0,0,.56)`. Plus 7 selectable accent presets as
   `--phone-accent-{crimson,ocean,violet,emerald,amber,rose,white}-{secondary,variant,bg,
-  bg-elevated,bg-card,focus-ring}` (values in the epic spec.md) — ship all 7 as tokens even
+bg-elevated,bg-card,focus-ring}` (values in the epic spec.md) — ship all 7 as tokens even
   though only one is wired as "active" for now (`--phone-accent-secondary` etc. aliasing to
   Crimson, NuvioMobile's default).
 - Typography: 13 named sizes (`--phone-type-label-xs` through `--phone-type-display-md`),

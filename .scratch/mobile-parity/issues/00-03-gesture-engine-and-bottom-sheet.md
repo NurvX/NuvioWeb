@@ -4,6 +4,7 @@
 sheet's drag-to-dismiss depends on the gesture engine existing first.
 
 **`js/ui/navigation/gestureEngine.js`** — pure Pointer Events API, no framework:
+
 - `attachLongPress(el, { onLongPress, onTap, threshold = 500, moveTolerance = 10 })`:
   `pointerdown` starts a timer; movement past `moveTolerance` or an early
   `pointerup`/`pointercancel` cancels the timer and calls `onTap`; the timer firing first
