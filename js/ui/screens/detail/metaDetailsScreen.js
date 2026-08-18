@@ -41,6 +41,12 @@ import {
 } from "../../components/posterOptionsMenu.js";
 import { StreamPreferencesStore } from "../../../data/local/streamPreferencesStore.js";
 import {
+  renderMetaDetailsScreenPhone,
+  mountMetaDetailsScreenPhone,
+  cleanupMetaDetailsScreenPhone,
+  handlePhoneMetaDetailsPointerActivate
+} from "./metaDetailsScreenPhone.js";
+import {
   WATCH_PROGRESS_COMPLETED_THRESHOLD,
   getWatchProgressFraction,
   isWatchProgressInProgress,
@@ -280,7 +286,11 @@ function formatResumeRemaining(progress = {}) {
   return durationText ? t("detail.timeLeftDuration", { time: durationText }, "{{time}} left") : "";
 }
 
-function isSeriesDetailMeta(meta = {}, episodes = null) {
+// Exported for js/ui/screens/detail/metaDetailsScreenPhone.js (ticket 02-01): the phone
+// render path reuses these pure helpers verbatim (series/movie detection, meta-row
+// formatting, preview-item normalization) rather than reimplementing them, matching
+// normalizeHomeRowItem's export in homeScreen.js.
+export function isSeriesDetailMeta(meta = {}, episodes = null) {
   const normalizedType = String(meta?.type || "")
     .trim()
     .toLowerCase();
@@ -295,7 +305,7 @@ function isSeriesDetailMeta(meta = {}, episodes = null) {
   return resolvedEpisodes.length > 0;
 }
 
-function resolvePlayableDetailType(itemType, meta = {}) {
+export function resolvePlayableDetailType(itemType, meta = {}) {
   const rawType = String(itemType || meta?.type || "").trim();
   if (!rawType) {
     return "movie";
@@ -683,13 +693,13 @@ function formatMdbListRating(provider, rating) {
   return formatRatingValue(rating, { digits: 1, stripTrailingZero: true });
 }
 
-function hasMdbListRatings(ratings = {}) {
+export function hasMdbListRatings(ratings = {}) {
   return ["trakt", "imdb", "tmdb", "letterboxd", "tomatoes", "audience", "metacritic"].some(
     (key) => ratings?.[key] != null && String(ratings[key]).trim() !== ""
   );
 }
 
-function normalizeGenreList(meta = {}) {
+export function normalizeGenreList(meta = {}) {
   const raw = Array.isArray(meta?.genres)
     ? meta.genres
     : String(meta?.genres || meta?.genre || "").split(/[•,|/]/);
@@ -730,7 +740,7 @@ function formatMovieReleaseDate(meta = {}) {
   return String(meta?.releaseInfo || "").trim();
 }
 
-function resolveImdbRating(meta = {}) {
+export function resolveImdbRating(meta = {}) {
   if (meta?.imdbRating != null && String(meta.imdbRating).trim() !== "") {
     return meta.imdbRating;
   }
@@ -757,7 +767,7 @@ function resolveEpisodeImdbRating(episode = {}, seriesRatingsBySeason = {}) {
   return normalizeEpisodeImdbRating(episode?.imdbRating);
 }
 
-function formatRuntimeMinutes(runtime) {
+export function formatRuntimeMinutes(runtime) {
   return formatDurationMinutes(runtime);
 }
 
@@ -775,7 +785,7 @@ function formatDurationMinutes(totalMinutes) {
   return `${minutes}m`;
 }
 
-function resolveEpisodeRuntimeForSeason(episodes = [], season = null) {
+export function resolveEpisodeRuntimeForSeason(episodes = [], season = null) {
   const seasonNumber = Number(season || 0);
   const inSeason = episodes.find(
     (episode) =>
@@ -909,7 +919,7 @@ function normalizeCountryLabel(raw = "") {
     .join(", ");
 }
 
-function normalizePreviewItem(item = {}, fallbackType = "movie") {
+export function normalizePreviewItem(item = {}, fallbackType = "movie") {
   return {
     id: String(item.id || ""),
     name: item.name || item.title || "Untitled",
@@ -971,7 +981,7 @@ function normalizeEpisodeTitle(rawTitle, episodeNumber) {
   return trimmed;
 }
 
-function extractPreviewYear(value = "") {
+export function extractPreviewYear(value = "") {
   const match = String(value || "").match(/\b(19|20)\d{2}\b/);
   return match ? match[0] : "";
 }
@@ -1565,6 +1575,10 @@ export const MetaDetailsScreen = {
   async mount(params = {}, navigationContext = {}) {
     this.container = document.getElementById("detail");
     ScreenUtils.show(this.container);
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render(this.meta));
     this.stopTrailerPlayback({
       keepDom: false,
       restartAutoplay: false,
@@ -2456,15 +2470,15 @@ export const MetaDetailsScreen = {
       (Array.isArray(watchedItems) ? watchedItems : [])
         .filter((entry) => entry?.episode != null)
         .map(
-          (entry) =>
-            `${String(entry.contentId || "").toLowerCase()}:${Number(entry.episode || 0)}`
+          (entry) => `${String(entry.contentId || "").toLowerCase()}:${Number(entry.episode || 0)}`
         )
     );
     (this.episodes || []).forEach((video) => {
-      const match = String(video?.id || "").match(
-        /^(mal|anidb|anilist|kitsu):(\d+):(\d+)/i
-      );
-      if (!match || !animeWatchedKeys.has(`${match[1].toLowerCase()}:${match[2]}:${Number(match[3])}`)) {
+      const match = String(video?.id || "").match(/^(mal|anidb|anilist|kitsu):(\d+):(\d+)/i);
+      if (
+        !match ||
+        !animeWatchedKeys.has(`${match[1].toLowerCase()}:${match[2]}:${Number(match[3])}`)
+      ) {
         return;
       }
       const season = Number(video?.season || 0);
@@ -2940,6 +2954,9 @@ export const MetaDetailsScreen = {
   },
 
   render(meta, focusRestore = undefined) {
+    if (Platform.isPhoneViewport()) {
+      return this.renderPhone(meta);
+    }
     if (this._sectionsUpdateRaf) {
       const cancelRaf =
         typeof cancelAnimationFrame === "function" ? cancelAnimationFrame : clearTimeout;
@@ -4762,6 +4779,60 @@ export const MetaDetailsScreen = {
     this.syncDetailActionButtons();
   },
 
+  // Whole-title "mark watched" toggle, extracted verbatim (ticket 02-01, mobile-parity epic)
+  // from its previous home inline inside the TV click dispatcher's `action === "toggleWatched"`
+  // branch — a pure move-method refactor, zero behavior change. Called from both the original
+  // TV dispatch site and js/ui/screens/detail/metaDetailsScreenPhone.js's own tap dispatch, so
+  // neither has to duplicate this ~45-line data-layer sequence.
+  async toggleWatchedFromDetail() {
+    const focusRestore = this.captureDetailFocus();
+    const isSeries = isSeriesDetailMeta(this.meta, this.episodes);
+    if (isSeries) {
+      if (this.isMarkedWatched) {
+        await watchedSeriesReconciliationService.unmarkSeriesWatched(this.params?.itemId, {
+          meta: this.meta
+        });
+      } else {
+        await watchedSeriesReconciliationService.markSeriesWatched(
+          this.params?.itemId,
+          this.params?.itemType || this.meta?.type || "series",
+          {
+            meta: this.meta,
+            title: this.meta?.name || this.params?.fallbackTitle || "Untitled"
+          }
+        );
+      }
+    } else if (this.isMarkedWatched) {
+      await watchedItemsRepository.unmark(this.params?.itemId);
+      await watchProgressRepository.removeProgress(this.params?.itemId);
+    } else {
+      await watchedItemsRepository.mark({
+        contentId: this.params?.itemId,
+        contentType: this.params?.itemType || "movie",
+        title: this.meta?.name || this.params?.fallbackTitle || "Untitled",
+        watchedAt: Date.now()
+      });
+      await watchProgressRepository.saveProgress({
+        contentId: this.params?.itemId,
+        contentType: this.params?.itemType || "movie",
+        videoId: null,
+        positionMs: 100,
+        durationMs: 100,
+        updatedAt: Date.now()
+      });
+    }
+    if (!isSeries && this.meta?.ids?.trakt) {
+      const enriched = await detailWatchedEnrichmentService.enrichMovieWatchedState(
+        this.params?.itemId,
+        this.meta.ids.trakt
+      );
+      this.enrichedMovieState = enriched;
+      this.isMarkedWatched = Boolean(enriched?.isWatched);
+    }
+    await this.refreshEpisodePlaybackState();
+    this.render(this.meta, focusRestore);
+  },
+
   cancelPendingPosterHold() {
     if (this.pendingPosterHoldTimer) {
       clearTimeout(this.pendingPosterHoldTimer);
@@ -5437,11 +5508,15 @@ export const MetaDetailsScreen = {
     }
     if (action === "saveLibraryLists" || action === "confirmDestructiveSimklRemoval") {
       try {
-        await libraryRepository.applyMembershipChanges(this.libraryListMenu.item, {
-          desiredMembership: this.libraryListMenu.membership || {}
-        }, {
-          destructiveRemovalConfirmed: action === "confirmDestructiveSimklRemoval"
-        });
+        await libraryRepository.applyMembershipChanges(
+          this.libraryListMenu.item,
+          {
+            desiredMembership: this.libraryListMenu.membership || {}
+          },
+          {
+            destructiveRemovalConfirmed: action === "confirmDestructiveSimklRemoval"
+          }
+        );
         this.isSavedInLibrary = Object.values(this.libraryListMenu.membership || {}).some(Boolean);
         this.closeHeroMenus({ restoreFocus: false });
         this.syncDetailActionButtons();
@@ -6192,9 +6267,12 @@ export const MetaDetailsScreen = {
     ) {
       return;
     }
-    this.trailerAutoplayTimer = setTimeout(() => {
-      this.playTrailer({ muted: false, restart: true, initiatedByUser: false });
-    }, Math.min(15, Math.max(0, Number(PlayerSettingsStore.get().trailerDelaySeconds ?? 7))) * 1000);
+    this.trailerAutoplayTimer = setTimeout(
+      () => {
+        this.playTrailer({ muted: false, restart: true, initiatedByUser: false });
+      },
+      Math.min(15, Math.max(0, Number(PlayerSettingsStore.get().trailerDelaySeconds ?? 7))) * 1000
+    );
   },
 
   detachTrailerMediaListeners() {
@@ -9029,52 +9107,7 @@ export const MetaDetailsScreen = {
     }
 
     if (action === "toggleWatched") {
-      const focusRestore = this.captureDetailFocus();
-      const isSeries = isSeriesDetailMeta(this.meta, this.episodes);
-      if (isSeries) {
-        if (this.isMarkedWatched) {
-          await watchedSeriesReconciliationService.unmarkSeriesWatched(this.params?.itemId, {
-            meta: this.meta
-          });
-        } else {
-          await watchedSeriesReconciliationService.markSeriesWatched(
-            this.params?.itemId,
-            this.params?.itemType || this.meta?.type || "series",
-            {
-              meta: this.meta,
-              title: this.meta?.name || this.params?.fallbackTitle || "Untitled"
-            }
-          );
-        }
-      } else if (this.isMarkedWatched) {
-        await watchedItemsRepository.unmark(this.params?.itemId);
-        await watchProgressRepository.removeProgress(this.params?.itemId);
-      } else {
-        await watchedItemsRepository.mark({
-          contentId: this.params?.itemId,
-          contentType: this.params?.itemType || "movie",
-          title: this.meta?.name || this.params?.fallbackTitle || "Untitled",
-          watchedAt: Date.now()
-        });
-        await watchProgressRepository.saveProgress({
-          contentId: this.params?.itemId,
-          contentType: this.params?.itemType || "movie",
-          videoId: null,
-          positionMs: 100,
-          durationMs: 100,
-          updatedAt: Date.now()
-        });
-      }
-      if (!isSeries && this.meta?.ids?.trakt) {
-        const enriched = await detailWatchedEnrichmentService.enrichMovieWatchedState(
-          this.params?.itemId,
-          this.meta.ids.trakt
-        );
-        this.enrichedMovieState = enriched;
-        this.isMarkedWatched = Boolean(enriched?.isWatched);
-      }
-      await this.refreshEpisodePlaybackState();
-      this.render(this.meta, focusRestore);
+      await this.toggleWatchedFromDetail();
       return;
     }
 
@@ -9141,6 +9174,24 @@ export const MetaDetailsScreen = {
 
   onPointerFocus() {},
 
+  // Phone render path (ticket 02-01, mobile-parity epic) — all markup/interaction logic
+  // lives in js/ui/screens/detail/metaDetailsScreenPhone.js; this just hands it the screen
+  // instance so it can read this.meta/this.episodes/this.selectedSeason/this.castItems/
+  // this.moreLikeThisItems/this.collectionItems (already populated by mount()'s existing
+  // data flow) and call this screen's own mutation methods (playDefaultFromHero/
+  // toggleLibraryFromHero/toggleWatchedFromDetail/openEpisodeStreamChooser/
+  // navigateBackFromDetail) directly.
+  renderPhone(meta) {
+    if (!this.container) {
+      return;
+    }
+    if (meta) {
+      this.meta = meta;
+    }
+    this.container.innerHTML = renderMetaDetailsScreenPhone(this);
+    mountMetaDetailsScreenPhone(this, this.container);
+  },
+
   onPointerActivate(target) {
     const actionTarget = target?.closest?.("[data-action]");
     const action = String(actionTarget?.dataset?.action || "");
@@ -9165,6 +9216,9 @@ export const MetaDetailsScreen = {
         preserveSource: true
       });
       return true;
+    }
+    if (Platform.isPhoneViewport()) {
+      return handlePhoneMetaDetailsPointerActivate(this, target);
     }
     return false;
   },
@@ -9199,6 +9253,9 @@ export const MetaDetailsScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
+    cleanupMetaDetailsScreenPhone(this);
     this.detailLoadToken = (this.detailLoadToken || 0) + 1;
     this.cancelPendingEpisodeHold();
     this.cancelPendingSeasonHold();

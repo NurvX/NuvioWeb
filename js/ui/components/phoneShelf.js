@@ -37,11 +37,13 @@ function escapeHtml(value = "") {
 /**
  * Poster aspect used per shelf `variant`. `"portrait"` (the default) is the standard catalog
  * row of upright poster cards; `"continueWatching"` renders the larger continue-watching-
- * style landscape cards NuvioMobile uses for in-progress items.
+ * style landscape cards NuvioMobile uses for in-progress items; `"cast"` (ticket 02-01)
+ * renders small circular-avatar cards for a cast row.
  */
 const VARIANT_ASPECT = {
   portrait: "portrait",
-  continueWatching: "landscape"
+  continueWatching: "landscape",
+  cast: "circle"
 };
 
 /**
@@ -71,6 +73,7 @@ export function renderPhoneShelf({
   }
 
   const isContinuous = variant === "continueWatching";
+  const isCast = variant === "cast";
   const aspect = VARIANT_ASPECT[variant] || VARIANT_ASPECT.portrait;
 
   const cardsMarkup = items.map((item) => renderPosterCard({ ...item, aspect })).join("");
@@ -100,7 +103,7 @@ export function renderPhoneShelf({
 
   return `
     <section
-      class="phone-shelf${isContinuous ? " phone-shelf-continuous" : ""}"
+      class="phone-shelf${isContinuous ? " phone-shelf-continuous" : ""}${isCast ? " phone-shelf-cast" : ""}"
       ${id ? `data-shelf-id="${escapeHtml(id)}"` : ""}
     >
       <div class="phone-shelf-header">

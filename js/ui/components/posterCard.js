@@ -32,13 +32,14 @@ function clampProgress(progress) {
 
 /**
  * Returns markup for one phone poster card. `aspect` is `"portrait"` (2:3, the default —
- * `--phone-radius-poster` at 126x189px) or `"landscape"` (16:9, used by episode cards and
- * some catalog styles). `progress` is a 0..1 fraction; pass `null`/`undefined` to omit the
- * continue-watching progress bar entirely (distinct from `0`, which renders an empty bar).
- * `action`/`id` become `data-action`/`data-id` on the tappable element so the calling
- * screen's own `onPointerActivate(target)` (the existing shared contract, e.g.
- * catalogSeeAllScreen.js's `target.closest("[data-action]")` pattern) can read them —
- * posterCard.js does not dispatch navigation itself.
+ * `--phone-radius-poster` at 126x189px), `"landscape"` (16:9, used by episode cards and some
+ * catalog styles), or `"circle"` (1:1 circular avatar, used by cast rows — ticket 02-01).
+ * `progress` is a 0..1 fraction; pass `null`/`undefined` to omit the continue-watching
+ * progress bar entirely (distinct from `0`, which renders an empty bar). `action`/`id` become
+ * `data-action`/`data-id` on the tappable element so the calling screen's own
+ * `onPointerActivate(target)` (the existing shared contract, e.g. catalogSeeAllScreen.js's
+ * `target.closest("[data-action]")` pattern) can read them — posterCard.js does not dispatch
+ * navigation itself.
  */
 export function renderPosterCard({
   id = "",
@@ -52,7 +53,11 @@ export function renderPosterCard({
   progress = null
 } = {}) {
   const aspectClass =
-    aspect === "landscape" ? "phone-poster-card-landscape" : "phone-poster-card-portrait";
+    aspect === "landscape"
+      ? "phone-poster-card-landscape"
+      : aspect === "circle"
+        ? "phone-poster-card-circle"
+        : "phone-poster-card-portrait";
   const clampedProgress = clampProgress(progress);
 
   const watchedBadgeMarkup = watched
