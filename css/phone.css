@@ -224,4 +224,121 @@
     font-weight: var(--phone-font-weight-regular);
     color: var(--phone-text-primary);
   }
+
+  /* Poster card (js/ui/components/posterCard.js), ported from NuvioMobile's poster-card
+     visual system: rounded artwork, a top-sheen gradient, a watched checkmark badge, and a
+     continue-watching progress bar, with a title/subtitle label pair below the artwork. */
+  .phone-poster {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-6);
+    width: 126px;
+  }
+
+  .phone-poster-card {
+    position: relative;
+    display: block;
+    width: 100%;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: var(--phone-accent-bg-card);
+    border-radius: var(--phone-radius-poster);
+    overflow: hidden;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-poster-card-portrait {
+    aspect-ratio: 2 / 3;
+  }
+
+  .phone-poster-card-landscape {
+    aspect-ratio: 16 / 9;
+  }
+
+  .phone-poster-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .phone-poster-image-empty {
+    background: var(--phone-accent-bg-elevated);
+  }
+
+  /* Top-sheen: a white-alpha gradient clipped to the card's own rounded corners (the overlay
+     is a sibling element inside the already-`overflow: hidden` card, not a canvas effect). */
+  .phone-poster-sheen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 22%;
+    background: linear-gradient(to bottom, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0));
+    pointer-events: none;
+  }
+
+  .phone-poster-watched-badge {
+    position: absolute;
+    top: var(--phone-space-6);
+    right: var(--phone-space-6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--phone-radius-full);
+    background: rgb(var(--phone-accent-secondary-rgb) / 0.92);
+    color: var(--phone-text-primary);
+    pointer-events: none;
+  }
+
+  .phone-poster-progress-track {
+    position: absolute;
+    left: var(--phone-space-6);
+    right: var(--phone-space-6);
+    bottom: var(--phone-space-6);
+    height: 4px;
+    border-radius: var(--phone-radius-full);
+    background: rgb(255 255 255 / 0.3);
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .phone-poster-progress-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--phone-accent-secondary);
+  }
+
+  .phone-poster-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .phone-poster-title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    font-weight: var(--phone-font-weight-regular);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-poster-subtitle {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-xs-size);
+    line-height: var(--phone-type-label-xs-line);
+    font-weight: var(--phone-font-weight-regular);
+    color: var(--phone-text-muted);
+  }
 }
