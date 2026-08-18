@@ -39,12 +39,21 @@ export function resolveTapOutcome({
  * `onPointerActivate` call the browser's own click event would otherwise still fire. A press
  * released before the threshold, without exceeding the tolerance, fires `onTap`. Returns a
  * teardown function.
+ *
+ * `onHoldStart`/`onHoldEnd` are an optional pair alongside `onLongPress`, for consumers that
+ * need a hold-*duration* effect (e.g. the player's press-and-hold playback-speed boost, ticket
+ * 04-02) rather than a single fire-once action: `onHoldStart` fires at the same moment as
+ * `onLongPress` (threshold reached without exceeding tolerance), and `onHoldEnd` fires once,
+ * on release/cancel, but only if `onHoldStart` already fired. Both are no-ops when omitted, so
+ * existing single-fire `onLongPress` callers (e.g. posterCard.js) are unaffected.
  */
 export function attachLongPress(
   el,
   {
     onLongPress,
     onTap,
+    onHoldStart,
+    onHoldEnd,
     threshold = DEFAULT_LONG_PRESS_THRESHOLD_MS,
     moveTolerance = DEFAULT_MOVE_TOLERANCE_PX
   } = {}
@@ -57,6 +66,7 @@ export function attachLongPress(
   let tracking = false;
   let longPressFired = false;
   let movedTooFar = false;
+  let holding = false;
   let startX = 0;
   let startY = 0;
 
@@ -67,11 +77,19 @@ export function attachLongPress(
     }
   };
 
-  const resetState = () => {
+  const endHold = (event) => {
+    if (holding) {
+      holding = false;
+      onHoldEnd?.(event);
+    }
+  };
+
+  const resetState = (event) => {
     tracking = false;
     longPressFired = false;
     movedTooFar = false;
     clearTimer();
+    endHold(event);
   };
 
   const onPointerDown = (event) => {
@@ -91,6 +109,8 @@ export function attachLongPress(
       longPressFired = true;
       el.dataset.suppressNextTap = "1";
       onLongPress?.(event);
+      holding = true;
+      onHoldStart?.(event);
     }, threshold);
   };
 
@@ -107,14 +127,14 @@ export function attachLongPress(
   const onPointerUp = (event) => {
     const isCleanTap =
       tracking && resolveTapOutcome({ longPressFired, movedTooFar, cancelled: false });
-    resetState();
+    resetState(event);
     if (isCleanTap) {
       onTap?.(event);
     }
   };
 
-  const onPointerCancel = () => {
-    resetState();
+  const onPointerCancel = (event) => {
+    resetState(event);
   };
 
   el.addEventListener("pointerdown", onPointerDown);

@@ -186,6 +186,73 @@ test("attachLongPress: moving past tolerance before the threshold cancels the lo
   el.remove();
 });
 
+test("attachLongPress: onHoldStart/onHoldEnd fire alongside a long-press hold, in addition to onLongPress", async () => {
+  const el = document.createElement("div");
+  document.body.appendChild(el);
+  const events = [];
+  const detach = attachLongPress(el, {
+    threshold: 20,
+    onLongPress: () => events.push("longPress"),
+    onHoldStart: () => events.push("holdStart"),
+    onHoldEnd: () => events.push("holdEnd")
+  });
+
+  dispatchPointer(el, "pointerdown", { x: 10, y: 10 });
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.deepEqual(events, ["longPress", "holdStart"]);
+  dispatchPointer(el, "pointerup", { x: 10, y: 10 });
+
+  assert.deepEqual(events, ["longPress", "holdStart", "holdEnd"]);
+
+  detach();
+  el.remove();
+});
+
+test("attachLongPress: onHoldEnd does not fire for a plain tap that never reached the hold threshold", async () => {
+  const el = document.createElement("div");
+  document.body.appendChild(el);
+  let holdStarted = false;
+  let holdEnded = false;
+  const detach = attachLongPress(el, {
+    threshold: 200,
+    onHoldStart: () => {
+      holdStarted = true;
+    },
+    onHoldEnd: () => {
+      holdEnded = true;
+    }
+  });
+
+  dispatchPointer(el, "pointerdown", { x: 10, y: 10 });
+  dispatchPointer(el, "pointerup", { x: 10, y: 10 });
+
+  assert.equal(holdStarted, false);
+  assert.equal(holdEnded, false);
+
+  detach();
+  el.remove();
+});
+
+test("attachLongPress: onHoldEnd fires on pointercancel after a hold started", async () => {
+  const el = document.createElement("div");
+  document.body.appendChild(el);
+  const events = [];
+  const detach = attachLongPress(el, {
+    threshold: 20,
+    onHoldStart: () => events.push("start"),
+    onHoldEnd: () => events.push("end")
+  });
+
+  dispatchPointer(el, "pointerdown", { x: 10, y: 10 });
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  dispatchPointer(el, "pointercancel", { x: 10, y: 10 });
+
+  assert.deepEqual(events, ["start", "end"]);
+
+  detach();
+  el.remove();
+});
+
 test("a long-press that fires does NOT also trigger the screen's onPointerActivate through the real FocusEngine seam", async () => {
   const { FocusEngine } = await import("./focusEngine.js");
   const { Router } = await import("./router.js");

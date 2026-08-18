@@ -43,7 +43,9 @@ import { selectAutoPlayStream } from "../../../core/streams/streamAutoPlaySelect
 import { metaRepository } from "../../../data/repository/metaRepository.js";
 import { I18n } from "../../../i18n/index.js";
 import { Environment } from "../../../platform/environment.js";
+import { Platform } from "../../../platform/index.js";
 import { Router } from "../../navigation/router.js";
+import { attachPlayerGestureLayer, PLAYER_GESTURE_HOLD_SPEED } from "./playerGestures.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
 import { DirectDebridResolver } from "../../../core/debrid/directDebridResolver.js";
 import { TrackingScrobbleService } from "../../../data/repository/trackingScrobbleService.js";
@@ -2165,6 +2167,12 @@ export const PlayerScreen = {
     const mountToken = Number(this.playerMountToken || 0) + 1;
     this.playerMountToken = mountToken;
     this.playerRouteActive = true;
+    // Phone gesture layer (ticket 04-02, mobile-parity epic) — re-synced live when the
+    // viewport crosses the phone breakpoint (00-07), same pattern as every other phone-mode
+    // screen. All of it is additive and gated behind Platform.isPhoneViewport(); it never
+    // touches the existing keydown-based D-pad control logic below.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.syncPhoneGestureLayer());
     this.webOsClockLocaleInfo = null;
     this.webOsClockSettingsSubscription?.cancel?.();
     this.webOsClockSettingsSubscription = null;
@@ -2576,6 +2584,7 @@ export const PlayerScreen = {
       void this.fetchSkipIntervals();
       void this.hydratePauseOverlayMeta();
     }
+    this.syncPhoneGestureLayer();
     this.renderEpisodePanel();
     this.applyAspectMode({ showToast: false });
     if (!this.isExternalFrameMode()) {
@@ -9681,9 +9690,12 @@ export const PlayerScreen = {
     if (!this.controlsVisible || this.paused || this.isDialogOpen() || this.seekOverlayVisible) {
       return;
     }
+    // Phone mode uses a shorter auto-hide delay (ticket 04-02) — TV's 4200ms is unchanged when
+    // Platform.isPhoneViewport() is false.
+    const hideDelayMs = Platform.isPhoneViewport() ? 3500 : 4200;
     this.controlsHideTimer = setTimeout(() => {
       this.setControlsVisible(false);
-    }, 4200);
+    }, hideDelayMs);
   },
 
   getPlaybackCurrentSeconds() {
@@ -19303,10 +19315,281 @@ export const PlayerScreen = {
     this.updateUiTick();
   },
 
+  // ---------------------------------------------------------------------------------------
+  // Phone gesture layer (ticket 04-02, mobile-parity epic — see
+  // .scratch/mobile-parity/spec.md and .scratch/mobile-parity/issues/04-02-player-gestures.md).
+  // Everything below is additive: it is wired via a single Pointer Events listener on the
+  // player UI root (js/ui/screens/player/playerGestures.js — attachPlayerGestureLayer), only
+  // when Platform.isPhoneViewport() is true, and only calls the same playback primitives the
+  // existing keydown-based control scheme above already uses (togglePause/seekPlaybackSeconds/
+  // applyPlaybackSpeed/setControlsVisible). None of this touches onKeyDown or its helpers.
+  // ---------------------------------------------------------------------------------------
+
+  // Re-synced from mount() and from the Platform.watchPhoneViewport() subscription so a live
+  // resize across the phone breakpoint attaches/detaches the layer without a full re-mount.
+  syncPhoneGestureLayer() {
+    if (this.isExternalFrameMode()) {
+      this.teardownPhoneGestureLayer();
+      return;
+    }
+    const shouldAttach = Platform.isPhoneViewport();
+    if (!shouldAttach) {
+      this.teardownPhoneGestureLayer();
+      return;
+    }
+    if (this.phoneGestureLayerDetach) {
+      // Already attached to the current #playerUiRoot (renderPlayerUi() only rebuilds it once
+      // per mount, so re-attaching on every resize tick would just leak listeners).
+      return;
+    }
+    const root = this.uiRefs?.root;
+    if (!root) {
+      return;
+    }
+    this.phoneGestureLayerDetach = attachPlayerGestureLayer(root, {
+      getContext: () => this.getPhoneGestureContext(),
+      shouldIgnoreTarget: (target) => this.shouldIgnorePhoneGestureTarget(target),
+      onSingleTap: () => this.onPhoneGestureTap(),
+      onSeekTap: (direction) => this.onPhoneGestureSeekTap(direction),
+      onHoldStart: () => this.onPhoneGestureHoldStart(),
+      onHoldEnd: () => this.onPhoneGestureHoldEnd(),
+      onScrubStart: () => this.onPhoneGestureScrubStart(),
+      onScrubMove: ({ previewSeconds }) => this.onPhoneGestureScrubMove(previewSeconds),
+      onScrubEnd: ({ previewSeconds, committed }) =>
+        this.onPhoneGestureScrubEnd(previewSeconds, committed),
+      onBrightnessMove: (value) => this.onPhoneGestureBrightnessMove(value),
+      onVolumeMove: (value) => this.onPhoneGestureVolumeMove(value),
+      onDragEnd: (kind) => this.onPhoneGestureDragEnd(kind)
+      // onFeedback intentionally not wired here: onScrubMove/onBrightnessMove/onVolumeMove
+      // above each already derive limitHit and call onPhoneGestureFeedback() themselves, so
+      // wiring the generic onFeedback callback too would fire the feedback pill twice per
+      // pointermove with two independently-derived limitHit values. See 04-02 review notes.
+    });
+  },
+
+  teardownPhoneGestureLayer() {
+    this.phoneGestureLayerDetach?.();
+    this.phoneGestureLayerDetach = null;
+    this.hidePhoneGestureFeedback();
+    if (this.phoneGestureHoldActive) {
+      this.onPhoneGestureHoldEnd();
+    }
+    this.phoneGestureBrightness = null;
+    const video = PlayerController.video;
+    if (video && video.style.filter) {
+      video.style.filter = "";
+    }
+  },
+
+  // A pointerdown that lands on existing interactive chrome (control buttons, dialogs, the
+  // progress bar) or while any dialog/overlay is already open must not also start a gesture
+  // session — the gesture layer only owns the bare video surface, never competing with the
+  // desktop-oriented click delegation (onPointerActivate) those elements already use.
+  shouldIgnorePhoneGestureTarget(target) {
+    if (
+      this.isDialogOpen() ||
+      this.isStartupErrorVisible() ||
+      this.pauseOverlayVisible ||
+      this.moreActionsVisible
+    ) {
+      return true;
+    }
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    return Boolean(
+      target.closest(
+        [
+          ".player-controls-overlay",
+          ".player-modal",
+          ".player-sources-panel",
+          ".player-pause-overlay",
+          ".player-next-episode-card",
+          ".player-skip-intro",
+          ".player-parental-guide",
+          ".player-startup-error-overlay",
+          "#episodeSidePanel"
+        ].join(",")
+      )
+    );
+  },
+
+  getPhoneGestureContext() {
+    return {
+      currentSeconds: this.getPlaybackCurrentSeconds(),
+      durationSeconds: this.getPlaybackDurationSeconds(),
+      brightness: Number.isFinite(this.phoneGestureBrightness) ? this.phoneGestureBrightness : 1,
+      volume: Number(PlayerController.video?.volume ?? 1),
+      scrubEnabled: this.isSeekBarAvailable() && !this.isExternalFrameMode()
+    };
+  },
+
+  // Single tap anywhere toggles controls visibility, same as a TV remote's select-to-reveal —
+  // reuses the existing setControlsVisible()/resetControlsAutoHide() auto-hide machinery.
+  onPhoneGestureTap() {
+    if (this.isExternalFrameMode()) {
+      return;
+    }
+    this.setControlsVisible(!this.controlsVisible, { focus: false });
+  },
+
+  // Double-tap on the left/right third seeks by a fixed step, reusing the same primitive the
+  // keydown seek-preview flow commits through.
+  onPhoneGestureSeekTap(direction) {
+    if (this.isExternalFrameMode() || !this.isSeekBarAvailable()) {
+      return;
+    }
+    const step = 10;
+    const current = this.getPlaybackCurrentSeconds();
+    this.seekPlaybackSeconds(Math.max(0, current + direction * step));
+    this.onPhoneGestureFeedback({
+      type: "seek-tap",
+      value: direction,
+      limitHit: false
+    });
+  },
+
+  // Press-and-hold = temporary playback-speed boost while held. Reuses the screen's existing
+  // applyPlaybackSpeed() (the same method the speed dialog calls) rather than touching
+  // PlayerController directly, so restoring the prior speed on release goes through the exact
+  // same path.
+  onPhoneGestureHoldStart() {
+    if (this.isExternalFrameMode() || this.paused || this.phoneGestureHoldActive) {
+      return;
+    }
+    this.phoneGestureHoldActive = true;
+    this.phoneGestureHoldPreviousSpeed = this.getPlaybackSpeed();
+    void this.applyPlaybackSpeed(PLAYER_GESTURE_HOLD_SPEED);
+    this.onPhoneGestureFeedback({
+      type: "hold-speed",
+      value: PLAYER_GESTURE_HOLD_SPEED,
+      limitHit: false
+    });
+  },
+
+  onPhoneGestureHoldEnd() {
+    if (!this.phoneGestureHoldActive) {
+      return;
+    }
+    this.phoneGestureHoldActive = false;
+    const restoreSpeed = Number.isFinite(this.phoneGestureHoldPreviousSpeed)
+      ? this.phoneGestureHoldPreviousSpeed
+      : 1;
+    this.phoneGestureHoldPreviousSpeed = null;
+    void this.applyPlaybackSpeed(restoreSpeed);
+    this.hidePhoneGestureFeedback();
+  },
+
+  // Horizontal drag = scrub preview, committed on release via the same seekPlaybackSeconds()
+  // the keydown seek-preview flow commits through. This ticket only needs to expose the live
+  // preview through the feedback callback (04-03 renders the real floating pill); the minimal
+  // text placeholder below stands in until then.
+  onPhoneGestureScrubStart() {
+    this.clearControlsAutoHide();
+  },
+
+  onPhoneGestureScrubMove(previewSeconds) {
+    const duration = this.getPlaybackDurationSeconds();
+    this.onPhoneGestureFeedback({
+      type: "scrub",
+      value: previewSeconds,
+      limitHit: previewSeconds <= 0 || (duration > 0 && previewSeconds >= duration)
+    });
+  },
+
+  onPhoneGestureScrubEnd(previewSeconds, committed) {
+    if (committed && Number.isFinite(previewSeconds)) {
+      this.seekPlaybackSeconds(previewSeconds);
+    }
+    this.hidePhoneGestureFeedback();
+    this.resetControlsAutoHide();
+  },
+
+  // Vertical drag on the left third = brightness. No OS/browser brightness API exists on the
+  // web, so this is a cosmetic-only CSS filter on the <video> element itself, not a real
+  // display-brightness change.
+  onPhoneGestureBrightnessMove(value) {
+    this.phoneGestureBrightness = value;
+    const video = PlayerController.video;
+    if (video) {
+      video.style.filter = `brightness(${(0.4 + value * 1.1).toFixed(3)})`;
+    }
+    this.onPhoneGestureFeedback({ type: "brightness", value, limitHit: value <= 0 || value >= 1 });
+  },
+
+  // Vertical drag on the right third = real playback volume.
+  onPhoneGestureVolumeMove(value) {
+    const video = PlayerController.video;
+    if (video) {
+      try {
+        video.volume = value;
+      } catch (_) {
+        // Some TV WebKit engines reject programmatic volume changes; harmless no-op there.
+      }
+    }
+    this.onPhoneGestureFeedback({ type: "volume", value, limitHit: value <= 0 || value >= 1 });
+  },
+
+  onPhoneGestureDragEnd(kind) {
+    if (kind === "brightness" || kind === "volume") {
+      this.hidePhoneGestureFeedback();
+    }
+  },
+
+  // Placeholder feedback surface (icon-less text pill) — ticket 04-03 owns the real floating
+  // pill's visual styling and replaces this. This just proves the callback contract fires with
+  // the right {type, value, limitHit} data for a real gesture in a real browser.
+  onPhoneGestureFeedback(payload) {
+    if (!payload) {
+      return;
+    }
+    const root = this.uiRefs?.root;
+    if (!root) {
+      return;
+    }
+    let pill = root.querySelector("#phonePlayerGestureFeedback");
+    if (!pill) {
+      pill = document.createElement("div");
+      pill.id = "phonePlayerGestureFeedback";
+      pill.className = "phone-player-gesture-feedback hidden";
+      root.appendChild(pill);
+    }
+    pill.textContent = this.formatPhoneGestureFeedbackText(payload);
+    pill.classList.remove("hidden");
+    pill.classList.toggle("limit-hit", Boolean(payload.limitHit));
+  },
+
+  formatPhoneGestureFeedbackText({ type, value }) {
+    if (type === "scrub") {
+      return formatTime(Number(value || 0));
+    }
+    if (type === "seek-tap") {
+      return value > 0 ? "+10s" : "-10s";
+    }
+    if (type === "brightness") {
+      return `Brightness ${Math.round(Number(value || 0) * 100)}%`;
+    }
+    if (type === "volume") {
+      return `Volume ${Math.round(Number(value || 0) * 100)}%`;
+    }
+    if (type === "hold-speed") {
+      return `${Number(value || 1)}x`;
+    }
+    return "";
+  },
+
+  hidePhoneGestureFeedback() {
+    const pill = this.uiRefs?.root?.querySelector("#phonePlayerGestureFeedback");
+    pill?.classList.add("hidden");
+  },
+
   cleanup() {
     try {
       this.playerRouteActive = false;
       this.playerMountToken = Number(this.playerMountToken || 0) + 1;
+      this.phoneViewportUnsubscribe?.();
+      this.phoneViewportUnsubscribe = null;
+      this.teardownPhoneGestureLayer();
       this.nextEpisodeLaunchToken = Number(this.nextEpisodeLaunchToken || 0) + 1;
       this.nextEpisodeLaunching = false;
       this.resetNextEpisodeLaunchPresentation();

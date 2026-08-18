@@ -2786,4 +2786,32 @@
     line-height: var(--phone-type-body-sm-line);
     color: var(--phone-text-secondary);
   }
+
+  /* Player gesture feedback pill (ticket 04-02) — placeholder styling only, enough to verify
+     the gesture callback contract fires with real data in a real browser. Ticket 04-03 owns
+     the pill's final visual design (icon + text) and is expected to replace this rule. */
+  .phone-player-gesture-feedback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 40;
+    padding: var(--phone-space-8) var(--phone-space-16);
+    border-radius: var(--phone-radius-full, 999px);
+    background: rgba(0, 0, 0, 0.72);
+    color: var(--phone-text-primary, #fff);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    font-weight: var(--phone-font-weight-semibold);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .phone-player-gesture-feedback.hidden {
+    display: none;
+  }
+
+  .phone-player-gesture-feedback.limit-hit {
+    background: rgba(120, 20, 20, 0.78);
+  }
 }
