@@ -1946,4 +1946,142 @@
     line-height: var(--phone-type-body-sm-line);
     color: var(--phone-text-muted);
   }
+
+  /* Catalog "see all" screen (js/ui/screens/catalog/catalogSeeAllScreenPhone.js, ticket 03-03):
+     a floating (non-fixed) header — `position: absolute` within this screen's own
+     `position: relative` root, not `position: fixed` against the viewport — that sits above a
+     separately-scrolling grid, with a top-to-bottom gradient so the grid's own artwork is
+     legible scrolling underneath it. The grid wrap's `padding-top` is set inline by JS to the
+     header's own measured `offsetHeight` so the first row starts just clear of it on initial
+     paint. */
+  .phone-catalog-seeall-root {
+    position: relative;
+    height: 100%;
+    background: var(--phone-accent-bg);
+    overflow: hidden;
+  }
+
+  .phone-catalog-seeall-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--phone-space-12);
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-screen-h)
+      var(--phone-space-20);
+    background: linear-gradient(
+      to bottom,
+      rgba(10, 10, 10, 0.78) 0%,
+      rgba(10, 10, 10, 0.42) 65%,
+      rgba(10, 10, 10, 0) 100%
+    );
+    pointer-events: none;
+  }
+
+  .phone-catalog-seeall-back {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: var(--phone-radius-full);
+    background: rgba(255 255 255 / 0.14);
+    color: var(--phone-text-primary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-catalog-seeall-back svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .phone-catalog-seeall-header-text {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 6px;
+  }
+
+  .phone-catalog-seeall-title {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-md-size);
+    line-height: var(--phone-type-title-md-line);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-catalog-seeall-subtitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-catalog-seeall-scroll {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .phone-catalog-seeall-grid-wrap {
+    padding: 0 var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-24));
+  }
+
+  .phone-catalog-seeall-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--phone-space-12) var(--phone-space-10);
+  }
+
+  .phone-catalog-seeall-grid .phone-poster {
+    width: 100%;
+  }
+
+  .phone-catalog-seeall-loading-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--phone-space-8);
+    padding: var(--phone-space-20) 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    color: var(--phone-text-muted);
+  }
+
+  .phone-catalog-seeall-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--phone-space-8);
+    padding: var(--phone-space-96) var(--phone-space-screen-h) var(--phone-space-40);
+  }
+
+  .phone-catalog-seeall-empty-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-sm-size);
+    line-height: var(--phone-type-title-sm-line);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
 }

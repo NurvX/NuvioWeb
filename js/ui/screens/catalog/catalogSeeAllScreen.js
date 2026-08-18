@@ -3,6 +3,7 @@ import { ScreenUtils } from "../../navigation/screen.js";
 import { catalogRepository } from "../../../data/repository/catalogRepository.js";
 import { watchedItemsRepository } from "../../../data/repository/watchedItemsRepository.js";
 import { Environment } from "../../../platform/environment.js";
+import { Platform } from "../../../platform/index.js";
 import { LayoutPreferences } from "../../../data/local/layoutPreferences.js";
 import { I18n } from "../../../i18n/index.js";
 import { focusWithoutAutoScroll } from "../../components/sidebarNavigation.js";
@@ -16,6 +17,12 @@ import {
   renderTitleWatchedBadge
 } from "../../components/watchedTitleBadge.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
+import {
+  renderCatalogSeeAllScreenPhone,
+  mountCatalogSeeAllScreenPhone,
+  cleanupCatalogSeeAllScreenPhone,
+  handleCatalogSeeAllPhonePointerActivate
+} from "./catalogSeeAllScreenPhone.js";
 
 const POSTER_HOLD_DELAY_MS = 650;
 
@@ -36,7 +43,7 @@ function t(key, params = {}, fallback = key) {
   return I18n.t(key, params, { fallback });
 }
 
-function extractReleaseYear(item = {}) {
+export function extractReleaseYear(item = {}) {
   const candidates = [
     item?.released,
     item?.releaseDate,
@@ -179,6 +186,10 @@ export const CatalogSeeAllScreen = {
   async mount(params = {}, navigationContext = {}) {
     this.container = document.getElementById("catalogSeeAll");
     ScreenUtils.show(this.container);
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render());
     this.params = params || {};
     this.items = Array.isArray(params?.initialItems) ? [...params.initialItems] : [];
     this.nextSkip = this.items.length ? 100 : 0;
@@ -592,6 +603,9 @@ export const CatalogSeeAllScreen = {
   },
 
   render() {
+    if (Platform.isPhoneViewport()) {
+      return this.renderPhone();
+    }
     const descriptor = this.params || {};
     const title = descriptor.catalogName || "Catalog";
     const cards = this.items.length
@@ -671,6 +685,20 @@ export const CatalogSeeAllScreen = {
       return;
     }
     ScreenUtils.setInitialFocus(this.container);
+  },
+
+  // Phone render path (ticket 03-03, mobile-parity epic) — all markup/interaction logic lives
+  // in js/ui/screens/catalog/catalogSeeAllScreenPhone.js; this just hands it the screen instance
+  // so it can read this.params/this.items/this.loading/this.hasMore/this.layoutPrefs/
+  // this.watchedTitleIds (already populated by mount()'s existing data flow) and call
+  // this.loadNextPage(...) (the TV screen's own existing async method) directly for
+  // infinite-scroll pagination.
+  renderPhone() {
+    if (!this.container) {
+      return;
+    }
+    this.container.innerHTML = renderCatalogSeeAllScreenPhone(this);
+    mountCatalogSeeAllScreenPhone(this, this.container);
   },
 
   bindCardEvents() {
@@ -754,7 +782,14 @@ export const CatalogSeeAllScreen = {
   // A tap is treated as a single-activation gesture (open detail), matching
   // the D-pad path's short-press behavior — the long-press poster-options
   // menu is a D-pad-hold-specific affordance, not reproduced for touch here.
+  //
+  // Phone dispatch (ticket 03-03, mobile-parity epic): delegates to
+  // catalogSeeAllScreenPhone.js's own handler, which understands that module's own markup
+  // (data-action via posterCard.js, not the TV `.seeall-card` dataset convention below).
   onPointerActivate(target) {
+    if (Platform.isPhoneViewport()) {
+      return handleCatalogSeeAllPhonePointerActivate(this, target);
+    }
     const actionTarget = target?.closest?.("[data-action]");
     const action = String(actionTarget?.dataset?.action || "");
     if (action === "openDetail") {
@@ -768,6 +803,9 @@ export const CatalogSeeAllScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
+    cleanupCatalogSeeAllScreenPhone(this);
     this.loadToken = (this.loadToken || 0) + 1;
     this.cancelPendingPosterHold();
     this.posterOptionsController?.destroy?.({ restoreFocus: false });
