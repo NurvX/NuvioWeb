@@ -303,6 +303,13 @@ export const FocusEngine = {
       return;
     }
     this.focusPointerTarget(target, event);
+    // A gestureEngine.js long-press that already fired sets this flag so the click that
+    // follows pointerup doesn't also activate the target — see attachLongPress. Never set
+    // on TV, so this is a no-op there.
+    if (target.dataset.suppressNextTap) {
+      delete target.dataset.suppressNextTap;
+      return;
+    }
     const currentScreen = Router.getCurrentScreen();
     if (hasActiveModal()) {
       return;

@@ -135,4 +135,93 @@
     max-height: 0;
     opacity: 0;
   }
+
+  /* Bottom sheet (js/ui/components/bottomSheet.js), ported from NuvioMobile's
+     NuvioModalBottomSheet / NuvioBottomSheetActionRow. */
+  .phone-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: var(--phone-overlay-scrim);
+    opacity: 0;
+    transition: opacity var(--phone-motion-sheet-enter) var(--phone-ease-standard);
+  }
+
+  .phone-sheet-backdrop.open {
+    opacity: 1;
+  }
+
+  .phone-sheet {
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: var(--phone-accent-bg-elevated);
+    border-radius: var(--phone-radius-sheet) var(--phone-radius-sheet) 0 0;
+    box-sizing: border-box;
+    transform: translateY(100%);
+    transition: transform var(--phone-motion-sheet-enter) var(--phone-ease-standard);
+  }
+
+  .phone-sheet-backdrop.open .phone-sheet {
+    transform: translateY(0);
+  }
+
+  .phone-sheet-drag-region {
+    display: flex;
+    justify-content: center;
+    padding: var(--phone-space-10) 0 var(--phone-space-6);
+    touch-action: none;
+  }
+
+  .phone-sheet-handle {
+    width: 54px;
+    height: 5px;
+    border-radius: var(--phone-radius-full);
+    background: var(--phone-border-default);
+  }
+
+  .phone-sheet-actions {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: var(--phone-space-sheet-padding);
+  }
+
+  .phone-sheet-action {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-14);
+    width: 100%;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--phone-border-default);
+    padding: var(--phone-space-16) var(--phone-space-screen-h);
+    cursor: pointer;
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-sheet-action:last-child {
+    border-bottom: none;
+  }
+
+  .phone-sheet-action-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    color: var(--phone-accent-secondary);
+    flex-shrink: 0;
+  }
+
+  .phone-sheet-action-title {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-sm-size);
+    line-height: var(--phone-type-title-sm-line);
+    font-weight: var(--phone-font-weight-regular);
+    color: var(--phone-text-primary);
+  }
 }
