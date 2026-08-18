@@ -123,6 +123,13 @@ import {
   uniqueNonEmptyValues
 } from "./homeUtils.js";
 
+import {
+  renderHomeScreenPhone,
+  mountHomeScreenPhone,
+  cleanupHomeScreenPhone,
+  handlePhoneHomePointerActivate
+} from "./homeScreenPhone.js";
+
 export { escapeAttribute, escapeHtml, formatCatalogRowTitle } from "./homeUtils.js";
 
 /** @typedef {import("./homeTypes.js").HomeMediaSourceLike} HomeMediaSourceLike */
@@ -796,7 +803,10 @@ function buildCollectionHomeRow(collection = {}) {
   };
 }
 
-function normalizeHomeRowItem(row = null, item = null) {
+// Exported for js/ui/screens/home/homeScreenPhone.js (ticket 01-01): the phone render path
+// needs the same row-item normalization TV rows already use (hero candidates, catalog/
+// collection shelves) rather than reimplementing it.
+export function normalizeHomeRowItem(row = null, item = null) {
   if (!row || !item) {
     return null;
   }
@@ -8013,6 +8023,10 @@ export const HomeScreen = {
   async mount(params = {}, navigationContext = {}) {
     const mountStart = HOME_PERF_DEBUG ? homePerfNow() : 0;
     this.container = document.getElementById("home");
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.requestRender());
     const restoredRouteFocusState =
       navigationContext?.isBackNavigation && navigationContext?.restoredState?.layoutMode
         ? navigationContext.restoredState
@@ -8871,6 +8885,9 @@ export const HomeScreen = {
   },
 
   render() {
+    if (Platform.isPhoneViewport()) {
+      return this.renderPhone();
+    }
     const renderStart = HOME_PERF_DEBUG ? homePerfNow() : 0;
     this.cancelScheduledRender();
     this.cancelModernCameraFollow({ stopAnimations: true });
@@ -9316,6 +9333,31 @@ export const HomeScreen = {
       continueWatching: Number(this.continueWatchingDisplay?.length || 0),
       focusables: Number(mountedCards + (this.navModel?.sidebar?.length || 0))
     });
+  },
+
+  // Phone render path (ticket 01-01, mobile-parity epic) — all markup/interaction logic lives
+  // in js/ui/screens/home/homeScreenPhone.js; this just hands it the screen instance so it can
+  // read this.rows/this.heroCandidates/this.continueWatchingDisplay/this.sidebarProfile
+  // (already populated by mount()'s existing data flow) and call this screen's own mutation
+  // methods (togglePosterLibrary/togglePosterWatched/openPosterListPicker/
+  // removeContinueWatchingItem/openContinueWatchingFromItem) directly.
+  renderPhone() {
+    if (!this.container) {
+      return;
+    }
+    this.container.innerHTML = renderHomeScreenPhone(this);
+    mountHomeScreenPhone(this, this.container);
+  },
+
+  // Delegates tap navigation for the phone home screen's poster-card markup (data-action/
+  // data-id via posterCard.js) through the shared onPointerActivate contract FocusEngine's
+  // global click dispatch already calls. Returns false (a no-op) outside phone mode so TV's
+  // own click handling — which never went through this contract — is unaffected.
+  onPointerActivate(target) {
+    if (!Platform.isPhoneViewport()) {
+      return false;
+    }
+    return handlePhoneHomePointerActivate(this, target);
   },
 
   scheduleHomeLazyImageHydration(anchorNode = null, { refreshIndex = false } = {}) {
@@ -11005,6 +11047,9 @@ export const HomeScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
+    cleanupHomeScreenPhone(this);
     this.cancelModernSidebarPillAutoCollapse();
     this.cancelPendingContinueWatchingEnter();
     this.cancelPendingContinueWatchingHold();
