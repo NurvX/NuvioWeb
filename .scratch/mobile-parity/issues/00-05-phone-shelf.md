@@ -31,8 +31,8 @@ behavior, spacing, and title/chevron treatment right here rather than in each co
 ## Comments
 
 - `js/ui/components/phoneShelf.js`: `renderPhoneShelf({id, title, items, variant,
-  viewAllLabel})` + `bindPhoneShelfEvents(container, {onViewAll, onLongPress, threshold,
-  moveTolerance})`. Renders a `--phone-type-title-lg` section title, an optional "view all"
+viewAllLabel})` + `bindPhoneShelfEvents(container, {onViewAll, onLongPress, threshold,
+moveTolerance})`. Renders a `--phone-type-title-lg` section title, an optional "view all"
   chevron pill (only when `viewAllLabel` is supplied), and a horizontally-scrolling row of
   real `posterCard.js` instances (`renderPosterCard`/`bindPosterCardEvents` — poster rendering
   itself is not reimplemented here). `variant` is `"portrait"` (default) or
