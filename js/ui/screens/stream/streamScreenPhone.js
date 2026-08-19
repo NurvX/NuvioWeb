@@ -169,7 +169,7 @@ function renderResumePill(screen, filtered) {
   }
   const positionLabel = formatResumeClock(Number(screen.params?.resumePositionMs || 0));
   return `
-    <button type="button" class="phone-stream-resume-pill" data-action="resumePlay" data-stream-id="${escapeHtml(target.id)}">
+    <button type="button" class="phone-stream-resume-pill focusable" data-action="resumePlay" data-stream-id="${escapeHtml(target.id)}">
       ${iconPlay()}
       <span>${escapeHtml(t("stream_resume_from", [positionLabel], `Resume from ${positionLabel}`))}</span>
     </button>
@@ -184,6 +184,7 @@ function renderChip({ addon, label, selected, status }) {
   const chipStatus = String(status || "success");
   const classes = [
     "phone-stream-chip",
+    "focusable",
     selected ? "selected" : "",
     chipStatus !== "success" ? chipStatus : ""
   ]
@@ -204,7 +205,7 @@ function renderChip({ addon, label, selected, status }) {
 function renderFilterRow(screen) {
   const ordered = screen.getOrderedFilterNames();
   const refreshChip = `
-    <button type="button" class="phone-stream-chip phone-stream-chip-refresh" data-action="refreshStreams" aria-label="${escapeHtml(t("common.refresh", {}, "Refresh"))}">
+    <button type="button" class="phone-stream-chip phone-stream-chip-refresh focusable" data-action="refreshStreams" aria-label="${escapeHtml(t("common.refresh", {}, "Refresh"))}">
       ${iconRefresh()}
     </button>
   `;
@@ -493,7 +494,7 @@ export function renderStreamScreenPhone(screen) {
         return `
           <div class="phone-stream-scroll" data-phone-stream-scroll>
             <header class="phone-stream-topbar">
-              <button type="button" class="phone-stream-back-btn" data-action="back" aria-label="${escapeHtml(t("common.back", {}, "Back"))}">
+              <button type="button" class="phone-stream-back-btn focusable" data-action="back" aria-label="${escapeHtml(t("common.back", {}, "Back"))}">
                 ${iconBack()}
               </button>
             </header>

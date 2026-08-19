@@ -35,8 +35,8 @@ function renderTextDialog(value) {
                spellcheck="false"
                value="${escapeHtml(value)}" />
         <div class="phone-settings-dialog-actions">
-          <button type="button" class="phone-settings-dialog-button" data-action="cancelText">${escapeHtml(I18n.t("common.cancel", {}, { fallback: "Cancel" }))}</button>
-          <button type="button" class="phone-settings-dialog-button is-primary" data-action="saveText">${escapeHtml(I18n.t("common.save", {}, { fallback: "Save" }))}</button>
+          <button type="button" class="phone-settings-dialog-button focusable" data-action="cancelText">${escapeHtml(I18n.t("common.cancel", {}, { fallback: "Cancel" }))}</button>
+          <button type="button" class="phone-settings-dialog-button is-primary focusable" data-action="saveText">${escapeHtml(I18n.t("common.save", {}, { fallback: "Save" }))}</button>
         </div>
       </div>
     </div>
