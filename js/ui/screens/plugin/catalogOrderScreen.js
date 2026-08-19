@@ -9,6 +9,7 @@ import {
 } from "../../../core/addons/homeCatalogs.js";
 import { Platform } from "../../../platform/index.js";
 import { ExperienceModeStore } from "../../../data/local/experienceModeStore.js";
+import { renderCatalogOrderScreenPhone } from "./catalogOrderScreenPhone.js";
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -188,7 +189,9 @@ export const CatalogOrderScreen = {
       })
       .join("");
 
-    this.container.innerHTML = `
+    this.container.innerHTML = Platform.isPhoneViewport()
+      ? `<div class="catalog-order-shell">${renderCatalogOrderScreenPhone(this)}</div>`
+      : `
       <div class="catalog-order-shell">
         <main class="catalog-order-main">
           <h1 class="catalog-order-title">Reorder Home Catalogs</h1>

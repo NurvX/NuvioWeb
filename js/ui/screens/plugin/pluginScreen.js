@@ -7,6 +7,7 @@ import { Platform } from "../../../platform/index.js";
 import { QrCodeGenerator } from "../../../core/qr/qrCodeGenerator.js";
 import { ExperienceModeStore } from "../../../data/local/experienceModeStore.js";
 import { I18n } from "../../../i18n/index.js";
+import { renderPluginScreenPhone } from "./pluginScreenPhone.js";
 
 function t(key, fallback) {
   return I18n.t(key, {}, { fallback });
@@ -163,7 +164,11 @@ export const PluginScreen = {
     if (!canvas) {
       return;
     }
-    QrCodeGenerator.generate(canvas, this.model.phoneManagerUrl, 440);
+    QrCodeGenerator.generate(
+      canvas,
+      this.model.phoneManagerUrl,
+      Platform.isPhoneViewport() ? 160 : 440
+    );
   },
 
   async openQrOverlay() {
@@ -224,7 +229,15 @@ export const PluginScreen = {
     });
 
     const enterClass = this.pluginRouteEnterPending ? " nuvio-route-slide-enter" : "";
-    this.container.innerHTML = `
+    this.container.innerHTML = Platform.isPhoneViewport()
+      ? `
+      <div class="addons-shell addons-route-shell">
+        <div class="addons-route-content${enterClass}">
+          ${renderPluginScreenPhone(this)}
+        </div>
+      </div>
+    `
+      : `
       <div class="addons-shell addons-route-shell">
         <div class="addons-route-content${enterClass}">
           <main class="home-main addons-main addons-main-centered">
@@ -234,8 +247,14 @@ export const PluginScreen = {
                 <p class="addons-lede">
                   ${escapeHtml(
                     this.model.isEssential
-                      ? t("addon_manage_addons_only_from_phone_subtitle", "Scan a QR code to install or remove add-ons from your phone")
-                      : t("addon_manage_from_phone_subtitle", "Scan a QR code to manage addons, catalogs, and collections from your phone")
+                      ? t(
+                          "addon_manage_addons_only_from_phone_subtitle",
+                          "Scan a QR code to install or remove add-ons from your phone"
+                        )
+                      : t(
+                          "addon_manage_from_phone_subtitle",
+                          "Scan a QR code to manage addons, catalogs, and collections from your phone"
+                        )
                   )}
                 </p>
                 <p class="addons-meta">${escapeHtml(`${this.model.addonCount} addon${this.model.addonCount === 1 ? "" : "s"} currently linked`)}</p>
@@ -252,15 +271,24 @@ export const PluginScreen = {
                     <strong>${escapeHtml(t("addon_manage_from_phone_title", "Manage from phone"))}</strong>
                     <small>${escapeHtml(
                       this.model.isEssential
-                        ? t("addon_manage_addons_only_from_phone_subtitle", "Scan a QR code to install or remove add-ons from your phone")
-                        : t("addon_manage_from_phone_subtitle", "Scan a QR code to manage addons, catalogs, and collections from your phone")
+                        ? t(
+                            "addon_manage_addons_only_from_phone_subtitle",
+                            "Scan a QR code to install or remove add-ons from your phone"
+                          )
+                        : t(
+                            "addon_manage_from_phone_subtitle",
+                            "Scan a QR code to manage addons, catalogs, and collections from your phone"
+                          )
                     )}</small>
                   </span>
                   <span class="addons-large-row-tail-group">
                     <span class="addons-large-row-tail material-icons" aria-hidden="true">phone_android</span>
                   </span>
                 </div>
-                ${this.model.isEssential ? "" : `<div role="button"
+                ${
+                  this.model.isEssential
+                    ? ""
+                    : `<div role="button"
                      class="addons-large-row addons-large-row-centered addons-focusable"
                      data-zone="content"
                      data-row="1"
@@ -275,7 +303,8 @@ export const PluginScreen = {
                   <span class="addons-large-row-tail-group">
                     <span class="addons-large-row-tail material-icons" aria-hidden="true">chevron_right</span>
                   </span>
-                </div>`}
+                </div>`
+                }
                 <div role="button"
                      class="addons-large-row addons-large-row-centered addons-focusable"
                      data-zone="content"
@@ -304,8 +333,14 @@ export const PluginScreen = {
             <div class="addons-qr-dialog">
               <p class="addons-qr-instruction">${escapeHtml(
                 this.model.isEssential
-                  ? t("addon_qr_addons_only_scan_instruction", "Scan with your phone to install or remove add-ons")
-                  : t("addon_qr_scan_instruction", "Scan with your phone to manage addons, catalogs, and collections")
+                  ? t(
+                      "addon_qr_addons_only_scan_instruction",
+                      "Scan with your phone to install or remove add-ons"
+                    )
+                  : t(
+                      "addon_qr_scan_instruction",
+                      "Scan with your phone to manage addons, catalogs, and collections"
+                    )
               )}</p>
               <canvas class="addons-qr-canvas" width="440" height="440" aria-label="QR code"></canvas>
               <p class="addons-qr-url">${escapeHtml(this.model.phoneManagerUrl)}</p>

@@ -3694,6 +3694,67 @@
     transform: translateX(18px);
   }
 
+  /* Catalog-order row: reorder/disable controls trailing a title+subtitle row, used by
+     catalogOrderScreenPhone.js. Shares the .phone-settings-row divider/padding rhythm. */
+  .phone-catalog-order-row {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-12);
+    width: 100%;
+    border-top: 1px solid var(--phone-border-default);
+    padding: var(--phone-space-14) var(--phone-space-card-padding);
+  }
+
+  .phone-settings-card-body > .phone-catalog-order-row:first-child {
+    border-top: none;
+  }
+
+  .phone-catalog-order-row-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-8);
+  }
+
+  .phone-catalog-order-icon-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--phone-radius-lg);
+    background: rgb(255 255 255 / 0.08);
+    color: var(--phone-text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-catalog-order-icon-btn.is-disabled {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .phone-catalog-order-toggle-btn {
+    flex-shrink: 0;
+    border: 1px solid var(--phone-border-default);
+    border-radius: var(--phone-radius-button);
+    background: none;
+    color: var(--phone-text-primary);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    font-weight: var(--phone-font-weight-semibold);
+    padding: var(--phone-space-8) var(--phone-space-14);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-catalog-order-toggle-btn.is-disabled-state {
+    color: var(--phone-text-muted);
+  }
+
   .phone-settings-footer {
     display: flex;
     flex-direction: column;
@@ -4632,5 +4693,379 @@
     font-family: var(--phone-font-family);
     font-size: var(--phone-type-label-sm-size);
     color: var(--phone-text-secondary);
+  }
+
+  /* Cast detail (js/ui/screens/cast/castDetailScreen.js) reuses its TV markup as-is — the
+     screen's card-track layout already reflows fine, it's only the fixed 220px avatar column
+     and TV-scale type that break on a phone width, so this is a CSS-only override rather than a
+     dedicated *ScreenPhone.js template. */
+  .cast-detail-shell {
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-32));
+  }
+
+  .cast-detail-hero-content {
+    grid-template-columns: 1fr;
+    gap: var(--phone-space-12);
+  }
+
+  .cast-detail-avatar {
+    width: 128px;
+    height: 186px;
+  }
+
+  .cast-detail-name {
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+    margin: var(--phone-space-4) 0 var(--phone-space-8);
+  }
+
+  .cast-detail-facts {
+    font-size: var(--phone-type-label-sm-size);
+    gap: var(--phone-space-8);
+  }
+
+  .cast-detail-facts span {
+    height: 28px;
+    padding: 0 var(--phone-space-10);
+  }
+
+  .cast-detail-bio {
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    max-width: 100%;
+  }
+
+  .cast-detail-section-title {
+    font-size: var(--phone-type-title-sm-size);
+    line-height: var(--phone-type-title-sm-line);
+    margin-bottom: var(--phone-space-10);
+  }
+
+  .cast-credit-card {
+    flex: 0 0 128px;
+    padding: var(--phone-space-8);
+  }
+
+  .cast-credit-title {
+    font-size: var(--phone-type-label-sm-size);
+    min-height: 34px;
+  }
+
+  .cast-credit-subtitle {
+    font-size: var(--phone-type-label-xs-size);
+  }
+
+  /* Settings > Tracking (js/ui/screens/trakt/traktScreen.js) and Settings > Supporters &
+     Contributors (js/ui/screens/supporters/supportersContributorsScreen.js) both reuse the
+     TV-scale `.settings-action-row`/`.settings-row-*`/`.settings-dialog-option` primitives from
+     settingsScreen.js (which only render on TV there — its own phone path uses different
+     markup), and `.settings-trakt-*`/`.supporters-*` sizing is expressed as `min(Nvw, Npx)`
+     tuned for a 1920px canvas. At a phone width that vw term collapses toward zero instead of
+     capping — e.g. `min(1.56vw, 30px)` is ~6px at 390px wide — so both screens need explicit
+     fixed-px overrides rather than just narrower layout. Tap already works on both screens
+     (plain container click listeners, not gated to any platform); this is a CSS-only fix. */
+  .settings-action-row {
+    min-height: auto;
+    padding: var(--phone-space-14) var(--phone-space-16);
+    border-radius: var(--phone-radius-lg);
+    gap: var(--phone-space-12);
+  }
+
+  .settings-row-leading-icon,
+  .settings-row-leading-image {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    font-size: 18px;
+  }
+
+  .settings-row-title {
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+  }
+
+  .settings-row-subtitle {
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+  }
+
+  .settings-row-value {
+    font-size: var(--phone-type-label-sm-size);
+  }
+
+  .settings-dialog-option {
+    min-height: auto;
+    padding: var(--phone-space-14) var(--phone-space-16);
+    font-size: var(--phone-type-body-md-size);
+  }
+
+  .trakt-route-shell {
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-32));
+  }
+
+  .trakt-route-shell .settings-tracking-panel {
+    width: 100%;
+  }
+
+  .trakt-route-shell .settings-trakt-panel {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    gap: var(--phone-space-16);
+  }
+
+  .trakt-route-shell .settings-trakt-hero {
+    height: auto;
+  }
+
+  .trakt-route-shell .settings-trakt-logo {
+    width: 56px;
+    height: 56px;
+  }
+
+  .trakt-route-shell .settings-trakt-title {
+    margin-top: var(--phone-space-8);
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+  }
+
+  .trakt-route-shell .settings-trakt-description {
+    margin-top: var(--phone-space-8);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+  }
+
+  .trakt-route-shell .settings-trakt-card {
+    border-radius: var(--phone-radius-card);
+    padding: var(--phone-space-card-padding);
+  }
+
+  .trakt-route-shell .settings-trakt-card-title {
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+  }
+
+  .trakt-route-shell .settings-trakt-body-copy {
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+  }
+
+  .trakt-route-shell .settings-trakt-meta-copy,
+  .trakt-route-shell .settings-trakt-message,
+  .trakt-route-shell .settings-trakt-error,
+  .trakt-route-shell .settings-trakt-warning {
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+  }
+
+  .trakt-route-shell .settings-trakt-code {
+    font-size: var(--phone-type-title-lg-size);
+    letter-spacing: 2px;
+  }
+
+  .trakt-route-shell .settings-trakt-qr {
+    width: 160px;
+    height: 160px;
+  }
+
+  .trakt-route-shell .settings-trakt-button,
+  .trakt-route-shell .settings-trakt-small-button {
+    min-height: 44px;
+    padding: 0 var(--phone-space-16);
+    font-size: var(--phone-type-label-sm-size);
+  }
+
+  .trakt-route-shell .settings-trakt-stats-label,
+  .trakt-route-shell .settings-trakt-stat span {
+    font-size: var(--phone-type-label-xs-size);
+    line-height: var(--phone-type-label-xs-line);
+  }
+
+  .trakt-route-shell .settings-trakt-stat strong {
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+  }
+
+  /* Supporters & Contributors */
+  .supporters-route-shell {
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-32));
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+  }
+
+  .supporters-route-content {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    gap: var(--phone-space-16);
+  }
+
+  .supporters-brand-card {
+    min-height: 320px;
+  }
+
+  .supporters-brand-face {
+    padding: var(--phone-space-24) var(--phone-space-16);
+  }
+
+  .supporters-brand-logo {
+    height: 64px;
+  }
+
+  .supporters-title,
+  .supporters-qr-copy h2,
+  .supporters-dialog h2 {
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+  }
+
+  .supporters-secondary-copy,
+  .supporters-qr-copy p {
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+  }
+
+  .supporters-donation-progress h2 {
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+  }
+
+  .supporters-donation-progress p {
+    font-size: var(--phone-type-label-xs-size);
+    line-height: var(--phone-type-label-xs-line);
+  }
+
+  .supporters-donate-button,
+  .supporters-back-button,
+  .supporters-retry-button,
+  .supporters-dialog-button {
+    min-height: 48px;
+    padding: 0 var(--phone-space-16);
+    font-size: var(--phone-type-body-sm-size);
+  }
+
+  .supporters-donate-qr {
+    width: 160px;
+    height: 160px;
+    margin: var(--phone-space-16) 0;
+  }
+
+  .supporters-content-card {
+    padding: var(--phone-space-16);
+    gap: var(--phone-space-12);
+  }
+
+  .supporters-tab {
+    min-height: 40px;
+    font-size: var(--phone-type-label-sm-size);
+    padding: 0 var(--phone-space-8);
+  }
+
+  .supporters-person-card {
+    min-height: auto;
+    border-radius: var(--phone-radius-lg);
+    padding: var(--phone-space-12);
+    gap: var(--phone-space-12);
+  }
+
+  .supporters-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .supporters-card-copy h3 {
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+  }
+
+  .supporters-card-copy p {
+    font-size: var(--phone-type-label-xs-size);
+    line-height: var(--phone-type-label-xs-line);
+  }
+
+  .supporters-dialog {
+    width: calc(100vw - var(--phone-space-32));
+    padding: var(--phone-space-20);
+  }
+
+  /* Plugins placeholder screen (js/ui/screens/plugin/pluginsScreen.js) — static "coming soon"
+     copy, no interactive rows beyond Back, so this is CSS-only. */
+  .plugins-route-shell {
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-32));
+  }
+
+  .plugins-route-shell .settings-title {
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+  }
+
+  .plugins-route-shell .settings-subtitle {
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+  }
+
+  .plugins-route-shell .settings-group-card {
+    border-radius: var(--phone-radius-card);
+    padding: var(--phone-space-16);
+  }
+
+  /* Licenses & Attribution (js/ui/screens/settings/licensesAttributionsScreen.js) already uses
+     rem/vw/vh sizing that reflows reasonably at phone width — just a touch oversized. */
+  .licenses-screen {
+    padding: var(--phone-space-24) var(--phone-space-screen-h);
+  }
+
+  .licenses-screen h1 {
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+  }
+
+  .licenses-screen header p {
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+  }
+
+  .license-row strong {
+    font-size: var(--phone-type-body-md-size);
+  }
+
+  .license-row span {
+    font-size: var(--phone-type-label-sm-size);
+  }
+
+  /* Debug console (js/ui/screens/debug/consoleDebugScreen.js) — dev-only diagnostic screen, low
+     user impact, but the fixed 220px/220px header rails leave negative space at phone width. */
+  .debug-console-shell {
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-16));
+    gap: var(--phone-space-12);
+  }
+
+  .debug-console-header {
+    grid-template-columns: 1fr;
+    gap: var(--phone-space-8);
+  }
+
+  .debug-console-back {
+    width: auto;
+    min-height: 40px;
+    padding: 0 var(--phone-space-16);
+    font-size: var(--phone-type-label-sm-size);
+    justify-self: start;
+  }
+
+  .debug-console-heading h1 {
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+  }
+
+  .debug-console-heading p {
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
   }
 }
