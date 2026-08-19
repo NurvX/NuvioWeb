@@ -82,6 +82,11 @@ import {
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
 import { getLatestAppUpdate } from "../../../core/update/appUpdateService.js";
 import { showAppUpdatePrompt } from "../../components/appUpdatePrompt.js";
+import {
+  renderSettingsScreenPhone,
+  mountSettingsScreenPhone,
+  cleanupSettingsScreenPhone
+} from "./settingsScreenPhone.js";
 
 const SETTINGS_UI_STATE_KEY = "settingsScreenUiState";
 const SETTINGS_RAIL_SCROLL_TARGET_RATIO = 0.42;
@@ -90,7 +95,9 @@ const SETTINGS_RAIL_SCROLL_DAMPING_RATIO = 0.95;
 const SETTINGS_MARQUEE_VELOCITY_PX_PER_SECOND = 90; // ATV 45dp/s -> 90px/s
 const CURRENT_APP_VERSION =
   typeof __NUVIO_APP_VERSION__ !== "undefined" ? __NUVIO_APP_VERSION__ : "0.0.0";
-const SETTINGS_VERSION_LABEL = formatSettingsVersionLabel(CURRENT_APP_VERSION);
+// Exported for js/ui/screens/settings/settingsScreenPhone.js (ticket 05-01): the phone
+// settings footer reuses the exact same version string TV's About section already shows.
+export const SETTINGS_VERSION_LABEL = formatSettingsVersionLabel(CURRENT_APP_VERSION);
 const PRIVACY_URL = "https://nuvio.tv/privacy-policy";
 
 function formatHalfStepSettingValue(value, suffix = "") {
@@ -679,7 +686,10 @@ const SECTION_META = [
   }
 ];
 
-const SECTION_ICONS = {
+// Exported for js/ui/screens/settings/settingsScreenPhone.js (ticket 05-01): the phone
+// screen's per-section card header (and per-row icon-chip fallback) reuses the same icon set
+// TV's nav rail already uses.
+export const SECTION_ICONS = {
   account: "person",
   profiles: "people",
   appearance: "palette",
@@ -904,7 +914,10 @@ function translateOptionCaption(option, fallback = "") {
   return String(option.caption || fallback);
 }
 
-function translateSectionCopy(section) {
+// Exported for js/ui/screens/settings/settingsScreenPhone.js (ticket 05-01): the phone
+// screen's card headers reuse the exact same section label/subtitle translation TV's nav rail
+// and content headers already use.
+export function translateSectionCopy(section) {
   if (!section) {
     return { label: "", subtitle: "" };
   }
@@ -2101,6 +2114,12 @@ export const SettingsScreen = {
   async mount(_params = {}, navigationContext = {}) {
     this.container = document.getElementById("settings");
     ScreenUtils.show(this.container);
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => {
+      void this.render({ refreshModel: false });
+    });
     if (!this.handleWheelBound) {
       this.handleWheelBound = this.handleWheelEvent.bind(this);
       this.container.addEventListener("wheel", this.handleWheelBound, { passive: false });
@@ -7167,6 +7186,16 @@ export const SettingsScreen = {
     this.ensureExpandedState(section.id);
     this.persistUiState();
 
+    // Phone render path (ticket 05-01, mobile-parity epic). Placed here rather than at the
+    // very top of render() because this.model/this.visibleSections/this.actionMap (reset just
+    // above) are shared prep both TV and phone need — settingsScreenPhone.js calls
+    // this.renderSection(...) itself per visible section, reusing that same actionMap. Only
+    // the TV-shell-specific DOM work from here on (ensureShell()/nav rail/content slot/dialog
+    // slot) is skipped for phone.
+    if (Platform.isPhoneViewport()) {
+      return this.renderPhone();
+    }
+
     this.ensureShell();
 
     const shell = this.container.querySelector(".settings-shell");
@@ -7265,6 +7294,26 @@ export const SettingsScreen = {
     syncLayoutPreviewMetricsSoon(this.container);
     updateSettingsRailIndicatorsSoon(navSlot);
     updateSettingsScrollIndicatorsSoon(contentSlot);
+  },
+
+  // Phone render path (ticket 05-01, mobile-parity epic) — all markup/interaction logic lives
+  // in js/ui/screens/settings/settingsScreenPhone.js; this just hands it the screen instance
+  // so it can read this.model/this.visibleSections/this.sidebarProfile and call
+  // this.renderSection(...)/this.actionMap/this.optionDialog/this.textDialog/
+  // this.submitTextDialog()/this.clearTextDialog()/this.closeTextDialog()/
+  // this.closeOptionDialog() directly, rather than duplicating any of that logic.
+  renderPhone() {
+    if (!this.container) {
+      return;
+    }
+    const previousScrollTop =
+      this.container.querySelector("[data-phone-settings-scroll]")?.scrollTop || 0;
+    this.container.innerHTML = renderSettingsScreenPhone(this);
+    mountSettingsScreenPhone(this, this.container);
+    const scrollNode = this.container.querySelector("[data-phone-settings-scroll]");
+    if (scrollNode) {
+      scrollNode.scrollTop = previousScrollTop;
+    }
   },
 
   applyFocus() {
@@ -7942,6 +7991,9 @@ export const SettingsScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
+    cleanupSettingsScreenPhone(this);
     this.persistUiState();
     this.stopTraktPolling?.();
     this.stopDebridDeviceAuth();

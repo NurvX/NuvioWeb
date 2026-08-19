@@ -3486,4 +3486,349 @@
     flex-shrink: 0;
     color: var(--phone-accent-secondary);
   }
+
+  /* Settings screen (ticket 05-01) — a single scrollable list of labeled section cards, each
+     a rounded bordered card of stacked navigation/toggle rows (icon chip + title + optional
+     description, hairline dividers between rows). See settingsScreenPhone.js's file header
+     for how rows are derived from the existing TV settings render methods. */
+  .phone-settings-scroll {
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--phone-accent-bg);
+  }
+
+  .phone-settings-page-header {
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-screen-h)
+      var(--phone-space-12);
+  }
+
+  .phone-settings-page-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-lg-size);
+    line-height: var(--phone-type-title-lg-line);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-settings-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-section-gap);
+    padding: 0 var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-96));
+  }
+
+  .phone-settings-card {
+    border: 1px solid var(--phone-border-default);
+    border-radius: var(--phone-radius-card);
+    background: var(--phone-accent-bg-elevated);
+    overflow: hidden;
+  }
+
+  .phone-settings-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--phone-space-card-padding) var(--phone-space-card-padding) var(--phone-space-12);
+  }
+
+  .phone-settings-card-title {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-settings-card-subtitle {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-settings-card-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .phone-settings-subheading {
+    padding: var(--phone-space-12) var(--phone-space-card-padding) var(--phone-space-4);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-xs-size);
+    line-height: var(--phone-type-label-xs-line);
+    font-weight: var(--phone-font-weight-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--phone-text-muted);
+  }
+
+  .phone-settings-row {
+    display: flex;
+    align-items: center;
+    gap: var(--phone-space-12);
+    width: 100%;
+    border: none;
+    border-top: 1px solid var(--phone-border-default);
+    background: none;
+    padding: var(--phone-space-14) var(--phone-space-card-padding);
+    text-align: left;
+    color: inherit;
+    font-family: var(--phone-font-family);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-settings-card-body > .phone-settings-subheading:first-child,
+  .phone-settings-card-body > .phone-settings-row:first-child {
+    border-top: none;
+  }
+
+  .phone-settings-row.is-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .phone-settings-row-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--phone-radius-lg);
+    background: rgb(255 255 255 / 0.08);
+    color: var(--phone-text-secondary);
+    font-size: 18px;
+  }
+
+  .phone-settings-row-swatch {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--phone-radius-lg);
+    border: 1px solid var(--phone-border-default);
+  }
+
+  .phone-settings-row-copy {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .phone-settings-row-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+    font-weight: var(--phone-font-weight-regular);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-settings-row-subtitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-settings-row-value {
+    flex-shrink: 0;
+    font-size: var(--phone-type-label-sm-size);
+    color: var(--phone-text-muted);
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .phone-settings-row-chevron {
+    flex-shrink: 0;
+    color: var(--phone-text-muted);
+  }
+
+  .phone-settings-row-check {
+    flex-shrink: 0;
+    color: var(--phone-accent-secondary);
+  }
+
+  .phone-settings-row-info {
+    cursor: default;
+  }
+
+  /* Native-styled toggle switch matching the phone accent color. */
+  .phone-settings-switch {
+    flex-shrink: 0;
+    position: relative;
+    width: 44px;
+    height: 26px;
+    border-radius: var(--phone-radius-full);
+    background: rgb(255 255 255 / 0.16);
+    transition: background 0.15s ease;
+  }
+
+  .phone-settings-switch.is-on {
+    background: var(--phone-accent-secondary);
+  }
+
+  .phone-settings-switch-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--phone-radius-full);
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+    transition: transform 0.15s ease;
+  }
+
+  .phone-settings-switch.is-on .phone-settings-switch-thumb {
+    transform: translateX(18px);
+  }
+
+  .phone-settings-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--phone-space-4);
+    padding: var(--phone-space-24) var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-96));
+    text-align: center;
+  }
+
+  .phone-settings-footer-line {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+    color: var(--phone-text-muted);
+  }
+
+  .phone-settings-footer-version {
+    font-size: var(--phone-type-label-xs-size);
+    line-height: var(--phone-type-label-xs-line);
+  }
+
+  /* Option/text dialog overlay — reads screen.optionDialog/screen.textDialog directly. */
+  .phone-settings-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    background: var(--phone-overlay-scrim);
+  }
+
+  .phone-settings-dialog {
+    width: 100%;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-12);
+    border-radius: var(--phone-radius-card) var(--phone-radius-card) 0 0;
+    background: var(--phone-accent-bg-elevated);
+    padding: var(--phone-space-sheet-padding) var(--phone-space-sheet-padding)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-20));
+  }
+
+  .phone-settings-dialog-title {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    line-height: var(--phone-type-body-md-line);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-settings-dialog-message {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-settings-dialog-list {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .phone-settings-dialog-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--phone-space-12);
+    width: 100%;
+    border: none;
+    border-top: 1px solid var(--phone-border-default);
+    background: none;
+    padding: var(--phone-space-14) var(--phone-space-4);
+    text-align: left;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    color: var(--phone-text-primary);
+    cursor: pointer;
+  }
+
+  .phone-settings-dialog-list > .phone-settings-dialog-option:first-child {
+    border-top: none;
+  }
+
+  .phone-settings-dialog-option.is-selected {
+    color: var(--phone-accent-secondary);
+  }
+
+  .phone-settings-dialog-option-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .phone-settings-dialog-field {
+    width: 100%;
+    border: 1px solid var(--phone-border-default);
+    border-radius: var(--phone-radius-md);
+    background: rgb(255 255 255 / 0.06);
+    padding: var(--phone-space-12);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    color: var(--phone-text-primary);
+    resize: vertical;
+  }
+
+  .phone-settings-dialog-status {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    color: var(--phone-danger);
+  }
+
+  .phone-settings-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--phone-space-12);
+  }
+
+  .phone-settings-dialog-button {
+    border: none;
+    border-radius: var(--phone-radius-md);
+    background: rgb(255 255 255 / 0.08);
+    padding: var(--phone-space-10) var(--phone-space-16);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+    cursor: pointer;
+  }
+
+  .phone-settings-dialog-button.is-primary {
+    background: var(--phone-accent-secondary);
+    color: var(--phone-accent-white-on-secondary, #111111);
+  }
 }
