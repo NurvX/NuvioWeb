@@ -10,15 +10,26 @@ import { NuvioDialog } from "../../ui/components/nuvioDialog.js";
 import { detailWatchedEnrichmentService } from "../../data/repository/detailWatchedEnrichmentService.js";
 import { resolveExperienceRoute } from "./experienceModeRouting.js";
 import { Platform } from "../../platform/index.js";
+import {
+  renderProfileSelectionScreenPhone,
+  mountProfileSelectionScreenPhone,
+  cleanupProfileSelectionScreenPhone,
+  syncProfileSelectionScreenPhoneBackground
+} from "./profileSelectionScreenPhone.js";
 
 const PINNED_AVATAR_CATEGORIES = ["anime", "animation", "tv", "movie", "gaming"];
 const DEFAULT_PROFILE_COLOR = "#f5f5f5";
 const PROFILE_HOLD_DELAY_MS = 650;
-const PROFILE_PIN_LENGTH = 4;
+// Exported for js/core/profile/profileSelectionScreenPhone.js (ticket 05-02): the phone PIN
+// keypad reuses this exact digit-count instead of hardcoding its own.
+export const PROFILE_PIN_LENGTH = 4;
 const PROFILE_PIN_OPEN_MS = 320;
 const PROFILE_PIN_CLOSE_MS = 240;
 const PROFILE_BACKGROUND_ANIMATION_MS = 520;
-const PROFILE_PIN_TEXT = {
+// Exported for js/core/profile/profileSelectionScreenPhone.js (ticket 05-02): the phone PIN
+// overlay reuses these exact (currently hardcoded, non-i18n) copy strings instead of
+// duplicating them.
+export const PROFILE_PIN_TEXT = {
   set: "Set PIN",
   change: "Change PIN",
   remove: "Remove PIN",
@@ -76,7 +87,10 @@ function keyEventToDigit(event) {
   return null;
 }
 
-function getDefaultProfileColor() {
+// Exported for js/core/profile/profileSelectionScreenPhone.js (ticket 05-02): the phone
+// screen's grid/editor/pin avatar chrome reuses this exact default color instead of
+// duplicating the CSS-variable lookup.
+export function getDefaultProfileColor() {
   const value = globalThis?.document
     ? getComputedStyle(document.documentElement).getPropertyValue("--secondary-color").trim()
     : "";
@@ -92,12 +106,16 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-function getProfileInitial(name) {
+// Exported for js/core/profile/profileSelectionScreenPhone.js (ticket 05-02): the phone
+// screen's avatar-initial fallback reuses this exact logic instead of duplicating it.
+export function getProfileInitial(name) {
   const trimmed = String(name || "").trim();
   return trimmed ? trimmed.charAt(0).toUpperCase() : "?";
 }
 
-function resolveProfileAvatarUrl(profile, avatarUrlResolver) {
+// Exported for js/core/profile/profileSelectionScreenPhone.js (ticket 05-02): the phone
+// screen's avatar-resolution fallback chain reuses this exact logic instead of duplicating it.
+export function resolveProfileAvatarUrl(profile, avatarUrlResolver) {
   const avatarUrl = String(profile?.avatarUrl || "").trim();
   if (avatarUrl) {
     return avatarUrl;
@@ -227,7 +245,9 @@ function fastOutSlowIn(t) {
   return ((ay * s + by) * s + cy) * s;
 }
 
-function categoryLabel(category) {
+// Exported for js/core/profile/profileSelectionScreenPhone.js (ticket 05-02): the phone
+// editor's category chip row reuses this exact label mapping instead of duplicating it.
+export function categoryLabel(category) {
   switch (String(category || "").toLowerCase()) {
     case "all":
       return "All";
@@ -246,7 +266,10 @@ function categoryLabel(category) {
   }
 }
 
-function getAvatarCategories(avatars) {
+// Exported for js/core/profile/profileSelectionScreenPhone.js (ticket 05-02): the phone
+// editor's category chip row reuses this exact ordered-category derivation instead of
+// duplicating it.
+export function getAvatarCategories(avatars) {
   const normalizedCategories = (Array.isArray(avatars) ? avatars : [])
     .map((avatar) =>
       String(avatar?.category || "")
@@ -328,6 +351,12 @@ export const ProfileSelectionScreen = {
     }
 
     this.container.style.display = "block";
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => {
+      this.render();
+    });
     this.screenMode = String(params?.mode || "selection").toLowerCase();
     this.returnRoute = String(params?.returnRoute || "");
     this.isManagementMode = this.screenMode === "management";
@@ -440,6 +469,19 @@ export const ProfileSelectionScreen = {
   },
 
   render() {
+    // Phone render path (ticket 05-02, mobile-parity epic). All markup/interaction logic lives
+    // in js/core/profile/profileSelectionScreenPhone.js; this just hands it the screen instance
+    // so it can read this.profiles/this.avatarCatalog/this.editorState/this.pinOverlayState/etc.
+    // and call this.activateProfile()/this.openPinOverlay()/this.openCreateEditor()/
+    // this.openEditEditor()/this.activateFocusedNode()/this.activatePinKey()/
+    // this.closePinOverlay()/this.updateBackground() directly, rather than duplicating any of
+    // that logic. Guarded at the very top since every state transition on this screen
+    // (opening/closing the editor or PIN overlay, toggling management mode, etc.) re-invokes
+    // this same render() — see that file's own header comment for the full design.
+    if (Platform.isPhoneViewport()) {
+      return this.renderPhone();
+    }
+
     const visibleProfiles = this.getVisibleProfiles();
     const canAddProfile = visibleProfiles.length < MAX_PROFILES;
     const totalItems = visibleProfiles.length + (canAddProfile ? 1 : 0);
@@ -489,6 +531,17 @@ export const ProfileSelectionScreen = {
       }
     }
     this.restoreFocus();
+  },
+
+  // Phone render path (ticket 05-02, mobile-parity epic) — all markup/interaction logic lives
+  // in js/core/profile/profileSelectionScreenPhone.js; this just hands it the screen instance.
+  renderPhone() {
+    if (!this.container) {
+      return;
+    }
+    this.container.innerHTML = renderProfileSelectionScreenPhone(this);
+    mountProfileSelectionScreenPhone(this, this.container);
+    syncProfileSelectionScreenPhoneBackground(this);
   },
 
   renderProfileCard(profile) {
@@ -2274,6 +2327,9 @@ export const ProfileSelectionScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
+    cleanupProfileSelectionScreenPhone(this);
     this._destroyDialogs();
     this.cancelPendingProfileHold();
     this.suppressHoldMenuEnterUntilKeyUp = false;

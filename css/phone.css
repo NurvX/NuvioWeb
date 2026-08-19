@@ -3831,4 +3831,514 @@
     background: var(--phone-accent-secondary);
     color: var(--phone-accent-white-on-secondary, #111111);
   }
+
+  /* Profile selection screen (js/core/profile/profileSelectionScreenPhone.js, ticket 05-02).
+     `.phone-profile-screen` is layered onto TV's own `.profile-screen` class (kept so
+     `updateBackground()`'s existing gradient math keeps working unmodified — see that file's
+     header comment) purely to reset the TV rule set's vw-based sizing for this breakpoint. */
+  .phone-profile-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .phone-profile-scroll {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-32)) var(--phone-space-20)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-40));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .phone-profile-logo {
+    height: 28px;
+    width: auto;
+    object-fit: contain;
+    margin-bottom: var(--phone-space-24);
+  }
+
+  .phone-profile-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-md-size);
+    line-height: var(--phone-type-title-md-line);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+    text-align: center;
+  }
+
+  .phone-profile-subtitle {
+    margin: var(--phone-space-6) 0 var(--phone-space-28);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    color: var(--phone-text-secondary);
+    text-align: center;
+  }
+
+  .phone-profile-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--phone-space-24) var(--phone-space-12);
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .phone-profile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--phone-space-8);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: var(--phone-font-family);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-profile-avatar-ring {
+    position: relative;
+    width: 88px;
+    height: 88px;
+    border-radius: var(--phone-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--phone-motion-fast) var(--phone-ease-standard);
+  }
+
+  .phone-profile-card:active .phone-profile-avatar-ring {
+    transform: scale(0.94);
+  }
+
+  .phone-profile-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--phone-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: var(--phone-type-title-md-size);
+    font-weight: var(--phone-font-weight-bold);
+    color: #ffffff;
+  }
+
+  .phone-profile-avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .phone-profile-avatar-add {
+    background: rgb(255 255 255 / 0.06);
+    border: 2px dashed var(--phone-border-default);
+    font-size: 30px;
+    line-height: 1;
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-profile-lock-badge {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--phone-radius-full);
+    background: rgb(0 0 0 / 0.72);
+    border: 2px solid var(--phone-accent-bg, #0d0d0d);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+  }
+
+  .phone-profile-edit-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--phone-radius-full);
+    background: var(--phone-accent-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--phone-accent-white-on-secondary, #111111);
+  }
+
+  .phone-profile-name {
+    max-width: 96px;
+    font-size: var(--phone-type-body-sm-size);
+    color: var(--phone-text-primary);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .phone-profile-badge {
+    font-size: var(--phone-type-label-xs-size);
+    font-weight: var(--phone-font-weight-semibold);
+    letter-spacing: 0.5px;
+    color: var(--phone-accent-secondary);
+  }
+
+  .phone-profile-manage-toggle {
+    margin-top: var(--phone-space-32);
+    padding: var(--phone-space-12) var(--phone-space-24);
+    border-radius: var(--phone-radius-full);
+    border: 1px solid var(--phone-border-default);
+    background: rgb(255 255 255 / 0.06);
+    color: var(--phone-text-primary);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    font-weight: var(--phone-font-weight-semibold);
+    cursor: pointer;
+  }
+
+  .phone-profile-manage-toggle.is-active {
+    background: var(--phone-accent-secondary);
+    color: var(--phone-accent-white-on-secondary, #111111);
+    border-color: transparent;
+  }
+
+  /* Create/Edit profile overlay */
+  .phone-profile-editor-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-16)) var(--phone-space-20)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-32));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .phone-profile-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--phone-space-12);
+    margin-bottom: var(--phone-space-24);
+  }
+
+  .phone-profile-editor-title {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-lg-size);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-profile-editor-cancel,
+  .phone-profile-editor-submit {
+    border: none;
+    background: none;
+    padding: var(--phone-space-8) var(--phone-space-4);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    font-weight: var(--phone-font-weight-semibold);
+    cursor: pointer;
+  }
+
+  .phone-profile-editor-cancel {
+    color: var(--phone-text-secondary);
+  }
+
+  .phone-profile-editor-submit {
+    color: var(--phone-accent-secondary);
+  }
+
+  .phone-profile-editor-submit.is-disabled {
+    color: var(--phone-text-muted);
+    pointer-events: none;
+  }
+
+  .phone-profile-editor-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--phone-space-16);
+    margin-bottom: var(--phone-space-28);
+  }
+
+  .phone-profile-editor-preview-avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: var(--phone-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: var(--phone-type-title-lg-size);
+    font-weight: var(--phone-font-weight-bold);
+    color: #ffffff;
+  }
+
+  .phone-profile-editor-preview-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .phone-profile-editor-name-input {
+    width: 100%;
+    max-width: 260px;
+    box-sizing: border-box;
+    border: 1px solid var(--phone-border-default);
+    border-radius: var(--phone-radius-md);
+    background: rgb(255 255 255 / 0.06);
+    padding: var(--phone-space-10) var(--phone-space-14);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    color: var(--phone-text-primary);
+    text-align: center;
+  }
+
+  .phone-profile-editor-avatar-title {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+    margin-bottom: var(--phone-space-12);
+  }
+
+  .phone-profile-editor-category-row {
+    display: flex;
+    gap: var(--phone-space-8);
+    overflow-x: auto;
+    padding-bottom: var(--phone-space-12);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .phone-profile-editor-category {
+    flex: 0 0 auto;
+    border: 1px solid var(--phone-border-default);
+    border-radius: var(--phone-radius-full);
+    background: rgb(255 255 255 / 0.04);
+    padding: var(--phone-space-6) var(--phone-space-16);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    color: var(--phone-text-secondary);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .phone-profile-editor-category.is-selected {
+    background: var(--phone-accent-secondary);
+    border-color: transparent;
+    color: var(--phone-accent-white-on-secondary, #111111);
+  }
+
+  .phone-profile-editor-avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--phone-space-12);
+  }
+
+  .phone-profile-editor-avatar-tile {
+    border: 2px solid transparent;
+    border-radius: var(--phone-radius-full);
+    padding: 0;
+    background: rgb(255 255 255 / 0.04);
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .phone-profile-editor-avatar-tile.is-selected {
+    border-color: var(--phone-accent-secondary);
+  }
+
+  .phone-profile-editor-avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .phone-profile-editor-avatar-empty {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    color: var(--phone-text-muted);
+    text-align: center;
+    padding: var(--phone-space-24) 0;
+  }
+
+  /* PIN entry overlay */
+  .phone-profile-pin-screen {
+    justify-content: center;
+  }
+
+  .phone-profile-pin-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--phone-space-16);
+    padding: var(--phone-space-32) var(--phone-space-24);
+    opacity: 0;
+    transform: translateY(12px);
+    transition:
+      opacity var(--phone-motion-normal) var(--phone-ease-standard),
+      transform var(--phone-motion-normal) var(--phone-ease-standard);
+  }
+
+  .phone-profile-pin-screen.is-open .phone-profile-pin-content,
+  .phone-profile-pin-screen.is-opening .phone-profile-pin-content {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .phone-profile-pin-screen.is-closing .phone-profile-pin-content {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  .phone-profile-pin-avatar {
+    width: 76px;
+    height: 76px;
+    border-radius: var(--phone-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: var(--phone-type-title-sm-size);
+    font-weight: var(--phone-font-weight-bold);
+    color: #ffffff;
+    margin-bottom: var(--phone-space-8);
+  }
+
+  .phone-profile-pin-avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .phone-profile-pin-heading {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-lg-size);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+    text-align: center;
+  }
+
+  .phone-profile-pin-box-row {
+    display: flex;
+    gap: var(--phone-space-14);
+  }
+
+  .phone-profile-pin-box {
+    width: 14px;
+    height: 14px;
+    border-radius: var(--phone-radius-full);
+    background: rgb(255 255 255 / 0.16);
+    border: 1px solid var(--phone-border-default);
+  }
+
+  .phone-profile-pin-box.is-filled {
+    background: var(--phone-accent-secondary);
+    border-color: transparent;
+  }
+
+  .phone-profile-pin-box.is-error {
+    background: var(--phone-danger);
+    border-color: transparent;
+  }
+
+  .phone-profile-pin-support {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    color: var(--phone-text-secondary);
+    text-align: center;
+    min-height: 16px;
+  }
+
+  .phone-profile-pin-support.is-error {
+    color: var(--phone-danger);
+  }
+
+  .phone-profile-pin-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--phone-space-16);
+    margin-top: var(--phone-space-8);
+  }
+
+  .phone-profile-pin-key {
+    width: 60px;
+    height: 60px;
+    border-radius: var(--phone-radius-full);
+    border: 1px solid var(--phone-border-default);
+    background: rgb(255 255 255 / 0.04);
+    color: var(--phone-text-primary);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-lg-size);
+    font-weight: var(--phone-font-weight-semibold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .phone-profile-pin-key:active {
+    background: rgb(255 255 255 / 0.14);
+  }
+
+  .phone-profile-pin-key-delete {
+    background: none;
+    border-color: transparent;
+  }
+
+  .phone-profile-pin-delete-icon {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+
+  .phone-profile-pin-forgot {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-xs-size);
+    color: var(--phone-text-muted);
+    text-align: center;
+    margin-top: var(--phone-space-8);
+  }
+
+  .phone-profile-pin-cancel {
+    border: none;
+    background: none;
+    color: var(--phone-text-secondary);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    font-weight: var(--phone-font-weight-semibold);
+    margin-top: var(--phone-space-8);
+    cursor: pointer;
+  }
+
+  /* Shared PIN-action toast (create/edit/delete confirmation, PIN saved/removed) */
+  .phone-profile-toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-32));
+    transform: translateX(-50%);
+    background: rgb(26 26 26 / 0.94);
+    border: 1px solid var(--phone-border-default);
+    border-radius: var(--phone-radius-md);
+    padding: var(--phone-space-10) var(--phone-space-18);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    color: var(--phone-text-primary);
+    max-width: calc(100vw - var(--phone-space-40));
+    text-align: center;
+    z-index: 60;
+  }
 }
