@@ -1,4 +1,6 @@
 ﻿import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
+import { Platform } from "../../../platform/index.js";
+import { renderAccountSettingsContentPhone } from "./accountSettingsContentPhone.js";
 
 export class AccountSettingsContent {
   constructor(container) {
@@ -7,6 +9,20 @@ export class AccountSettingsContent {
   }
 
   render(uiState, callbacks) {
+    // Phone render path (ticket 05-03, mobile-parity epic) — all markup lives in
+    // js/ui/screens/account/accountSettingsContentPhone.js; this just hands it the same
+    // `uiState` and reuses `attachFocus(callbacks)` verbatim, so every tap still dispatches
+    // through the exact same `callbacks[action]()` call TV rows already use.
+    if (Platform.isPhoneViewport()) {
+      this.container.innerHTML = `
+        <section class="phone-settings-card">
+          <div class="phone-settings-card-body">${renderAccountSettingsContentPhone(uiState)}</div>
+        </section>
+      `;
+      this.attachFocus(callbacks);
+      return;
+    }
+
     const { authState, syncOverview, isSyncOverviewLoading } = uiState;
 
     if (authState === "loading") {

@@ -2,6 +2,8 @@ import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { AuthManager } from "../../../core/auth/authManager.js";
 import { I18n } from "../../../i18n/index.js";
+import { Platform } from "../../../platform/index.js";
+import { renderAuthSignInScreenPhone } from "./authSignInScreenPhone.js";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -19,12 +21,29 @@ export const AuthSignInScreen = {
     this.pendingEmail = "";
     this.errorMessage = "";
     ScreenUtils.show(this.container);
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render());
     this.render();
     this.onClickBound = this.onClick.bind(this);
     this.container.addEventListener("click", this.onClickBound);
   },
 
   render() {
+    // Phone render path (ticket 05-03, mobile-parity epic). All markup lives in
+    // js/ui/screens/account/authSignInScreenPhone.js; it keeps the same `data-action`
+    // attributes the TV markup uses, so this screen's own container-level click listener
+    // (bound once in `mount()`) keeps dispatching every tap unmodified.
+    if (Platform.isPhoneViewport()) {
+      this.container.innerHTML = renderAuthSignInScreenPhone(this);
+      if (this.textDialog) {
+        const input = this.container.querySelector("[data-action='textInput']");
+        input?.focus?.();
+      }
+      return;
+    }
+
     this.container.innerHTML = `
                 <div class="auth-simple-shell">
                         <div class="auth-simple-hero">
@@ -220,6 +239,8 @@ export const AuthSignInScreen = {
   cleanup() {
     this.textDialog = null;
     this.pendingEmail = "";
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
     this.container?.removeEventListener("click", this.onClickBound);
     ScreenUtils.hide(this.container);
   }

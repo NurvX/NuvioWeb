@@ -4341,4 +4341,255 @@
     text-align: center;
     z-index: 60;
   }
+
+  /* Account / sign-in / QR sign-in / sync-code screens (ticket 05-03) — reuses the
+     phone-settings-card/-row family (05-01) for list-style content (Account, the
+     AccountSettingsContent sync overview) and a shared phone-auth / phone-qr centered shell
+     for the simple sign-in/QR/sync-code screens, with a small round avatar chip matching
+     05-02's profile-card avatar language for the signed-in identity row. */
+  .phone-account-screen,
+  .phone-auth-shell,
+  .phone-qr-shell {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--phone-accent-bg);
+  }
+
+  .phone-account-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .phone-account-identity-row {
+    cursor: default;
+  }
+
+  .phone-account-avatar {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--phone-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--phone-accent-secondary);
+    color: #ffffff;
+    font-family: var(--phone-font-family);
+    font-weight: var(--phone-font-weight-bold);
+    font-size: var(--phone-type-body-md-size);
+  }
+
+  .phone-settings-row-icon.is-danger,
+  .phone-settings-row-title.is-danger {
+    color: var(--phone-danger);
+  }
+
+  /* Account sync-overview stat grid (AccountSettingsContent phone path) */
+  .phone-account-sync-total {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--phone-space-16);
+    padding: var(--phone-space-14) var(--phone-space-card-padding);
+    border-top: 1px solid var(--phone-border-default);
+  }
+
+  .phone-account-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 48px;
+  }
+
+  .phone-account-stat-value {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-account-stat-label {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-xs-size);
+    color: var(--phone-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .phone-account-profile-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--phone-space-10);
+    padding: var(--phone-space-12) var(--phone-space-card-padding);
+    border-top: 1px solid var(--phone-border-default);
+  }
+
+  .phone-account-profile-avatar {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--phone-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-family: var(--phone-font-family);
+    font-weight: var(--phone-font-weight-bold);
+    font-size: var(--phone-type-label-sm-size);
+  }
+
+  .phone-account-profile-name {
+    flex-shrink: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    color: var(--phone-text-primary);
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .phone-account-profile-stats {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--phone-space-10);
+    justify-content: flex-end;
+  }
+
+  /* Sign-in / sync-code centered shell */
+  .phone-auth-scroll {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--phone-space-16);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-32)) var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-32));
+    text-align: center;
+  }
+
+  .phone-auth-logo {
+    height: 32px;
+    width: auto;
+    margin-bottom: var(--phone-space-8);
+  }
+
+  .phone-auth-title {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-title-md-size);
+    line-height: var(--phone-type-title-md-line);
+    font-weight: var(--phone-font-weight-bold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-auth-subtitle {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-sm-size);
+    line-height: var(--phone-type-body-sm-line);
+    color: var(--phone-text-secondary);
+    max-width: 320px;
+  }
+
+  .phone-auth-actions {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-10);
+    margin-top: var(--phone-space-8);
+  }
+
+  .phone-auth-action-btn {
+    width: 100%;
+    border: 1px solid var(--phone-border-default);
+    border-radius: var(--phone-radius-button);
+    background: var(--phone-accent-bg-elevated);
+    color: var(--phone-text-primary);
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    font-weight: var(--phone-font-weight-semibold);
+    padding: var(--phone-space-14) var(--phone-space-20);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-auth-action-btn.is-primary {
+    background: var(--phone-accent-secondary);
+    border-color: transparent;
+    color: #ffffff;
+  }
+
+  .phone-auth-error {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    color: var(--phone-danger);
+    max-width: 320px;
+  }
+
+  .phone-auth-status {
+    margin: 0;
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    color: var(--phone-text-muted);
+  }
+
+  /* QR sign-in card */
+  .phone-qr-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--phone-space-16);
+    padding: calc(env(safe-area-inset-top, 0px) + var(--phone-space-24)) var(--phone-space-screen-h)
+      calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-32));
+    text-align: center;
+  }
+
+  .phone-qr-card {
+    width: 100%;
+    max-width: 320px;
+    border: 1px solid var(--phone-border-default);
+    border-radius: var(--phone-radius-card);
+    background: var(--phone-accent-bg-elevated);
+    padding: var(--phone-space-24) var(--phone-space-20);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--phone-space-12);
+  }
+
+  .phone-qr-frame {
+    width: 176px;
+    height: 176px;
+    border-radius: var(--phone-radius-lg);
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .phone-qr-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .phone-qr-code-text {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    color: var(--phone-text-secondary);
+  }
 }

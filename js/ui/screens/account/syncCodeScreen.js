@@ -2,6 +2,8 @@ import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { LocalStore } from "../../../core/storage/localStore.js";
 import { I18n } from "../../../i18n/index.js";
+import { Platform } from "../../../platform/index.js";
+import { renderSyncCodeScreenPhone } from "./syncCodeScreenPhone.js";
 
 const KEY = "manualSyncCode";
 
@@ -17,11 +19,29 @@ export const SyncCodeScreen = {
   async mount() {
     this.container = document.getElementById("account");
     ScreenUtils.show(this.container);
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render());
     this.render();
   },
 
   render() {
     const value = LocalStore.get(KEY, "");
+
+    // Phone render path (ticket 05-03, mobile-parity epic). All markup lives in
+    // js/ui/screens/account/syncCodeScreenPhone.js; it keeps the same `data-action` attributes
+    // and `.focusable` class the TV markup uses, so `onPointerActivate` below needs no
+    // phone-specific branch — it already dispatches on `data-action` alone.
+    if (Platform.isPhoneViewport()) {
+      this.container.innerHTML = renderSyncCodeScreenPhone(this, value);
+      if (this.textDialog) {
+        const input = this.container.querySelector("[data-action='textInput']");
+        input?.focus?.();
+      }
+      return;
+    }
+
     this.container.innerHTML = `
       <div class="auth-simple-shell">
         <div class="auth-simple-hero">
@@ -180,6 +200,8 @@ export const SyncCodeScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
     ScreenUtils.hide(this.container);
   }
 };

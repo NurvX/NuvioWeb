@@ -2,6 +2,8 @@ import { AuthManager } from "../../../core/auth/authManager.js";
 import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { I18n } from "../../../i18n/index.js";
+import { Platform } from "../../../platform/index.js";
+import { renderAccountScreenPhone } from "./accountScreenPhone.js";
 
 export const AccountScreen = {
   async mount() {
@@ -18,6 +20,11 @@ export const AccountScreen = {
       this.render();
     });
 
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render());
+
     this.render();
   },
 
@@ -26,6 +33,9 @@ export const AccountScreen = {
       this.unsubscribe();
       this.unsubscribe = null;
     }
+
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
 
     if (this.container) {
       this.container.style.display = "none";
@@ -41,6 +51,13 @@ export const AccountScreen = {
   render() {
     if (!this.container) {
       return;
+    }
+
+    // Phone render path (ticket 05-03, mobile-parity epic) — all markup lives in
+    // js/ui/screens/account/accountScreenPhone.js; this just hands it the screen instance so
+    // it can read this.state directly, same as the TV branches below.
+    if (Platform.isPhoneViewport()) {
+      return this.renderPhone();
     }
 
     if (this.state.authState === "loading") {
@@ -73,6 +90,15 @@ export const AccountScreen = {
         <div class="account-card account-card-danger focusable" data-action="logout">${I18n.t("auth.account.signOut")}</div>
       </div>
     `;
+    this.attachFocus();
+  },
+
+  // Phone render path (ticket 05-03, mobile-parity epic). The phone markup keeps the same
+  // `.focusable`/`data-action` contract the TV markup already used, so this only needs to
+  // (re)index focusables the same way TV does — `onPointerActivate` below is already generic
+  // over any markup carrying `data-action`, so it needs no phone-specific branch.
+  renderPhone() {
+    this.container.innerHTML = renderAccountScreenPhone(this);
     this.attachFocus();
   },
 

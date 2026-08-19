@@ -4,6 +4,8 @@ import { LocalStore } from "../../../core/storage/localStore.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { AuthManager } from "../../../core/auth/authManager.js";
 import { I18n } from "../../../i18n/index.js";
+import { Platform } from "../../../platform/index.js";
+import { renderAuthQrSignInScreenPhone } from "./authQrSignInScreenPhone.js";
 
 let pollInterval = null;
 let countdownInterval = null;
@@ -21,7 +23,39 @@ export const AuthQrSignInScreen = {
     this.isLeaving = false;
     ScreenUtils.show(this.container);
 
-    this.container.innerHTML = `
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => {
+      // renderShell() rebuilds fresh #qr-container/#qr-status nodes for the new layout, so the
+      // in-flight QR session (whose image/status live only in those DOM nodes, not on `this`)
+      // needs restarting rather than just leaving those nodes empty.
+      this.renderShell();
+      if (this.isMounted && !this.isLeaving) {
+        void this.startQr();
+      }
+    });
+
+    this.renderShell();
+    await this.startQr();
+  },
+
+  // Builds the screen's markup and wires the refresh/back buttons — extracted verbatim from
+  // the previous body of `mount()` (ticket 05-03, mobile-parity epic) only so a phone-viewport
+  // guard clause can pick `authQrSignInScreenPhone.js`'s markup instead of the TV template
+  // below; every id the rest of this file queries (`#qr-container`/`#qr-code-text`/
+  // `#qr-status`/`#qr-refresh-btn`/`#qr-back-btn`) is unchanged in both templates, so
+  // `renderQr()`/`clearQr()`/`setStatus()`/`updateActionButtons()` and the button wiring here
+  // work identically either way.
+  renderShell() {
+    if (!this.container) {
+      return;
+    }
+
+    if (Platform.isPhoneViewport()) {
+      this.container.innerHTML = renderAuthQrSignInScreenPhone(this);
+    } else {
+      this.container.innerHTML = `
       <div class="qr-layout">
         <section class="qr-left-panel">
           <div class="qr-brand-lockup">
@@ -51,7 +85,8 @@ export const AuthQrSignInScreen = {
           </div>
         </section>
       </div>
-    `;
+      `;
+    }
 
     this.refreshButton = this.container.querySelector("#qr-refresh-btn");
     this.backButton = this.container.querySelector("#qr-back-btn");
@@ -66,9 +101,10 @@ export const AuthQrSignInScreen = {
       };
     }
 
-    ScreenUtils.indexFocusables(this.container);
-    ScreenUtils.setInitialFocus(this.container);
-    await this.startQr();
+    if (!Platform.isPhoneViewport()) {
+      ScreenUtils.indexFocusables(this.container);
+      ScreenUtils.setInitialFocus(this.container);
+    }
   },
 
   async startQr() {
@@ -354,6 +390,8 @@ export const AuthQrSignInScreen = {
     this.isMounted = false;
     activeQrSessionId += 1;
     this.stopIntervals();
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
     if (this.refreshButton) {
       this.refreshButton.onclick = null;
       this.refreshButton = null;
