@@ -2,22 +2,25 @@ import { ExperienceModeStore } from "../../../data/local/experienceModeStore.js"
 import { ProfileManager } from "../../../core/profile/profileManager.js";
 import { ProfileSettingsSyncService } from "../../../core/profile/profileSettingsSyncService.js";
 import { I18n } from "../../../i18n/index.js";
+import { Platform } from "../../../platform/index.js";
 import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
+import { renderEssentialAddonSetupScreenPhone } from "./essentialAddonSetupScreenPhone.js";
 
 function t(key, fallback) {
   return I18n.t(key, {}, { fallback });
 }
 
 function escapeHtml(value = "") {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-export const EssentialAddonSetupScreen = {
-  async mount() {
-    this.container = document.getElementById("essentialAddonSetup");
-    ScreenUtils.show(this.container);
-    this.container.innerHTML = `
+function renderTvMarkup() {
+  return `
       <main class="experience-mode-screen essential-addon-setup">
         <img class="experience-mode-logo" src="assets/brand/app_logo_wordmark.png" alt="Nuvio" />
         <h1>${escapeHtml(t("essential_addon_setup_title", "Set up your add-ons"))}</h1>
@@ -27,11 +30,28 @@ export const EssentialAddonSetupScreen = {
           <button class="experience-mode-card focusable" data-index="1" data-action="skip"><strong>${escapeHtml(t("essential_addon_continue_for_now", "Continue for now"))}</strong><span>${escapeHtml(t("essential_addon_setup_subtitle", "You can add them later from Settings."))}</span></button>
         </div>
       </main>`;
+}
+
+export const EssentialAddonSetupScreen = {
+  render() {
+    this.container.innerHTML = Platform.isPhoneViewport()
+      ? renderEssentialAddonSetupScreenPhone()
+      : renderTvMarkup();
+    ScreenUtils.setInitialFocus(this.container);
+  },
+
+  async mount() {
+    this.container = document.getElementById("essentialAddonSetup");
+    ScreenUtils.show(this.container);
+    this.render();
+    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
+    // flips between its TV and phone render paths without needing a full navigation.
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render());
     this.onKeyDownBound = this.onKeyDown.bind(this);
     this.onClickBound = this.onClick.bind(this);
     document.addEventListener("keydown", this.onKeyDownBound);
     this.container.addEventListener("click", this.onClickBound);
-    ScreenUtils.setInitialFocus(this.container);
   },
 
   async finish(skipped) {
@@ -39,7 +59,11 @@ export const EssentialAddonSetupScreen = {
     ExperienceModeStore.setForProfile(profileId, { addonSetupSkipped: skipped });
     await ProfileSettingsSyncService.push(profileId);
     if (skipped) {
-      await Router.navigate("home", { forceReload: true }, { replaceHistory: true, skipStackPush: true });
+      await Router.navigate(
+        "home",
+        { forceReload: true },
+        { replaceHistory: true, skipStackPush: true }
+      );
     } else {
       await Router.navigate("plugin", { essentialSetup: true });
     }
@@ -62,6 +86,8 @@ export const EssentialAddonSetupScreen = {
   },
 
   cleanup() {
+    this.phoneViewportUnsubscribe?.();
+    this.phoneViewportUnsubscribe = null;
     document.removeEventListener("keydown", this.onKeyDownBound);
     this.container?.removeEventListener("click", this.onClickBound);
     ScreenUtils.hide(this.container);

@@ -4536,6 +4536,47 @@
     max-width: 320px;
   }
 
+  /* First-run onboarding choice cards (experience-mode-selection / essential-addon-setup) —
+     reuses the phone-auth-shell/-scroll/-logo/-title/-subtitle centered layout, adding a
+     title+subtitle card variant of phone-auth-action-btn for the two-line choice options. */
+  .phone-onboarding-cards {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--phone-space-10);
+    margin-top: var(--phone-space-8);
+  }
+
+  .phone-onboarding-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--phone-space-4);
+    text-align: left;
+    width: 100%;
+    border: 1px solid var(--phone-border-default);
+    border-radius: var(--phone-radius-lg);
+    background: var(--phone-accent-bg-elevated);
+    padding: var(--phone-space-14) var(--phone-space-16);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .phone-onboarding-card-title {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-body-md-size);
+    font-weight: var(--phone-font-weight-semibold);
+    color: var(--phone-text-primary);
+  }
+
+  .phone-onboarding-card-subtitle {
+    font-family: var(--phone-font-family);
+    font-size: var(--phone-type-label-sm-size);
+    line-height: var(--phone-type-label-sm-line);
+    color: var(--phone-text-secondary);
+  }
+
   .phone-auth-status {
     margin: 0;
     font-family: var(--phone-font-family);
