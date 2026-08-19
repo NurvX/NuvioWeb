@@ -46,6 +46,11 @@ import { Environment } from "../../../platform/environment.js";
 import { Platform } from "../../../platform/index.js";
 import { Router } from "../../navigation/router.js";
 import { attachPlayerGestureLayer, PLAYER_GESTURE_HOLD_SPEED } from "./playerGestures.js";
+import {
+  renderPhonePlayerChrome,
+  mountPhonePlayerChrome,
+  updatePhonePlayerChrome
+} from "./playerScreenPhone.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
 import { DirectDebridResolver } from "../../../core/debrid/directDebridResolver.js";
 import { TrackingScrobbleService } from "../../../data/repository/trackingScrobbleService.js";
@@ -2172,7 +2177,7 @@ export const PlayerScreen = {
     // screen. All of it is additive and gated behind Platform.isPhoneViewport(); it never
     // touches the existing keydown-based D-pad control logic below.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.syncPhoneGestureLayer());
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.syncPhoneMode());
     this.webOsClockLocaleInfo = null;
     this.webOsClockSettingsSubscription?.cancel?.();
     this.webOsClockSettingsSubscription = null;
@@ -2584,7 +2589,7 @@ export const PlayerScreen = {
       void this.fetchSkipIntervals();
       void this.hydratePauseOverlayMeta();
     }
-    this.syncPhoneGestureLayer();
+    this.syncPhoneMode();
     this.renderEpisodePanel();
     this.applyAspectMode({ showToast: false });
     if (!this.isExternalFrameMode()) {
@@ -3377,6 +3382,7 @@ export const PlayerScreen = {
     const renderKey = `${activeKey}|ready:${playbackReady ? 1 : 0}|controls:${this.controlsVisible ? 1 : 0}|hidden:${this.skipIntroAutoHidden ? 1 : 0}|dismissed:${this.skipIntervalDismissed ? 1 : 0}`;
     button.classList.toggle("hidden", !isVisible);
     button.classList.toggle("is-raised", Boolean(this.controlsVisible));
+    this.syncPhonePlayerChrome();
     if (!isVisible && this.controlFocusZone === "skipIntro") {
       this.controlFocusZone =
         this.controlsVisible && this.isSeekBarAvailable() ? "progress" : "buttons";
@@ -5145,6 +5151,9 @@ export const PlayerScreen = {
       this.renderPauseOverlay();
       this.renderNextEpisodeCard();
     }
+    // Phone overlay chrome (ticket 04-03) — #playerUiRoot was just rebuilt above, so the phone
+    // chrome layer (if any) needs rebuilding too. No-ops off-phone. See syncPhonePlayerChrome().
+    this.syncPhonePlayerChrome();
   },
 
   cachePlayerUiRefs(root = null) {
@@ -6458,6 +6467,7 @@ export const PlayerScreen = {
     overlay.classList.toggle("hidden", hidden);
     overlay.classList.toggle("is-still-watching", Boolean(this.stillWatchingPromptVisible));
     controlsOverlay?.classList.toggle("pause-overlay-active", !hidden);
+    this.syncPhonePlayerChrome();
     if (hidden) {
       return;
     }
@@ -9137,6 +9147,7 @@ export const PlayerScreen = {
     this.renderNextEpisodeCard();
     this.syncPlayerOverlayLayoutState();
     this.renderBitmapSubtitleAtCurrentTime();
+    this.syncPhonePlayerChrome();
   },
 
   syncControlFocusDom() {
@@ -9992,6 +10003,7 @@ export const PlayerScreen = {
     const hidden = !this.isNextEpisodeCardVisible();
 
     card.classList.toggle("hidden", hidden);
+    this.syncPhonePlayerChrome();
     if (hidden) {
       card.innerHTML = "";
       return;
@@ -10144,6 +10156,7 @@ export const PlayerScreen = {
     if (this.seekOverlayVisible && this.seekPreviewSeconds == null) {
       this.renderSeekOverlay();
     }
+    this.syncPhonePlayerChrome();
   },
   renderSeekOverlay() {
     const overlay = this.uiRefs?.seekOverlay;
@@ -19325,6 +19338,73 @@ export const PlayerScreen = {
   // applyPlaybackSpeed/setControlsVisible). None of this touches onKeyDown or its helpers.
   // ---------------------------------------------------------------------------------------
 
+  // Single entry point mount()/the Platform.watchPhoneViewport() subscription call: keeps the
+  // gesture layer (04-02) and the visual overlay chrome (04-03, playerScreenPhone.js) in sync
+  // together, since both are gated behind the same Platform.isPhoneViewport() check.
+  syncPhoneMode() {
+    this.syncPhoneGestureLayer();
+    this.syncPhonePlayerChrome();
+  },
+
+  // Ticket 04-03's phone overlay chrome (playerScreenPhone.js) is appended as an additional
+  // sibling layer inside #playerUiRoot rather than replacing any TV markup — see
+  // playerScreenPhone.js's own header comment for why. This just owns the build/teardown/
+  // refresh lifecycle of that layer; all real markup/interaction logic lives in that module.
+  // Called from renderPlayerUi() (initial build), syncPhoneMode() (mount + viewport resize),
+  // and from updateUiTick()/renderPauseOverlay()/renderSkipIntroButton()/
+  // renderNextEpisodeCard()/renderControlButtons() (state-change refresh) — see each of those
+  // methods' own trailing call. Cheap to call repeatedly: it only rebuilds the DOM once per
+  // #playerUiRoot lifetime and otherwise just refreshes existing nodes.
+  syncPhonePlayerChrome() {
+    if (this.isExternalFrameMode() || !Platform.isPhoneViewport()) {
+      this.teardownPhonePlayerChrome();
+      return;
+    }
+    const root = this.uiRefs?.root;
+    if (!root) {
+      return;
+    }
+    if (!this.phonePlayerChromeRoot || !root.contains(this.phonePlayerChromeRoot)) {
+      this.teardownPhonePlayerChrome();
+      const container = document.createElement("div");
+      container.id = "phonePlayerUi";
+      container.className = "phone-player-ui";
+      container.innerHTML = renderPhonePlayerChrome(this);
+      root.appendChild(container);
+      this.phonePlayerChromeRoot = container;
+      this.phonePlayerChromeTeardown = mountPhonePlayerChrome(this, container);
+    }
+    updatePhonePlayerChrome(this, this.phonePlayerChromeRoot);
+  },
+
+  teardownPhonePlayerChrome() {
+    this.phonePlayerChromeTeardown?.();
+    this.phonePlayerChromeTeardown = null;
+    this.phonePlayerChromeRoot?.remove();
+    this.phonePlayerChromeRoot = null;
+  },
+
+  // Deliberately scoped-down "external handoff" for the phone header button: playerScreen.js
+  // has no equivalent to streamScreen.js's tryOpenInExternalPlayer()/launchExternalPlayerHref()
+  // (that logic lives entirely in streamScreen.js's own state/params, resolved before ever
+  // entering the internal player — see 04-03's research notes). Reusing it here would mean
+  // either duplicating its OS-URI-scheme branching or a cross-screen refactor, both out of
+  // this ticket's scope, so this just opens the currently-playing URL in a new tab/window,
+  // which mobile browsers already hand off to a native player or download prompt for direct
+  // video URLs.
+  tryOpenCurrentStreamExternally() {
+    const url = String(this.activePlaybackUrl || "").trim();
+    if (!url) {
+      return false;
+    }
+    try {
+      window.open(url, "_blank", "noopener");
+      return true;
+    } catch (_) {
+      return false;
+    }
+  },
+
   // Re-synced from mount() and from the Platform.watchPhoneViewport() subscription so a live
   // resize across the phone breakpoint attaches/detaches the layer without a full re-mount.
   syncPhoneGestureLayer() {
@@ -19390,7 +19470,11 @@ export const PlayerScreen = {
       this.isDialogOpen() ||
       this.isStartupErrorVisible() ||
       this.pauseOverlayVisible ||
-      this.moreActionsVisible
+      this.moreActionsVisible ||
+      // Phone-only additions (ticket 04-03): the lock overlay swallows all input except its
+      // own unlock button, and any tap landing on the phone chrome itself (header/center/
+      // bottom bar/pickers) must not also start a video-surface gesture underneath it.
+      this.phoneLockActive
     ) {
       return true;
     }
@@ -19408,7 +19492,8 @@ export const PlayerScreen = {
           ".player-skip-intro",
           ".player-parental-guide",
           ".player-startup-error-overlay",
-          "#episodeSidePanel"
+          "#episodeSidePanel",
+          ".phone-player-ui"
         ].join(",")
       )
     );
@@ -19536,9 +19621,10 @@ export const PlayerScreen = {
     }
   },
 
-  // Placeholder feedback surface (icon-less text pill) — ticket 04-03 owns the real floating
-  // pill's visual styling and replaces this. This just proves the callback contract fires with
-  // the right {type, value, limitHit} data for a real gesture in a real browser.
+  // Real floating feedback pill (ticket 04-03) — icon + text, red-tinted on `limitHit`. 04-02
+  // built this method as a text-only placeholder and explicitly left the visual design to this
+  // ticket; the {type, value, limitHit} callback contract itself (wired in
+  // syncPhoneGestureLayer() above) is unchanged.
   onPhoneGestureFeedback(payload) {
     if (!payload) {
       return;
@@ -19554,9 +19640,28 @@ export const PlayerScreen = {
       pill.className = "phone-player-gesture-feedback hidden";
       root.appendChild(pill);
     }
-    pill.textContent = this.formatPhoneGestureFeedbackText(payload);
+    pill.innerHTML = `
+      <span class="phone-player-gesture-feedback-icon" aria-hidden="true">${this.getPhoneGestureFeedbackIcon(payload.type)}</span>
+      <span class="phone-player-gesture-feedback-text">${escapeHtml(this.formatPhoneGestureFeedbackText(payload))}</span>
+    `;
     pill.classList.remove("hidden");
     pill.classList.toggle("limit-hit", Boolean(payload.limitHit));
+  },
+
+  getPhoneGestureFeedbackIcon(type) {
+    if (type === "scrub" || type === "seek-tap") {
+      return '<svg viewBox="0 0 24 24" width="16" height="16" focusable="false"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="currentColor"></path></svg>';
+    }
+    if (type === "brightness") {
+      return '<svg viewBox="0 0 24 24" width="16" height="16" focusable="false"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zm0-5h0v3h0V2zm0 17h0v3h0v-3zM4.22 4.22l1.42 1.42-1.42-1.42zm12.14 12.14l1.42 1.42-1.42-1.42zM2 12h3H2zm17 0h3h-3zM4.22 19.78l1.42-1.42-1.42 1.42zM16.36 6.64l1.42-1.42-1.42 1.42z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>';
+    }
+    if (type === "volume") {
+      return '<svg viewBox="0 0 24 24" width="16" height="16" focusable="false"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2A4.5 4.5 0 0014 7.97v8.05a4.48 4.48 0 002.5-4.02z" fill="currentColor"></path></svg>';
+    }
+    if (type === "hold-speed") {
+      return '<svg viewBox="0 0 24 24" width="16" height="16" focusable="false"><path d="M13 3a9 9 0 00-9 9H2l3.89 3.89.07.14L10 12H8a5 5 0 015-5c2.76 0 5 2.24 5 5s-2.24 5-5 5c-1.38 0-2.63-.56-3.54-1.46l-1.41 1.41A6.98 6.98 0 0013 19a7 7 0 000-14z" fill="currentColor"></path></svg>';
+    }
+    return "";
   },
 
   formatPhoneGestureFeedbackText({ type, value }) {
@@ -19567,10 +19672,10 @@ export const PlayerScreen = {
       return value > 0 ? "+10s" : "-10s";
     }
     if (type === "brightness") {
-      return `Brightness ${Math.round(Number(value || 0) * 100)}%`;
+      return `${Math.round(Number(value || 0) * 100)}%`;
     }
     if (type === "volume") {
-      return `Volume ${Math.round(Number(value || 0) * 100)}%`;
+      return `${Math.round(Number(value || 0) * 100)}%`;
     }
     if (type === "hold-speed") {
       return `${Number(value || 1)}x`;
@@ -19590,6 +19695,8 @@ export const PlayerScreen = {
       this.phoneViewportUnsubscribe?.();
       this.phoneViewportUnsubscribe = null;
       this.teardownPhoneGestureLayer();
+      this.teardownPhonePlayerChrome();
+      this.phoneLockActive = false;
       this.nextEpisodeLaunchToken = Number(this.nextEpisodeLaunchToken || 0) + 1;
       this.nextEpisodeLaunching = false;
       this.resetNextEpisodeLaunchPresentation();
