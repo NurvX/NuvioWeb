@@ -849,7 +849,10 @@ export const FolderDetailScreen = {
     // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
     // flips between its TV and phone render paths without needing a full navigation.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render());
+    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => {
+      this.refreshUseHomeFollowLayout();
+      this.render();
+    });
     this.params = params || {};
     this.layoutPrefs = LayoutPreferences.get();
     this.collection =
@@ -868,10 +871,8 @@ export const FolderDetailScreen = {
     this.restoredFocusedItem = null;
     this.navModel = { rows: [] };
     this.tabs = [];
-    const preferredHomeLayout = String(this.layoutPrefs?.homeLayout || "classic").toLowerCase();
     this.viewMode = String(this.collection?.viewMode || "TABBED_GRID").toUpperCase();
-    this.useHomeFollowLayout =
-      this.viewMode === "FOLLOW_LAYOUT" || preferredHomeLayout === "modern";
+    this.refreshUseHomeFollowLayout();
     this.folderRouteEnterPending = true;
     this.heroItem = null;
 
@@ -1245,6 +1246,16 @@ export const FolderDetailScreen = {
       }
     }
     return candidates[0];
+  },
+
+  // The follow layout is a TV/desktop hero presentation — it must never be selected on a
+  // phone viewport even when the user's Home Layout preference is "modern", or this screen
+  // renders TV-sized markup on phone instead of dispatching to renderPhone().
+  refreshUseHomeFollowLayout() {
+    const preferredHomeLayout = String(this.layoutPrefs?.homeLayout || "classic").toLowerCase();
+    this.useHomeFollowLayout =
+      !Platform.isPhoneViewport() &&
+      (this.viewMode === "FOLLOW_LAYOUT" || preferredHomeLayout === "modern");
   },
 
   render() {

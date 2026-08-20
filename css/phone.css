@@ -2091,9 +2091,10 @@
      optional collapsible cover-image hero — parallax-scrolled the same way Detail's own hero
      is (see `.phone-detail-hero-bg`) — followed by either a horizontally-scrolling tab row +
      responsive poster grid (TABBED_GRID) or a stack of phoneShelf.js rows, one per source
-     (row-track). Never rendered for `useHomeFollowLayout` folders — those keep rendering
-     HomeScreen's own TV-styled modern layout at any viewport width (see the epic spec's Out
-     of Scope section on that layout's swipeable-row transform positioning). */
+     (row-track). Never rendered for `useHomeFollowLayout` folders on non-phone viewports —
+     those keep rendering HomeScreen's own TV-styled modern layout (see the epic spec's Out
+     of Scope section on that layout's swipeable-row transform positioning); on a phone
+     viewport this screen always takes over regardless of that preference. */
   .phone-folder-root {
     position: relative;
     height: 100%;
@@ -2167,8 +2168,9 @@
   .phone-folder-title {
     margin: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     font-family: var(--phone-font-family);
     font-size: var(--phone-type-title-md-size);
     line-height: var(--phone-type-title-md-line);
@@ -2195,7 +2197,10 @@
     position: relative;
     width: 100%;
     height: 26vh;
-    min-height: 170px;
+    /* Tall enough to clear the floating header even at its 2-line-title/safe-area-inset
+       worst case (~111px header content + up to ~59px notch inset), so a long folder title
+       never bleeds into the tabs/grid below it. */
+    min-height: 196px;
     overflow: hidden;
     background: var(--phone-accent-bg-elevated);
   }
