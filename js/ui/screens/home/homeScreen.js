@@ -8173,6 +8173,8 @@ export const HomeScreen = {
 
     if (this.hasLoadedOnce && Array.isArray(this.rows) && this.rows.length) {
       this.homeLoadToken = (this.homeLoadToken || 0) + 1;
+      this.layoutPrefs = LayoutPreferences.get();
+      this.layoutMode = String(this.layoutPrefs.homeLayout || "classic").toLowerCase();
       this.render();
       this.loadData({
         background: true,
