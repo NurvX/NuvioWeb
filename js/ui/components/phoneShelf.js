@@ -55,8 +55,9 @@ const VARIANT_ASPECT = {
  *
  * `items` are plain objects forwarded as-is to `renderPosterCard` (`id`, `posterUrl`,
  * `title`, `subtitle`, `action`, `hideLabels`, `watched`, `progress`) — this function does
- * not reshape them, it only supplies the `aspect` implied by `variant` (an item-level
- * `aspect` override is not honored; use `variant` to control the whole row's card shape).
+ * not reshape them, it only supplies the `aspect` implied by `variant` as each item's
+ * default. An item carrying its own `aspect` (e.g. a collection-folder tile mixed into an
+ * otherwise-portrait row) overrides that default, so a single row can mix card shapes.
  * `variant` is `"portrait"` (default, standard poster cards) or `"continueWatching"` (larger
  * landscape cards, sized via the `.phone-shelf-continuous` CSS scope). Returns an empty
  * string when `items` is empty — an empty shelf has nothing useful to render.
@@ -76,7 +77,7 @@ export function renderPhoneShelf({
   const isCast = variant === "cast";
   const aspect = VARIANT_ASPECT[variant] || VARIANT_ASPECT.portrait;
 
-  const cardsMarkup = items.map((item) => renderPosterCard({ ...item, aspect })).join("");
+  const cardsMarkup = items.map((item) => renderPosterCard({ aspect, ...item })).join("");
 
   const viewAllMarkup = viewAllLabel
     ? `

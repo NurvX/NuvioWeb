@@ -264,6 +264,12 @@
     object-fit: cover;
   }
 
+  /* Custom banner art (e.g. collection-folder covers) must never be cropped — matches
+     `.home-screen-shell .home-collection-card .content-poster` in css/components.css. */
+  .phone-poster-image-fit-fill {
+    object-fit: fill;
+  }
+
   .phone-poster-image-empty {
     background: var(--phone-accent-bg-elevated);
   }

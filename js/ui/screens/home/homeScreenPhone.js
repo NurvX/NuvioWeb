@@ -245,12 +245,22 @@ function continueWatchingShelfItem(item) {
   };
 }
 
+// Collection-folder items (rowKind "collection", or individually flagged via
+// isCollectionFolderItem — see normalizeCollectionFolderItem in homeScreen.js) carry a
+// custom-authored banner cover, not real artwork — a LANDSCAPE tileShape must render at a
+// 16:9 aspect with no cropping (`fit: "fill"`), matching what the TV/desktop
+// `.home-collection-card.is-collection-landscape` styling already does in css/components.css.
+// Cropping a LANDSCAPE banner into the default portrait card (the old behavior) chopped off
+// whatever logo/text sits near its edges.
 function catalogShelfItem(item) {
+  const isLandscapeCollectionFolder =
+    item.type === "collection_folder" && item.tileShape === "LANDSCAPE";
   return {
     id: item.id,
     posterUrl: item.poster || item.landscapePoster || "",
     title: item.name || item.title || "",
-    subtitle: ""
+    subtitle: "",
+    ...(isLandscapeCollectionFolder ? { aspect: "landscape", fit: "fill" } : {})
   };
 }
 

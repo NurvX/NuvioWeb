@@ -34,6 +34,11 @@ function clampProgress(progress) {
  * Returns markup for one phone poster card. `aspect` is `"portrait"` (2:3, the default —
  * `--phone-radius-poster` at 126x189px), `"landscape"` (16:9, used by episode cards and some
  * catalog styles), or `"circle"` (1:1 circular avatar, used by cast rows — ticket 02-01).
+ * `fit` is the image's `object-fit`: `"cover"` (the default — crops to fill, right for real
+ * photographic artwork) or `"fill"` (stretches to exactly fill the box with no cropping —
+ * use for custom banner art, e.g. collection-folder covers, where the whole image including
+ * any baked-in text/logo near the edges must stay visible, mirroring the TV/desktop
+ * `.home-collection-card`'s `object-fit: fill` in css/components.css).
  * `progress` is a 0..1 fraction; pass `null`/`undefined` to omit the continue-watching
  * progress bar entirely (distinct from `0`, which renders an empty bar). `action`/`id` become
  * `data-action`/`data-id` on the tappable element so the calling screen's own
@@ -47,6 +52,7 @@ export function renderPosterCard({
   title = "",
   subtitle = "",
   aspect = "portrait",
+  fit = "cover",
   action = "openDetail",
   hideLabels = false,
   watched = false,
@@ -58,6 +64,7 @@ export function renderPosterCard({
       : aspect === "circle"
         ? "phone-poster-card-circle"
         : "phone-poster-card-portrait";
+  const imageFitClass = fit === "fill" ? " phone-poster-image-fit-fill" : "";
   const clampedProgress = clampProgress(progress);
 
   const watchedBadgeMarkup = watched
@@ -105,7 +112,7 @@ export function renderPosterCard({
       >
         ${
           posterUrl
-            ? `<img class="phone-poster-image" src="${escapeHtml(posterUrl)}" alt="" loading="lazy" />`
+            ? `<img class="phone-poster-image${imageFitClass}" src="${escapeHtml(posterUrl)}" alt="" loading="lazy" />`
             : `<span class="phone-poster-image phone-poster-image-empty" aria-hidden="true"></span>`
         }
         <span class="phone-poster-sheen" aria-hidden="true"></span>
