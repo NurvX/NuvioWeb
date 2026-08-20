@@ -152,6 +152,13 @@ export const LibrarySyncService = {
           true
         );
         const addonUrls = applyPulledAddons(addonRows);
+        // An empty remote result must not wipe a non-empty local list -- that's just "nothing
+        // has been pushed for this profile yet", not "the user wants zero addons". Mirrors the
+        // same guard ProfileSyncService/PluginSyncService already apply to their own pulls.
+        if (!addonUrls.length && localUrls.length) {
+          recordPullStatus("ok", { count: localUrls.length });
+          return localUrls;
+        }
         await addonRepository.setAddonOrder(addonUrls, { silent: true });
         recordPullStatus("ok", { count: addonUrls.length });
         return addonUrls;
@@ -171,6 +178,10 @@ export const LibrarySyncService = {
           true
         );
         const urls = applyPulledAddons(rows);
+        if (!urls.length && localUrls.length) {
+          recordPullStatus("ok", { count: localUrls.length });
+          return localUrls;
+        }
         await addonRepository.setAddonOrder(urls, { silent: true });
         recordPullStatus("ok", { count: urls.length });
         return urls;
@@ -190,6 +201,10 @@ export const LibrarySyncService = {
             true
           );
           const urls = applyPulledAddons(rpcRows);
+          if (!urls.length && localUrls.length) {
+            recordPullStatus("ok", { count: localUrls.length });
+            return localUrls;
+          }
           await addonRepository.setAddonOrder(urls, { silent: true });
           recordPullStatus("ok", { count: urls.length });
           return urls;
