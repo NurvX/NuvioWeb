@@ -6,6 +6,7 @@ import { LocalStore } from "../../../core/storage/localStore.js";
 import { SessionStore } from "../../../core/storage/sessionStore.js";
 import { TmdbSettingsStore } from "../../../data/local/tmdbSettingsStore.js";
 import { HomeCatalogStore } from "../../../data/local/homeCatalogStore.js";
+import { CollectionsStore } from "../../../data/local/collectionsStore.js";
 import { ThemeStore } from "../../../data/local/themeStore.js";
 import { ThemeManager } from "../../theme/themeManager.js";
 import { PlayerSettingsStore } from "../../../data/local/playerSettingsStore.js";
@@ -2151,6 +2152,8 @@ export const SettingsScreen = {
     );
     this.streamBadgePreviewSourceUrl = null;
     this.advancedCacheCleared = false;
+    this.collectionsImportStatus = null;
+    this.collectionsImportCount = 0;
     this.optionDialog = this.optionDialog || null;
     this.textDialog = this.textDialog || null;
     this.debridAuthDialog = null;
@@ -3330,6 +3333,9 @@ export const SettingsScreen = {
         }
       });
     });
+    this.actionMap.set("advanced:importCollections", () => {
+      this.triggerCollectionsFileImport();
+    });
 
     if (isEssential) {
       return `
@@ -3429,7 +3435,79 @@ export const SettingsScreen = {
       </div>`
           : ""
       }
+      <div class="settings-group-heading">
+        <div class="settings-group-title">${escapeHtml(t("advanced_section_collections", {}, "Collections"))}</div>
+      </div>
+      <div class="settings-group-card">
+        <div class="settings-stack">
+          ${this.renderActionRow({
+            focusKey: "advanced:importCollections",
+            title: t("advanced_import_collections", {}, "Import Collections"),
+            subtitle:
+              this.collectionsImportStatus === "done"
+                ? t(
+                    "advanced_import_collections_done",
+                    { count: this.collectionsImportCount || 0 },
+                    `Imported ${this.collectionsImportCount || 0} collection(s)`
+                  )
+                : this.collectionsImportStatus === "error"
+                  ? t(
+                      "advanced_import_collections_error",
+                      {},
+                      "Could not read that file - check it's valid collections JSON."
+                    )
+                  : t(
+                      "advanced_import_collections_subtitle",
+                      {},
+                      "Load a collections.json file to add folder tiles to your Home screen."
+                    ),
+            icon: null
+          })}
+        </div>
+      </div>
     `;
+  },
+
+  triggerCollectionsFileImport() {
+    let input = this.collectionsImportInput;
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,application/json";
+      input.style.display = "none";
+      input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        input.value = "";
+        if (!file) {
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          void this.applyImportedCollectionsJson(String(reader.result || ""));
+        };
+        reader.onerror = () => {
+          this.collectionsImportStatus = "error";
+          void this.render({ refreshModel: false });
+        };
+        reader.readAsText(file);
+      });
+      document.body.appendChild(input);
+      this.collectionsImportInput = input;
+    }
+    input.click();
+  },
+
+  async applyImportedCollectionsJson(text) {
+    const parsed = CollectionsStore.importFromJson(text);
+    if (!parsed.length) {
+      this.collectionsImportStatus = "error";
+      await this.render({ refreshModel: false });
+      return;
+    }
+    CollectionsStore.replace(parsed);
+    this.collectionsImportStatus = "done";
+    this.collectionsImportCount = parsed.length;
+    await this.render({ refreshModel: false });
   },
 
   renderAppearanceSection(model) {
