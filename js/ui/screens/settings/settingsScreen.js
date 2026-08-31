@@ -639,7 +639,8 @@ const SECTION_META = [
   {
     id: "layout",
     labelKey: "settings.sections.layout.label",
-    subtitleKey: "settings.sections.layout.subtitle"
+    subtitleKey: "settings.sections.layout.subtitle",
+    hideFromNav: true
   },
   {
     id: "contentDiscovery",
