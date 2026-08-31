@@ -670,7 +670,8 @@ const SECTION_META = [
   {
     id: "playback",
     labelKey: "settings.sections.playback.label",
-    subtitleKey: "settings.sections.playback.subtitle"
+    subtitleKey: "settings.sections.playback.subtitle",
+    hideFromNav: true
   },
   {
     id: "trakt",
