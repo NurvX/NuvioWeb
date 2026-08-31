@@ -658,7 +658,8 @@ const SECTION_META = [
   {
     id: "integration",
     labelKey: "settings.sections.integration.label",
-    subtitleKey: "settings.sections.integration.subtitle"
+    subtitleKey: "settings.sections.integration.subtitle",
+    hideFromNav: true
   },
   {
     id: "streams",
