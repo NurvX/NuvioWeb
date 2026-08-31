@@ -17,8 +17,6 @@ import {
   isSelectedSidebarAction,
   isRootSidebarNode,
   renderRootSidebar,
-  setModernSidebarExpanded,
-  setModernSidebarPillIconOnly,
   setLegacySidebarExpanded
 } from "../../components/sidebarNavigation.js";
 import {
@@ -353,7 +351,7 @@ export const SearchScreen = {
     this.lastContentFocus = snapshot?.lastContentFocus
       ? { ...snapshot.lastContentFocus }
       : this.lastContentFocus || null;
-    this.sidebarExpanded = Boolean(this.layoutPrefs?.modernSidebar && snapshot?.sidebarExpanded);
+    this.sidebarExpanded = false;
     this.sidebarFocusIndex = Number.isFinite(snapshot?.sidebarFocusIndex)
       ? snapshot.sidebarFocusIndex
       : 0;
@@ -511,10 +509,7 @@ export const SearchScreen = {
       <div class="home-shell search-screen-shell${this.searchRouteEnterPending ? " search-route-enter" : ""}">
         ${renderRootSidebar({
           selectedRoute: "search",
-          profile: this.sidebarProfile,
-          layout: this.layoutPrefs,
-          expanded: Boolean(this.sidebarExpanded),
-          pillIconOnly: Boolean(this.pillIconOnly)
+          profile: this.sidebarProfile
         })}
         <main class="home-main search-content search-loading-shell">
           <div class="search-loading">
@@ -792,15 +787,7 @@ export const SearchScreen = {
         <div class="search-empty-state">
           <span class="search-empty-icon material-icons" aria-hidden="true">search</span>
           <h2>${escapeHtml(t("search_start_title", {}, "Start Searching"))}</h2>
-          <p>${escapeHtml(
-            this.layoutPrefs?.discoverLocation === "in_search"
-              ? t("search_start_subtitle", {}, "Enter at least 2 characters")
-              : t(
-                  "search_start_subtitle_no_discover",
-                  {},
-                  "Discover is disabled. Enter at least 2 characters"
-                )
-          )}</p>
+          <p>${escapeHtml(t("search_start_subtitle", {}, "Enter at least 2 characters"))}</p>
         </div>
       `;
     }
@@ -877,22 +864,13 @@ export const SearchScreen = {
       <div class="home-shell search-screen-shell${this.searchRouteEnterPending ? " search-route-enter" : ""}">
         ${renderRootSidebar({
           selectedRoute: "search",
-          profile: this.sidebarProfile,
-          layout: this.layoutPrefs,
-          expanded: Boolean(this.sidebarExpanded),
-          pillIconOnly: Boolean(this.pillIconOnly)
+          profile: this.sidebarProfile
         })}
         <main class="home-main search-content">
-          <section class="search-header${this.layoutPrefs?.discoverLocation === "in_search" ? "" : " no-discover"}${this.voiceSearchSupported ? "" : " no-voice"}">
-            ${
-              this.layoutPrefs?.discoverLocation === "in_search"
-                ? `
-              <button class="search-discover-btn focusable" data-action="openDiscover">
-                <span class="search-action-icon material-icons" aria-hidden="true">explore</span>
-              </button>
-            `
-                : ""
-            }
+          <section class="search-header${this.voiceSearchSupported ? "" : " no-voice"}">
+            <button class="search-discover-btn focusable" data-action="openDiscover">
+              <span class="search-action-icon material-icons" aria-hidden="true">explore</span>
+            </button>
             ${
               this.voiceSearchSupported
                 ? `<button
@@ -1184,23 +1162,15 @@ export const SearchScreen = {
 
   async openSidebar() {
     this.captureLiveViewState();
-    const selected = getRootSidebarSelectedNode(this.container, this.layoutPrefs);
+    const selected = getRootSidebarSelectedNode(this.container);
     this.focusZone = "sidebar";
-    if (this.layoutPrefs?.modernSidebar && !this.sidebarExpanded) {
-      this.sidebarExpanded = true;
-      setModernSidebarExpanded(this.container, true);
-    }
-    const nodes = getRootSidebarNodes(this.container, this.layoutPrefs);
+    const nodes = getRootSidebarNodes(this.container);
     return this.focusSidebarNode(selected || nodes[0] || null);
   },
 
   async closeSidebarToContent() {
     this.captureLiveViewState();
     this.focusZone = "content";
-    if (this.layoutPrefs?.modernSidebar && this.sidebarExpanded) {
-      this.sidebarExpanded = false;
-      setModernSidebarExpanded(this.container, false);
-    }
     return this.restoreContentFocus(false) || true;
   },
 
@@ -1284,9 +1254,7 @@ export const SearchScreen = {
     const currentZone = String(current?.dataset?.navZone || "");
     const sidebarFocused = isRootSidebarNode(target);
     this.focusZone = sidebarFocused ? "sidebar" : "content";
-    if (!this.layoutPrefs?.modernSidebar) {
-      setLegacySidebarExpanded(this.container, sidebarFocused);
-    }
+    setLegacySidebarExpanded(this.container, sidebarFocused);
     if (!sidebarFocused) {
       this.rememberContentFocus(target);
     }
@@ -1793,8 +1761,7 @@ export const SearchScreen = {
 
     if (action === "openDetail") this.openDetailFromNode(node);
     if (action === "openCatalogSeeAll") this.openCatalogSeeAllFromNode(node);
-    if (action === "openDiscover" && this.layoutPrefs?.discoverLocation === "in_search")
-      Router.navigate("discover");
+    if (action === "openDiscover") Router.navigate("discover");
     if (action === "openVoice") this.handleVoiceSearch();
   },
 
@@ -1957,15 +1924,6 @@ export const SearchScreen = {
 
     if (this.keepSearchInputEditingKey(event, code)) {
       return;
-    }
-    if (this.layoutPrefs?.modernSidebar && !this.sidebarExpanded) {
-      if (code === 40) {
-        this.pillIconOnly = true;
-        setModernSidebarPillIconOnly(this.container, true);
-      } else if (code === 38) {
-        this.pillIconOnly = false;
-        setModernSidebarPillIconOnly(this.container, false);
-      }
     }
 
     if (this.focusZone === "sidebar") {

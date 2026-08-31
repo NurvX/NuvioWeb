@@ -6120,13 +6120,6 @@ button:focus-visible {
   --home-continue-height: 236px;
 }
 
-.home-screen-shell.home-layout-modern.home-modern-landscape-posters {
-  --home-row-gap: 24px;
-  --modern-rows-viewport-height: 49%;
-  --modern-rows-viewport-padding-bottom: 49vh;
-  --home-poster-radius: 24px;
-}
-
 .home-screen-shell.home-layout-modern .home-hero,
 .home-screen-shell.home-layout-modern .home-modern-hero-card {
   position: absolute;
@@ -6183,40 +6176,6 @@ button:focus-visible {
     transparent 82%,
     rgb(var(--bg-color-rgb) / 0.25) 89.2%,
     rgb(var(--bg-color-rgb) / 0.65) 95.5%,
-    var(--bg-color) 100%
-  );
-}
-
-/* Android TV parity: the optional fullscreen backdrop expands the media
-   behind the rows and uses the stronger fullscreen gradient stops. */
-.home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop .home-modern-hero-media {
-  right: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media::before {
-  width: 65%;
-  right: auto;
-  background: linear-gradient(
-    90deg,
-    var(--bg-color) 0%,
-    rgb(var(--bg-color-rgb) / 0.9) 22%,
-    rgb(var(--bg-color-rgb) / 0.8) 46%,
-    rgb(var(--bg-color-rgb) / 0.42) 76%,
-    transparent 100%
-  );
-}
-
-.home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media::after {
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    transparent 64%,
-    rgb(var(--bg-color-rgb) / 0.35) 74.8%,
-    rgb(var(--bg-color-rgb) / 0.75) 85.6%,
     var(--bg-color) 100%
   );
 }
@@ -6552,17 +6511,9 @@ button:focus-visible {
   padding: 0 0 var(--modern-rows-viewport-padding-bottom);
 }
 
-.home-screen-shell.home-layout-modern.home-modern-landscape-posters .home-modern-rows-scroll {
-  gap: 24px;
-}
-
 .home-screen-shell.home-layout-modern .home-modern-catalogs {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-}
-
-.home-screen-shell.home-layout-modern.home-modern-landscape-posters .home-modern-catalogs {
   gap: 24px;
 }
 
@@ -6603,16 +6554,8 @@ button:focus-visible {
   align-items: flex-end;
 }
 
-.home-screen-shell.home-layout-modern.home-modern-landscape-posters .home-modern-row .home-track {
-  align-items: flex-start;
-}
-
 .home-screen-shell.home-layout-modern .home-row-continue {
   margin-top: 0;
-}
-
-.home-screen-shell.home-layout-modern.home-modern-landscape-posters .home-row-continue {
-  margin-bottom: 18px;
 }
 
 .home-screen-shell.home-layout-modern .home-hero-indicators {
@@ -6779,23 +6722,10 @@ button:focus-visible {
   max-width: var(--home-poster-expanded-width);
 }
 
-.home-screen-shell.home-layout-modern.home-modern-landscape-posters
-  .home-poster-card.is-landscape.is-expanded {
-  flex-basis: var(--home-landscape-poster-width);
-  min-width: var(--home-landscape-poster-width);
-  max-width: var(--home-landscape-poster-width);
-}
-
 .home-screen-shell.home-layout-modern
   .home-poster-card.is-landscape.is-expanded
   .home-poster-frame {
   height: var(--home-poster-height);
-}
-
-.home-screen-shell.home-layout-modern.home-modern-landscape-posters
-  .home-poster-card.is-landscape.is-expanded
-  .home-poster-frame {
-  height: var(--home-landscape-poster-height);
 }
 
 .home-screen-shell.home-layout-modern
@@ -7337,10 +7267,7 @@ button:focus-visible {
   border-color: rgba(var(--focus-color-rgb), 0.18);
 }
 
-.trakt-route-shell
-  .settings-tracking-panel
-  .settings-trakt-scroll-area
-  > .settings-trakt-card {
+.trakt-route-shell .settings-tracking-panel .settings-trakt-scroll-area > .settings-trakt-card {
   height: auto;
   max-height: none;
   flex: 0 0 auto;
@@ -11488,49 +11415,6 @@ html.legacy-webos .debug-console-log-frame {
   background: var(--player-subtitle-background);
 }
 
-.settings-shell[data-settings-style="classic"] .settings-workspace {
-  gap: 28px;
-}
-
-.settings-shell[data-settings-style="classic"] .settings-group-card {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.settings-shell[data-settings-style="zen"] .settings-group-card {
-  background: transparent;
-  box-shadow: none;
-  border-radius: 0;
-}
-
-.settings-shell[data-settings-style="zen"] .settings-row {
-  border-radius: 8px;
-}
-
-.settings-shell[data-settings-style="horizon"] .settings-workspace {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 116px minmax(0, 1fr);
-  gap: 20px;
-}
-
-.settings-shell[data-settings-style="horizon"] .settings-sidebar {
-  flex-direction: row;
-  gap: 14px;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.settings-shell[data-settings-style="horizon"] .settings-nav-item {
-  flex: 0 0 auto;
-  min-height: 88px;
-  padding: 0 28px;
-}
-
-.settings-shell[data-settings-style="horizon"] .settings-nav-chevron,
-.settings-shell[data-settings-style="horizon"] .settings-scroll-indicator-up,
-.settings-shell[data-settings-style="horizon"] .settings-scroll-indicator-down {
-  display: none;
-}
-
 .home-row-continue-wide .home-continue-card {
   width: calc(var(--poster-card-width, 126px) * 1.7);
 }
@@ -11541,26 +11425,6 @@ html.legacy-webos .debug-console-log-frame {
 
 .home-row-continue-poster .home-continue-media {
   aspect-ratio: 2 / 3;
-}
-
-.home-card-depth.depth-posters .poster-card,
-.home-card-depth.depth-posters .home-content-card:not(.home-continue-card),
-.home-card-depth.depth-continue-watching .home-continue-card {
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, var(--card-depth-edge, 0.28)),
-    inset 0 18px 28px rgba(255, 255, 255, var(--card-depth-sheen, 0.1));
-}
-
-html[data-card-depth="true"][data-card-depth-episodes="true"] .series-episode-card,
-html[data-card-depth="true"][data-card-depth-cast="true"] .movie-cast-card,
-html[data-card-depth="true"][data-card-depth-trailers="true"] .detail-trailer-card {
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, var(--card-depth-edge, 0.28)),
-    inset 0 var(--card-depth-coverage-size, 12px) 28px rgba(255, 255, 255, var(--card-depth-sheen, 0.1));
-}
-
-.home-classic-focus-gradient .home-screen-main {
-  background: linear-gradient(90deg, transparent 52%, rgba(255, 255, 255, 0.045) 100%);
 }
 
 /* Match Android TV's default caption presentation on LG webOS: regular
@@ -16570,11 +16434,6 @@ html[data-card-depth="true"][data-card-depth-trailers="true"] .detail-trailer-ca
   background: var(--detail-bg-card) center center / cover no-repeat;
 }
 
-.series-episode-image.is-blurred {
-  filter: blur(12px);
-  transform: scale(1.08);
-}
-
 .series-episode-card.focused {
   border-color: transparent;
   box-shadow: none;
@@ -19555,34 +19414,6 @@ html[data-card-depth="true"][data-card-depth-trailers="true"] .detail-trailer-ca
   background: linear-gradient(180deg, transparent 88%, rgba(0, 0, 0, 0.62) 100%);
 }
 
-.tizen-tv
-  .home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media::before {
-  width: 65%;
-  right: auto;
-  background: linear-gradient(
-    90deg,
-    #0d0d0d 0%,
-    rgba(13, 13, 13, 0.9) 22%,
-    rgba(13, 13, 13, 0.8) 46%,
-    rgba(13, 13, 13, 0.42) 76%,
-    rgba(13, 13, 13, 0) 100%
-  );
-}
-
-.tizen-tv
-  .home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media::after {
-  background: linear-gradient(
-    180deg,
-    rgba(13, 13, 13, 0) 0%,
-    rgba(13, 13, 13, 0) 64%,
-    rgba(13, 13, 13, 0.35) 74.8%,
-    rgba(13, 13, 13, 0.75) 85.6%,
-    #0d0d0d 100%
-  );
-}
-
 .legacy-tizen .home-screen-shell.home-layout-modern {
   --home-content-start: 128px;
   --home-track-end: 128px;
@@ -21690,52 +21521,6 @@ html[data-card-depth="true"][data-card-depth-trailers="true"] .detail-trailer-ca
   );
 }
 
-.legacy-tizen
-  .home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media,
-.legacy-webos
-  .home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media {
-  right: 0;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-}
-
-.legacy-tizen
-  .home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media::before,
-.legacy-webos
-  .home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media::before {
-  width: 65%;
-  right: auto;
-  background: linear-gradient(
-    90deg,
-    #0d0d0d 0%,
-    rgba(13, 13, 13, 0.9) 22%,
-    rgba(13, 13, 13, 0.8) 46%,
-    rgba(13, 13, 13, 0.42) 76%,
-    rgba(13, 13, 13, 0) 100%
-  );
-}
-
-.legacy-tizen
-  .home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media::after,
-.legacy-webos
-  .home-screen-shell.home-layout-modern.home-modern-fullscreen-backdrop
-  .home-modern-hero-media::after {
-  background: linear-gradient(
-    180deg,
-    rgba(13, 13, 13, 0) 0%,
-    rgba(13, 13, 13, 0) 64%,
-    rgba(13, 13, 13, 0.35) 74.8%,
-    rgba(13, 13, 13, 0.75) 85.6%,
-    #0d0d0d 100%
-  );
-}
-
 .legacy-tizen .stream-route-backdrop-dim,
 .legacy-webos .stream-route-backdrop-dim {
   background: rgba(13, 13, 13, 0.24);
@@ -21791,7 +21576,13 @@ html[data-card-depth="true"][data-card-depth-trailers="true"] .detail-trailer-ca
   box-sizing: border-box;
   padding: 7vh 8vw;
   color: var(--color-text, #fff);
-  background: radial-gradient(circle at 50% 0%, rgba(var(--accent-rgb, 255, 255, 255), 0.12), transparent 45%), var(--color-background, #090909);
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(var(--accent-rgb, 255, 255, 255), 0.12),
+      transparent 45%
+    ),
+    var(--color-background, #090909);
 }
 
 .experience-mode-screen {
@@ -21802,18 +21593,76 @@ html[data-card-depth="true"][data-card-depth-trailers="true"] .detail-trailer-ca
   text-align: center;
 }
 
-.experience-mode-logo { width: min(22vw, 360px); margin-bottom: 4vh; }
-.experience-mode-screen h1, .licenses-screen h1 { font-size: 3rem; margin: 0 0 1rem; }
-.experience-mode-screen > p, .licenses-screen header p { color: var(--color-text-secondary, #aaa); font-size: 1.2rem; max-width: 54rem; }
-.experience-mode-options { display: grid; grid-template-columns: repeat(2, minmax(18rem, 28rem)); gap: 1.4rem; margin-top: 3rem; }
-.experience-mode-options.is-layout { grid-template-columns: repeat(3, minmax(13rem, 20rem)); }
-.experience-mode-card, .license-row { border: 1px solid rgba(255,255,255,.16); border-radius: 1rem; color: inherit; background: rgba(255,255,255,.06); text-align: left; padding: 1.5rem; }
-.experience-mode-card strong, .license-row strong { display: block; font-size: 1.35rem; margin-bottom: .55rem; }
-.experience-mode-card span, .license-row span { color: var(--color-text-secondary, #aaa); line-height: 1.45; }
-.experience-mode-card.focused, .license-row.focused { border-color: var(--color-accent, #fff); transform: scale(1.025); background: rgba(255,255,255,.12); }
-.licenses-screen { overflow-y: auto; }
-.licenses-screen header { max-width: 64rem; margin-bottom: 2rem; }
-.licenses-list { max-width: 72rem; }
-.licenses-list section { margin-bottom: 2rem; }
-.licenses-list h2 { font-size: .95rem; letter-spacing: .12em; color: var(--color-text-secondary, #aaa); }
-.license-row { display: block; width: 100%; margin: .65rem 0; }
+.experience-mode-logo {
+  width: min(22vw, 360px);
+  margin-bottom: 4vh;
+}
+.experience-mode-screen h1,
+.licenses-screen h1 {
+  font-size: 3rem;
+  margin: 0 0 1rem;
+}
+.experience-mode-screen > p,
+.licenses-screen header p {
+  color: var(--color-text-secondary, #aaa);
+  font-size: 1.2rem;
+  max-width: 54rem;
+}
+.experience-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(18rem, 28rem));
+  gap: 1.4rem;
+  margin-top: 3rem;
+}
+.experience-mode-options.is-layout {
+  grid-template-columns: repeat(3, minmax(13rem, 20rem));
+}
+.experience-mode-card,
+.license-row {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 1rem;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.06);
+  text-align: left;
+  padding: 1.5rem;
+}
+.experience-mode-card strong,
+.license-row strong {
+  display: block;
+  font-size: 1.35rem;
+  margin-bottom: 0.55rem;
+}
+.experience-mode-card span,
+.license-row span {
+  color: var(--color-text-secondary, #aaa);
+  line-height: 1.45;
+}
+.experience-mode-card.focused,
+.license-row.focused {
+  border-color: var(--color-accent, #fff);
+  transform: scale(1.025);
+  background: rgba(255, 255, 255, 0.12);
+}
+.licenses-screen {
+  overflow-y: auto;
+}
+.licenses-screen header {
+  max-width: 64rem;
+  margin-bottom: 2rem;
+}
+.licenses-list {
+  max-width: 72rem;
+}
+.licenses-list section {
+  margin-bottom: 2rem;
+}
+.licenses-list h2 {
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  color: var(--color-text-secondary, #aaa);
+}
+.license-row {
+  display: block;
+  width: 100%;
+  margin: 0.65rem 0;
+}

@@ -25,8 +25,6 @@ import {
   isSelectedSidebarAction,
   isRootSidebarNode,
   renderRootSidebar,
-  setModernSidebarExpanded,
-  setModernSidebarPillIconOnly,
   setLegacySidebarExpanded
 } from "../../components/sidebarNavigation.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
@@ -325,9 +323,7 @@ export const LibraryScreen = {
     focusWithoutAutoScroll(target);
     const sidebarFocused = this.isSidebarNode(target);
     this.focusZone = sidebarFocused ? "sidebar" : "content";
-    if (!this.layoutPrefs?.modernSidebar) {
-      setLegacySidebarExpanded(this.container, sidebarFocused);
-    }
+    setLegacySidebarExpanded(this.container, sidebarFocused);
     if (!sidebarFocused) {
       this.lastMainFocus = target;
       scrollIntoNearestView(target);
@@ -365,10 +361,7 @@ export const LibraryScreen = {
   renderSidebar() {
     return renderRootSidebar({
       selectedRoute: "library",
-      profile: this.sidebarProfile,
-      layout: this.layoutPrefs,
-      expanded: Boolean(this.sidebarExpanded),
-      pillIconOnly: Boolean(this.pillIconOnly)
+      profile: this.sidebarProfile
     });
   },
 
@@ -1030,7 +1023,7 @@ export const LibraryScreen = {
     }
     this.cancelScheduledRender();
     this.layoutPrefs = LayoutPreferences.get();
-    this.sidebarExpanded = Boolean(this.layoutPrefs?.modernSidebar && this.sidebarExpanded);
+    this.sidebarExpanded = false;
     const state = this.controller.getState();
     const expandedPicker = state.expandedPicker || null;
     if (this.lastRenderedExpandedPicker && this.lastRenderedExpandedPicker !== expandedPicker) {
@@ -1046,9 +1039,7 @@ export const LibraryScreen = {
     if (state.isLoading || state.isSyncing) {
       this.renderLoading();
       ScreenUtils.indexFocusables(this.container);
-      if (!this.layoutPrefs?.modernSidebar) {
-        setLegacySidebarExpanded(this.container, false);
-      }
+      setLegacySidebarExpanded(this.container, false);
       return;
     }
 
@@ -1844,10 +1835,6 @@ export const LibraryScreen = {
 
   async focusSidebarNode(preferredNode = null) {
     this.focusZone = "sidebar";
-    if (this.layoutPrefs?.modernSidebar && !this.sidebarExpanded) {
-      this.sidebarExpanded = true;
-      setModernSidebarExpanded(this.container, true);
-    }
     const target =
       preferredNode ||
       getRootSidebarSelectedNode(this.container, this.layoutPrefs) ||
@@ -1862,10 +1849,6 @@ export const LibraryScreen = {
 
   async focusMainNode(preferredNode = null, { preferEntryPoint = false } = {}) {
     this.focusZone = "content";
-    if (this.layoutPrefs?.modernSidebar && this.sidebarExpanded) {
-      this.sidebarExpanded = false;
-      setModernSidebarExpanded(this.container, false);
-    }
     if (this.pendingHydrationState) {
       const pendingHydrationState = this.pendingHydrationState;
       this.pendingHydrationState = null;
@@ -2161,15 +2144,6 @@ export const LibraryScreen = {
     if (this.suppressHoldMenuEnterUntilKeyUp && code === 13) {
       event?.preventDefault?.();
       return;
-    }
-    if (this.layoutPrefs?.modernSidebar && !this.sidebarExpanded) {
-      if (code === 40) {
-        this.pillIconOnly = true;
-        setModernSidebarPillIconOnly(this.container, true);
-      } else if (code === 38) {
-        this.pillIconOnly = false;
-        setModernSidebarPillIconOnly(this.container, false);
-      }
     }
     const activeNode = document.activeElement;
     if (isTextField(activeNode) && ![37, 38, 39, 40].includes(code)) {

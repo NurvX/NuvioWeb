@@ -727,9 +727,6 @@ function formatMovieReleaseDate(meta = {}) {
       ? new Date(`${rawDate}T00:00:00`)
       : new Date(rawDate);
     if (!Number.isNaN(parsed.getTime())) {
-      if (LayoutPreferences.get().showFullReleaseDate === false) {
-        return String(parsed.getFullYear());
-      }
       return new Intl.DateTimeFormat(undefined, {
         month: "long",
         day: "numeric",
@@ -800,10 +797,6 @@ export function resolveEpisodeRuntimeForSeason(episodes = [], season = null) {
 
 function renderPlayGlyph() {
   return `<svg class="series-btn-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4086 9.35258C23.5305 10.5065 23.5305 13.4935 21.4086 14.6474L8.59662 21.6145C6.53435 22.736 4 21.2763 4 18.9671L4 5.0329C4 2.72368 6.53435 1.26402 8.59661 2.38548L21.4086 9.35258Z" fill="currentColor"/></svg>`;
-}
-
-function renderTrailerGlyph() {
-  return `<svg class="series-btn-svg" viewBox="0 0 566.828 566.828" aria-hidden="true"><path d="M563.824,192.783c-1.58-17.399-3.85-32.944-6.801-46.659c-3.371-15.386-10.703-28.36-21.982-38.899c-11.285-10.539-24.412-16.652-39.383-18.348c-46.811-5.275-117.564-7.907-212.247-7.907c-94.688,0-165.436,2.632-212.248,7.907c-14.976,1.695-28.048,7.809-39.223,18.348c-11.181,10.539-18.458,23.513-21.824,38.899c-3.164,13.715-5.533,29.26-7.118,46.659c-1.579,17.399-2.479,31.793-2.687,43.183C0.098,247.343,0,263.163,0,283.414c0,20.238,0.104,36.053,0.312,47.449c0.208,11.377,1.107,25.777,2.687,43.17c1.585,17.398,3.843,32.957,6.799,46.658c3.372,15.41,10.704,28.373,21.983,38.912c11.279,10.551,24.407,16.67,39.382,18.348c46.812,5.275,117.559,7.906,212.248,7.906c94.683,0,165.431-2.631,212.247-7.906c14.971-1.684,28.043-7.797,39.225-18.348c11.174-10.539,18.451-23.502,21.822-38.912c3.164-13.701,5.533-29.26,7.119-46.658c1.578-17.398,2.479-31.793,2.686-43.17c0.209-11.391,0.318-27.211,0.318-47.449c0-20.251-0.109-36.065-0.318-47.448C566.303,224.57,565.402,210.176,563.824,192.783z M395.389,300.488L233.436,401.707c-2.956,2.111-6.537,3.164-10.753,3.164c-3.164,0-6.432-0.838-9.804-2.533c-6.958-3.795-10.441-9.688-10.441-17.705V182.189c0-8.005,3.476-13.923,10.441-17.717c7.167-3.794,14.021-3.568,20.557,0.63l161.953,101.219c6.328,3.599,9.492,9.29,9.492,17.087C404.875,291.223,401.711,296.914,395.389,300.488z" fill="currentColor"/></svg>`;
 }
 
 function renderLibraryGlyph(isSaved = false) {
@@ -3119,19 +3112,10 @@ export const MetaDetailsScreen = {
       : `<h1 class="series-detail-title">${escapeHtml(meta.name || "Untitled")}</h1>`;
     const externalRatings = this.renderExternalRatingsRow(meta);
     const trailerSource = this.trailerSource || resolveTrailerSource(meta);
-    const hasTrailerCandidate = Boolean(trailerSource);
     if (!this.trailerSource && trailerSource) {
       this.trailerSource = trailerSource;
     }
-    const trailerButtonEnabled = Boolean(LayoutPreferences.get().detailPageTrailerButtonEnabled);
-    const trailerButton =
-      trailerButtonEnabled && hasTrailerCandidate
-        ? `
-          <button class="series-circle-btn focusable" data-action="toggleTrailer" aria-label="${escapeAttribute(t("detail.playTrailer", {}, "Play trailer"))}">
-            ${renderTrailerGlyph()}
-          </button>
-        `
-        : "";
+    const trailerButton = "";
     return `
       <section class="detail-hero-section">
         <div class="detail-hero-brand">
@@ -3903,7 +3887,6 @@ export const MetaDetailsScreen = {
     const isWatched = this.enrichedWatchedState?.has(episodeKey)
       ? Boolean(this.enrichedWatchedState.get(episodeKey)?.isWatched)
       : this.watchedEpisodeKeys.has(episodeKey);
-    const shouldBlur = Boolean(LayoutPreferences.get().blurUnwatchedEpisodes) && !isWatched;
     const rating = resolveEpisodeImdbRating(episode, this.seriesRatingsBySeason);
     const dateLabel = formatEpisodeCardDate(episode.released || "");
     const isUnavailable = episode.available === false;
@@ -3922,7 +3905,7 @@ export const MetaDetailsScreen = {
             data-video-id="${escapeHtml(episode.id)}"
             data-episode-index="${absoluteIndex}">
         <div class="series-episode-thumb">
-          <div class="series-episode-image${shouldBlur ? " is-blurred" : ""}"${episode.thumbnail ? ` data-thumb="${escapeHtml(episode.thumbnail)}"` : ""}></div>
+          <div class="series-episode-image"${episode.thumbnail ? ` data-thumb="${escapeHtml(episode.thumbnail)}"` : ""}></div>
           <div class="series-episode-overlay"></div>
           ${isWatched ? `<div class="series-episode-status complete">${renderWatchedBadgeGlyph()}</div>` : progressRatio < 0.02 ? `<div class="series-episode-status idle"></div>` : ""}
           ${isUnavailable ? `<div class="series-episode-unavailable">${escapeHtml(t("episodes_unavailable", {}, "Unavailable").toUpperCase())}</div>` : ""}
@@ -4175,10 +4158,7 @@ export const MetaDetailsScreen = {
     const isWatched = this.isEpisodeMarkedWatched(episode);
 
     card.classList.toggle("watched", isWatched);
-    image.classList.toggle(
-      "is-blurred",
-      Boolean(LayoutPreferences.get().blurUnwatchedEpisodes) && !isWatched
-    );
+    image.classList.remove("is-blurred");
 
     let statusNode = thumb.querySelector(".series-episode-status");
     if (isWatched) {
