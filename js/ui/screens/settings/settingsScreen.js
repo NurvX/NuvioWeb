@@ -664,7 +664,8 @@ const SECTION_META = [
   {
     id: "streams",
     labelKey: "settings_stream_badges_section",
-    subtitleKey: "settings_stream_badges_description"
+    subtitleKey: "settings_stream_badges_description",
+    hideFromNav: true
   },
   {
     id: "playback",
