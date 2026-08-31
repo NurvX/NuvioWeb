@@ -73,11 +73,9 @@ import {
   getRootSidebarNodes,
   getRootSidebarSelectedNode,
   getSidebarProfileState,
-  isModernSidebarBlurAvailable,
   isSelectedSidebarAction,
   isRootSidebarNode,
   renderRootSidebar,
-  setModernSidebarExpanded,
   setLegacySidebarExpanded
 } from "../../components/sidebarNavigation.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
@@ -2019,9 +2017,7 @@ function createDefaultExpandedState(sectionId) {
       homeLayout: false,
       homeContent: false,
       continueWatching: false,
-      detailPage: false,
-      focusedPoster: false,
-      cardAppearance: false
+      detailPage: false
     };
   }
 
@@ -3559,20 +3555,6 @@ export const SettingsScreen = {
       ThemeStore.set({ amoledSurfacesMode: !ThemeStore.get().amoledSurfacesMode });
       ThemeManager.apply();
     });
-    this.actionMap.set("appearance:settingsUiStyle", () => {
-      const options = ["CLASSIC", "HORIZON", "ZEN"].map((id) => ({
-        id,
-        labelKey: `settings_style_${id.toLowerCase()}`
-      }));
-      this.openOptionDialog({
-        title: t("appearance_settings_style", {}, "Settings style"),
-        options,
-        selectedId: model.theme.settingsUiStyle || "CLASSIC",
-        returnFocusKey: "appearance:settingsUiStyle",
-        onSelect: (option) => ThemeStore.set({ settingsUiStyle: option.id })
-      });
-    });
-
     return `
       ${this.renderSectionHeader(SECTION_META.find((item) => item.id === "appearance"))}
       <div class="settings-group-card settings-appearance-group-card settings-theme-grid-card">
@@ -3620,20 +3602,6 @@ export const SettingsScreen = {
         </div>
         <div class="settings-stack">
           ${this.renderActionRow({
-            focusKey: "appearance:settingsUiStyle",
-            title: t("appearance_settings_style", {}, "Settings style"),
-            subtitle: t(
-              "appearance_settings_style_subtitle",
-              {},
-              "Choose the layout used by Settings"
-            ),
-            value: t(
-              `settings_style_${String(model.theme.settingsUiStyle || "CLASSIC").toLowerCase()}`,
-              {},
-              String(model.theme.settingsUiStyle || "CLASSIC")
-            )
-          })}
-          ${this.renderActionRow({
             focusKey: "appearance:font",
             title: t("appearance_font", {}, "App Font"),
             subtitle: t("appearance_font_subtitle", {}, "Choose your preferred font"),
@@ -3666,12 +3634,6 @@ export const SettingsScreen = {
     this.actionMap.set("layout:toggle:detailPage", () => {
       this.toggleExpandedSection("layout", "detailPage");
     });
-    this.actionMap.set("layout:toggle:focusedPoster", () => {
-      this.toggleExpandedSection("layout", "focusedPoster");
-    });
-    this.actionMap.set("layout:toggle:cardAppearance", () => {
-      this.toggleExpandedSection("layout", "cardAppearance");
-    });
 
     HOME_LAYOUT_OPTIONS.forEach((option) => {
       this.actionMap.set(`layout:layout:${option.id}`, () => {
@@ -3679,15 +3641,6 @@ export const SettingsScreen = {
       });
     });
 
-    this.actionMap.set("layout:collapseSidebar", () => {
-      LayoutPreferences.set({ collapseSidebar: !LayoutPreferences.get().collapseSidebar });
-    });
-    this.actionMap.set("layout:modernSidebar", () => {
-      LayoutPreferences.set({ modernSidebar: !LayoutPreferences.get().modernSidebar });
-    });
-    this.actionMap.set("layout:modernSidebarBlur", () => {
-      LayoutPreferences.set({ modernSidebarBlur: !LayoutPreferences.get().modernSidebarBlur });
-    });
     this.actionMap.set("layout:heroSection", () => {
       LayoutPreferences.set({ heroSectionEnabled: !LayoutPreferences.get().heroSectionEnabled });
     });
@@ -3707,118 +3660,11 @@ export const SettingsScreen = {
         onToggle: (selectedIds) => LayoutPreferences.set({ heroCatalogKeys: selectedIds })
       });
     });
-    this.actionMap.set("layout:searchDiscover", () => {
-      const options = [
-        { id: "in_search", labelKey: "layout_discover_location_in_search" },
-        { id: "in_sidebar", labelKey: "layout_discover_location_in_sidebar" },
-        { id: "off", labelKey: "common_off" }
-      ];
-      this.openOptionDialog({
-        title: t("layout_discover_location_dialog_title", {}, "Discover location"),
-        options,
-        selectedId: model.layout.discoverLocation || "in_search",
-        returnFocusKey: "layout:searchDiscover",
-        onSelect: (option) => LayoutPreferences.set({ discoverLocation: option.id })
-      });
-    });
-    this.actionMap.set("layout:classicFocusGradient", () =>
-      LayoutPreferences.set({
-        classicFocusGradientEnabled: !LayoutPreferences.get().classicFocusGradientEnabled
-      })
-    );
-    this.actionMap.set("layout:showFullReleaseDate", () =>
-      LayoutPreferences.set({ showFullReleaseDate: !LayoutPreferences.get().showFullReleaseDate })
-    );
     this.actionMap.set("layout:detail:preferExternalMeta", () =>
       LayoutPreferences.set({
         preferExternalMetaAddonDetail: !LayoutPreferences.get().preferExternalMetaAddonDetail
       })
     );
-    this.actionMap.set("layout:continueWatchingCardStyle", () =>
-      this.openOptionDialog({
-        title: t("layout_cw_card_style", {}, "Continue Watching card style"),
-        options: ["card", "wide", "poster"].map((id) => ({
-          id,
-          labelKey: `layout_cw_card_style_${id}`
-        })),
-        selectedId: model.layout.continueWatchingCardStyle || "card",
-        returnFocusKey: "layout:continueWatchingCardStyle",
-        onSelect: (option) => LayoutPreferences.set({ continueWatchingCardStyle: option.id })
-      })
-    );
-    const openNumberSetting = (focusKey, titleKey, field, values, fallback) =>
-      this.actionMap.set(focusKey, () =>
-        this.openOptionDialog({
-          title: t(titleKey, {}, titleKey),
-          options: values.map((value) => ({ id: String(value), label: String(value) })),
-          selectedId: String(model.layout[field] ?? fallback),
-          returnFocusKey: focusKey,
-          onSelect: (option) => LayoutPreferences.set({ [field]: Number(option.id) })
-        })
-      );
-    openNumberSetting(
-      "layout:posterWidth",
-      "layout_card_width",
-      "posterCardWidthDp",
-      [96, 108, 116, 126, 136, 146, 156, 168],
-      126
-    );
-    openNumberSetting(
-      "layout:posterRadius",
-      "layout_card_radius",
-      "posterCardCornerRadiusDp",
-      [0, 4, 8, 12, 16, 20, 24],
-      12
-    );
-    openNumberSetting(
-      "layout:cardDepthEdge",
-      "settings_card_depth_edge_value",
-      "cardDepthEdgeStrength",
-      [0, 10, 20, 28, 40, 60, 80, 100],
-      28
-    );
-    openNumberSetting(
-      "layout:cardDepthSheen",
-      "settings_card_depth_sheen_value",
-      "cardDepthSheenStrength",
-      [0, 10, 20, 40, 60, 80, 100],
-      10
-    );
-    openNumberSetting(
-      "layout:cardDepthCoverage",
-      "settings_card_depth_coverage_value",
-      "cardDepthEdgeCoverage",
-      [0, 25, 50, 75, 100],
-      0
-    );
-    [
-      "Enabled",
-      "PostersEnabled",
-      "ContinueWatchingEnabled",
-      "EpisodeCardsEnabled",
-      "CastEnabled",
-      "TrailersEnabled"
-    ].forEach((suffix) => {
-      const field = `cardDepth${suffix}`;
-      this.actionMap.set(`layout:${field}`, () =>
-        LayoutPreferences.set({ [field]: !LayoutPreferences.get()[field] })
-      );
-    });
-    this.actionMap.set("layout:hideUnreleased", () => {
-      LayoutPreferences.set({
-        hideUnreleasedContent: !LayoutPreferences.get().hideUnreleasedContent
-      });
-    });
-    this.actionMap.set("layout:useEpisodeThumbnailsInCw", () => {
-      LayoutPreferences.set({
-        useEpisodeThumbnailsInCw: !LayoutPreferences.get().useEpisodeThumbnailsInCw
-      });
-    });
-    this.actionMap.set("layout:blurContinueWatchingNextUp", () => {
-      LayoutPreferences.set({
-        blurContinueWatchingNextUp: !LayoutPreferences.get().blurContinueWatchingNextUp
-      });
-    });
     this.actionMap.set("layout:nextUpFromFurthest", () => {
       LayoutPreferences.set({
         nextUpFromFurthestEpisode: !LayoutPreferences.get().nextUpFromFurthestEpisode
@@ -3868,85 +3714,8 @@ export const SettingsScreen = {
         catalogTypeSuffixEnabled: !LayoutPreferences.get().catalogTypeSuffixEnabled
       });
     });
-    this.actionMap.set("layout:modernLandscapePosters", () => {
-      LayoutPreferences.set({
-        modernLandscapePostersEnabled: !LayoutPreferences.get().modernLandscapePostersEnabled
-      });
-    });
-    this.actionMap.set("layout:modernHeroFullScreenBackdrop", () => {
-      LayoutPreferences.set({
-        modernHeroFullScreenBackdropEnabled:
-          !LayoutPreferences.get().modernHeroFullScreenBackdropEnabled
-      });
-    });
-    this.actionMap.set("layout:focusedPosterExpand", () => {
-      LayoutPreferences.set({
-        focusedPosterBackdropExpandEnabled:
-          !LayoutPreferences.get().focusedPosterBackdropExpandEnabled
-      });
-    });
-    this.actionMap.set("layout:focusedPosterExpandDelay", () => {
-      const options = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((value) => ({
-        id: String(value),
-        label: `${value}s`
-      }));
-      this.openOptionDialog({
-        title: t("settings.dialogs.backdropExpandDelay"),
-        options,
-        selectedId: String(model.layout.focusedPosterBackdropExpandDelaySeconds ?? 3),
-        returnFocusKey: "layout:focusedPosterExpandDelay",
-        onSelect: (option) => {
-          LayoutPreferences.set({
-            focusedPosterBackdropExpandDelaySeconds: Number(option.id || 0) || 0
-          });
-        }
-      });
-    });
-    this.actionMap.set("layout:focusedPosterTrailer", () => {
-      LayoutPreferences.set({
-        focusedPosterBackdropTrailerEnabled:
-          !LayoutPreferences.get().focusedPosterBackdropTrailerEnabled
-      });
-    });
-    this.actionMap.set("layout:focusedPosterTrailerMuted", () => {
-      LayoutPreferences.set({
-        focusedPosterBackdropTrailerMuted:
-          !LayoutPreferences.get().focusedPosterBackdropTrailerMuted
-      });
-    });
-    this.actionMap.set("layout:focusedPosterTrailerTarget", () => {
-      const options = [
-        { id: "hero_media", labelKey: "settings.layout.trailerTargets.heroMedia" },
-        { id: "expanded_card", labelKey: "settings.layout.trailerTargets.expandedCard" }
-      ];
-      this.openOptionDialog({
-        title: t("settings.dialogs.modernTrailerPlaybackLocation"),
-        options,
-        selectedId: String(model.layout.focusedPosterBackdropTrailerPlaybackTarget || "hero_media"),
-        returnFocusKey: "layout:focusedPosterTrailerTarget",
-        onSelect: (option) => {
-          LayoutPreferences.set({
-            focusedPosterBackdropTrailerPlaybackTarget: String(option.id || "hero_media")
-          });
-        }
-      });
-    });
-    this.actionMap.set("layout:detail:trailerButton", () => {
-      LayoutPreferences.set({
-        detailPageTrailerButtonEnabled: !LayoutPreferences.get().detailPageTrailerButtonEnabled
-      });
-    });
-    this.actionMap.set("layout:detail:blurUnwatched", () => {
-      LayoutPreferences.set({
-        blurUnwatchedEpisodes: !LayoutPreferences.get().blurUnwatchedEpisodes
-      });
-    });
-
     const selectedLayout = String(model.layout.homeLayout || "").toLowerCase();
     const isModernLayout = selectedLayout === "modern";
-    const isModernLandscape = isModernLayout && Boolean(model.layout.modernLandscapePostersEnabled);
-    const cardExpansionEnabled = Boolean(model.layout.focusedPosterBackdropExpandEnabled);
-    const showAutoplayRow = cardExpansionEnabled || isModernLandscape;
     const continueWatchingSortMode = String(model.layout.continueWatchingSortMode || "default");
     const continueWatchingSortLabel =
       continueWatchingSortMode === "split_upcoming"
@@ -3966,26 +3735,6 @@ export const SettingsScreen = {
             )
           ).join("")}
         </div>
-        ${
-          isModernLayout
-            ? this.renderToggleRow({
-                focusKey: "layout:modernLandscapePosters",
-                title: t("settings.layout.landscapePosters.title"),
-                subtitle: t("settings.layout.landscapePosters.subtitle"),
-                checked: Boolean(model.layout.modernLandscapePostersEnabled)
-              })
-            : ""
-        }
-        ${
-          isModernLayout
-            ? this.renderToggleRow({
-                focusKey: "layout:modernHeroFullScreenBackdrop",
-                title: t("settings.layout.fullscreenHeroBackdrop.title"),
-                subtitle: t("settings.layout.fullscreenHeroBackdrop.subtitle"),
-                checked: Boolean(model.layout.modernHeroFullScreenBackdropEnabled)
-              })
-            : ""
-        }
       </div>
     `;
 
@@ -3997,20 +3746,6 @@ export const SettingsScreen = {
         })}
         <div class="settings-group-card"><div class="settings-stack">
           ${homeLayoutBody}
-          ${
-            selectedLayout === "classic"
-              ? this.renderToggleRow({
-                  focusKey: "layout:classicFocusGradient",
-                  title: t("layout_classic_focus_gradient", {}, "Classic focus gradient"),
-                  subtitle: t(
-                    "layout_classic_focus_gradient_sub",
-                    {},
-                    "Show the focus gradient in Classic layout."
-                  ),
-                  checked: Boolean(model.layout.classicFocusGradientEnabled)
-                })
-              : ""
-          }
           ${
             !isModernLayout && model.layout.heroSectionEnabled
               ? this.renderActionRow({
@@ -4030,32 +3765,6 @@ export const SettingsScreen = {
 
     const homeContentBody = `
       <div class="settings-stack">
-        ${
-          !model.layout.modernSidebar
-            ? this.renderToggleRow({
-                focusKey: "layout:collapseSidebar",
-                title: t("settings.layout.collapseSidebar.title"),
-                subtitle: t("settings.layout.collapseSidebar.subtitle"),
-                checked: Boolean(model.layout.collapseSidebar)
-              })
-            : ""
-        }
-        ${this.renderToggleRow({
-          focusKey: "layout:modernSidebar",
-          title: t("settings.layout.modernSidebar.title"),
-          subtitle: t("settings.layout.modernSidebar.subtitle"),
-          checked: Boolean(model.layout.modernSidebar)
-        })}
-        ${
-          model.layout.modernSidebar && isModernSidebarBlurAvailable()
-            ? this.renderToggleRow({
-                focusKey: "layout:modernSidebarBlur",
-                title: t("settings.layout.modernSidebarBlur.title"),
-                subtitle: t("settings.layout.modernSidebarBlur.subtitle"),
-                checked: Boolean(model.layout.modernSidebarBlur)
-              })
-            : ""
-        }
         ${this.renderToggleRow({
           focusKey: "layout:heroSection",
           title: t("settings.layout.heroSection.title"),
@@ -4063,18 +3772,6 @@ export const SettingsScreen = {
           checked: Boolean(model.layout.heroSectionEnabled)
         })}
         ${model.layout.heroSectionEnabled ? this.renderActionRow({ focusKey: "layout:heroCatalogs", title: t("layout_hero_catalog", {}, "Hero catalogs"), subtitle: t("layout_hero_catalog_sub", {}, "Choose catalogs used by the Hero section"), value: model.layout.heroCatalogKeys?.length ? String(model.layout.heroCatalogKeys.length) : t("common_all", {}, "All") }) : ""}
-        ${this.renderActionRow({
-          focusKey: "layout:searchDiscover",
-          title: t("layout_discover_location_action", {}, "Discover location"),
-          subtitle: t("settings.layout.searchDiscover.subtitle"),
-          value:
-            model.layout.discoverLocation === "in_sidebar"
-              ? t("layout_discover_location_in_sidebar")
-              : model.layout.discoverLocation === "off"
-                ? t("common.off", {}, "Off")
-                : t("layout_discover_location_in_search")
-        })}
-        ${!isModernLayout ? this.renderToggleRow({ focusKey: "layout:classicFocusGradient", title: t("layout_classic_focus_gradient"), subtitle: t("layout_classic_focus_gradient_sub"), checked: Boolean(model.layout.classicFocusGradientEnabled) }) : ""}
         ${
           !isModernLayout
             ? this.renderToggleRow({
@@ -4101,46 +3798,11 @@ export const SettingsScreen = {
           subtitle: t("settings.layout.catalogType.subtitle"),
           checked: Boolean(model.layout.catalogTypeSuffixEnabled)
         })}
-        ${this.renderToggleRow({
-          focusKey: "layout:hideUnreleased",
-          title: t("settings.layout.hideUnreleased.title"),
-          subtitle: t("settings.layout.hideUnreleased.subtitle"),
-          checked: Boolean(model.layout.hideUnreleasedContent)
-        })}
       </div>
     `;
 
     const continueWatchingBody = `
       <div class="settings-stack">
-        ${this.renderActionRow({ focusKey: "layout:continueWatchingCardStyle", title: t("layout_cw_card_style", {}, "Card style"), subtitle: t("layout_section_continue_watching_desc", {}, "Choose the Continue Watching card shape"), value: t(`layout_cw_card_style_${model.layout.continueWatchingCardStyle || "card"}`, {}, model.layout.continueWatchingCardStyle || "card") })}
-        ${this.renderToggleRow({
-          focusKey: "layout:useEpisodeThumbnailsInCw",
-          title: t("settings.layout.useEpisodeThumbnailsInCw.title", {}, "Use Episode Thumbnails"),
-          subtitle: t(
-            "settings.layout.useEpisodeThumbnailsInCw.subtitle",
-            {},
-            "Show episode artwork in Continue Watching cards."
-          ),
-          checked: model.layout.useEpisodeThumbnailsInCw !== false
-        })}
-        ${
-          model.layout.useEpisodeThumbnailsInCw !== false
-            ? this.renderToggleRow({
-                focusKey: "layout:blurContinueWatchingNextUp",
-                title: t(
-                  "settings.layout.blurContinueWatchingNextUp.title",
-                  {},
-                  "Blur Next Up Artwork"
-                ),
-                subtitle: t(
-                  "settings.layout.blurContinueWatchingNextUp.subtitle",
-                  {},
-                  "Blur upcoming episode artwork in Continue Watching."
-                ),
-                checked: Boolean(model.layout.blurContinueWatchingNextUp)
-              })
-            : ""
-        }
         ${this.renderToggleRow({
           focusKey: "layout:nextUpFromFurthest",
           title: t("settings.layout.nextUpFromFurthest.title", {}, "Up Next From Furthest Episode"),
@@ -4177,127 +3839,13 @@ export const SettingsScreen = {
     const detailPageBody = `
       <div class="settings-stack">
         ${this.renderToggleRow({
-          focusKey: "layout:detail:blurUnwatched",
-          title: t("settings.layout.blurUnwatched.title"),
-          subtitle: t("settings.layout.blurUnwatched.subtitle"),
-          checked: Boolean(model.layout.blurUnwatchedEpisodes)
-        })}
-        ${this.renderToggleRow({
-          focusKey: "layout:detail:trailerButton",
-          title: t("settings.layout.showTrailerButton.title"),
-          subtitle: t("settings.layout.showTrailerButton.subtitle"),
-          checked: Boolean(model.layout.detailPageTrailerButtonEnabled)
-        })}
-        ${this.renderToggleRow({
           focusKey: "layout:detail:preferExternalMeta",
           title: t("settings.layout.preferExternalMeta.title"),
           subtitle: t("settings.layout.preferExternalMeta.subtitle"),
           checked: model.layout.preferExternalMetaAddonDetail !== false
         })}
-        ${this.renderToggleRow({ focusKey: "layout:showFullReleaseDate", title: t("layout_show_full_release_date"), subtitle: t("layout_show_full_release_date_sub"), checked: model.layout.showFullReleaseDate !== false })}
       </div>
     `;
-
-    const focusedPosterBody = `
-      <div class="settings-stack">
-        ${
-          !isModernLandscape
-            ? this.renderToggleRow({
-                focusKey: "layout:focusedPosterExpand",
-                title: t("settings.layout.focusedPosterExpand.title"),
-                subtitle: t("settings.layout.focusedPosterExpand.subtitle"),
-                checked: Boolean(model.layout.focusedPosterBackdropExpandEnabled)
-              })
-            : ""
-        }
-        ${
-          !isModernLandscape && Boolean(model.layout.focusedPosterBackdropExpandEnabled)
-            ? this.renderActionRow({
-                focusKey: "layout:focusedPosterExpandDelay",
-                title: t("settings.layout.focusedPosterExpandDelay.title"),
-                subtitle: t("settings.layout.focusedPosterExpandDelay.subtitle"),
-                value: `${Number(model.layout.focusedPosterBackdropExpandDelaySeconds ?? 3)}s`
-              })
-            : ""
-        }
-        ${
-          showAutoplayRow
-            ? this.renderToggleRow({
-                focusKey: "layout:focusedPosterTrailer",
-                title: isModernLayout
-                  ? t("settings.layout.autoplayTrailer.title")
-                  : t("settings.layout.autoplayTrailerExpandedCard.title"),
-                subtitle: isModernLayout
-                  ? t("settings.layout.autoplayTrailer.subtitle")
-                  : t("settings.layout.autoplayTrailerExpandedCard.subtitle"),
-                checked: Boolean(model.layout.focusedPosterBackdropTrailerEnabled)
-              })
-            : ""
-        }
-        ${
-          showAutoplayRow && Boolean(model.layout.focusedPosterBackdropTrailerEnabled)
-            ? this.renderToggleRow({
-                focusKey: "layout:focusedPosterTrailerMuted",
-                title: isModernLayout
-                  ? t("settings.layout.trailerMuted.title")
-                  : t("settings.layout.trailerMutedExpandedCard.title"),
-                subtitle: isModernLayout
-                  ? t("settings.layout.trailerMuted.subtitle")
-                  : t("settings.layout.trailerMutedExpandedCard.subtitle"),
-                checked: Boolean(model.layout.focusedPosterBackdropTrailerMuted)
-              })
-            : ""
-        }
-        ${
-          isModernLayout &&
-          showAutoplayRow &&
-          Boolean(model.layout.focusedPosterBackdropTrailerEnabled)
-            ? this.renderActionRow({
-                focusKey: "layout:focusedPosterTrailerTarget",
-                title: t("settings.layout.trailerTarget.title"),
-                subtitle: t("settings.layout.trailerTarget.subtitle"),
-                value:
-                  String(
-                    model.layout.focusedPosterBackdropTrailerPlaybackTarget || "hero_media"
-                  ) === "expanded_card"
-                    ? t("settings.layout.trailerTargets.expandedCard")
-                    : t("settings.layout.trailerTargets.heroMedia")
-              })
-            : ""
-        }
-      </div>
-    `;
-
-    const cardAppearanceBody = `
-      <div class="settings-stack">
-        ${this.renderActionRow({ focusKey: "layout:posterWidth", title: t("layout_card_width", {}, "Card width"), subtitle: t("layout_section_card_style_desc", {}, "Adjust poster card width"), value: String(model.layout.posterCardWidthDp) })}
-        ${this.renderActionRow({ focusKey: "layout:posterRadius", title: t("layout_card_radius", {}, "Card corner radius"), subtitle: t("layout_section_card_style_desc", {}, "Adjust poster card corner radius"), value: String(model.layout.posterCardCornerRadiusDp) })}
-        ${this.renderToggleRow({ focusKey: "layout:cardDepthEnabled", title: t("settings_card_depth_enabled", {}, "Enable depth effect"), subtitle: t("settings_card_depth_description", {}, "Add edge light and sheen to image cards"), checked: Boolean(model.layout.cardDepthEnabled) })}
-        ${
-          model.layout.cardDepthEnabled
-            ? `
-          ${this.renderActionRow({ focusKey: "layout:cardDepthEdge", title: t("settings_card_depth_edge_value", {}, "Edge glow"), value: `${model.layout.cardDepthEdgeStrength}%` })}
-          ${this.renderActionRow({ focusKey: "layout:cardDepthSheen", title: t("settings_card_depth_sheen_value", {}, "Sheen"), value: `${model.layout.cardDepthSheenStrength}%` })}
-          ${this.renderActionRow({ focusKey: "layout:cardDepthCoverage", title: t("settings_card_depth_coverage_value", {}, "Edge coverage"), value: `${model.layout.cardDepthEdgeCoverage}%` })}
-          ${[
-            ["PostersEnabled", "settings_card_depth_surface_posters"],
-            ["ContinueWatchingEnabled", "settings_card_depth_surface_continue_watching"],
-            ["EpisodeCardsEnabled", "settings_card_depth_surface_episodes"],
-            ["CastEnabled", "settings_card_depth_surface_cast"],
-            ["TrailersEnabled", "settings_card_depth_surface_trailers"]
-          ]
-            .map(([suffix, key]) =>
-              this.renderToggleRow({
-                focusKey: `layout:cardDepth${suffix}`,
-                title: t(key, {}, key),
-                checked: model.layout[`cardDepth${suffix}`] !== false
-              })
-            )
-            .join("")}
-        `
-            : ""
-        }
-      </div>`;
 
     return `
       ${this.renderSectionHeader(SECTION_META.find((item) => item.id === "layout"))}
@@ -4335,14 +3883,6 @@ export const SettingsScreen = {
             expanded: Boolean(expanded.detailPage),
             bodyHtml: detailPageBody
           })}
-          ${this.renderCollapsibleRow({
-            focusKey: "layout:toggle:focusedPoster",
-            title: t("settings.layout.groups.focusedPoster.title"),
-            subtitle: t("settings.layout.groups.focusedPoster.subtitle"),
-            expanded: Boolean(expanded.focusedPoster),
-            bodyHtml: focusedPosterBody
-          })}
-          ${this.renderCollapsibleRow({ focusKey: "layout:toggle:cardAppearance", title: t("settings_card_depth_title", {}, "Card appearance"), subtitle: t("settings_card_depth_description", {}, "Size, corners and depth surfaces"), expanded: Boolean(expanded.cardAppearance), bodyHtml: cardAppearanceBody })}
         </div>
       </div>
     `;
@@ -7239,7 +6779,7 @@ export const SettingsScreen = {
       this.model = await this.collectModel();
     }
     this.layoutPrefs = this.model.layout;
-    this.sidebarExpanded = Boolean(this.layoutPrefs?.modernSidebar && this.sidebarExpanded);
+    this.sidebarExpanded = false;
     this.visibleSections = getVisibleSections(this.model);
     this.actionMap = new Map();
     if (!this.visibleSections.length) {
@@ -7278,9 +6818,7 @@ export const SettingsScreen = {
 
     const shell = this.container.querySelector(".settings-shell");
     if (shell) {
-      shell.dataset.settingsStyle = String(
-        this.model.theme.settingsUiStyle || "CLASSIC"
-      ).toLowerCase();
+      shell.dataset.settingsStyle = "classic";
       shell.classList.toggle("settings-route-enter", Boolean(this.settingsRouteEnterPending));
       if (this.settingsRouteEnterPending) {
         void shell.offsetWidth;
@@ -7294,10 +6832,7 @@ export const SettingsScreen = {
 
     const rootSidebarHtml = renderRootSidebar({
       selectedRoute: "settings",
-      profile: this.sidebarProfile,
-      layout: this.layoutPrefs,
-      expanded: Boolean(this.sidebarExpanded),
-      pillIconOnly: Boolean(this.pillIconOnly)
+      profile: this.sidebarProfile
     });
     if (rootSidebarSlot && rootSidebarSlot.innerHTML !== rootSidebarHtml) {
       rootSidebarSlot.innerHTML = rootSidebarHtml;
@@ -7448,17 +6983,13 @@ export const SettingsScreen = {
       if (sidebarNode) {
         sidebarNode.classList.add("focused");
         focusSettingsNode(sidebarNode);
-        if (!this.layoutPrefs?.modernSidebar) {
-          setLegacySidebarExpanded(this.container, true);
-        }
+        setLegacySidebarExpanded(this.container, true);
         return;
       }
       this.focusZone = "nav";
     }
 
-    if (!this.layoutPrefs?.modernSidebar) {
-      setLegacySidebarExpanded(this.container, false);
-    }
+    setLegacySidebarExpanded(this.container, false);
     if (this.focusZone === "content") {
       const contentNode = this.contentFocusKey
         ? this.container.querySelector(
@@ -7499,23 +7030,15 @@ export const SettingsScreen = {
 
   async openSidebar() {
     this.focusZone = "sidebar";
-    const sidebarNodes = getRootSidebarNodes(this.container, this.layoutPrefs);
-    const selectedSidebarNode = getRootSidebarSelectedNode(this.container, this.layoutPrefs);
+    const sidebarNodes = getRootSidebarNodes(this.container);
+    const selectedSidebarNode = getRootSidebarSelectedNode(this.container);
     this.sidebarFocusIndex = Math.max(0, sidebarNodes.indexOf(selectedSidebarNode));
-    if (this.layoutPrefs?.modernSidebar && !this.sidebarExpanded) {
-      this.sidebarExpanded = true;
-      setModernSidebarExpanded(this.container, true);
-    }
     this.applyFocus();
   },
 
   async closeSidebarToNav() {
     this.syncNavFocusToActive();
     this.focusZone = "nav";
-    if (this.layoutPrefs?.modernSidebar && this.sidebarExpanded) {
-      this.sidebarExpanded = false;
-      setModernSidebarExpanded(this.container, false);
-    }
     this.applyFocus();
   },
 
@@ -7957,31 +7480,6 @@ export const SettingsScreen = {
       }
 
       if (this.focusZone === "nav") {
-        const horizonStyle = String(this.model?.theme?.settingsUiStyle || "CLASSIC") === "HORIZON";
-        if (horizonStyle && code === 37) {
-          this.moveNavFocus(this.navIndex - 1);
-          return;
-        }
-        if (horizonStyle && code === 39) {
-          this.moveNavFocus(this.navIndex + 1);
-          return;
-        }
-        if (horizonStyle && code === 40) {
-          const firstContent = this.container.querySelector(".settings-content-focusable");
-          if (firstContent) {
-            this.focusZone = "content";
-            this.contentFocusKey = String(firstContent.dataset.focusKey || "");
-            this.applyFocus();
-          }
-          return;
-        }
-        if (horizonStyle && code === 38) {
-          const sidebarNodes = getRootSidebarNodes(this.container, this.layoutPrefs);
-          const selectedSidebarNode = getRootSidebarSelectedNode(this.container, this.layoutPrefs);
-          this.sidebarFocusIndex = Math.max(0, sidebarNodes.indexOf(selectedSidebarNode));
-          await this.openSidebar();
-          return;
-        }
         if (code === 38) {
           this.moveNavFocus(this.navIndex - 1);
           return;
@@ -8009,14 +7507,6 @@ export const SettingsScreen = {
       }
 
       if (this.focusZone === "content") {
-        if (code === 38 && String(this.model?.theme?.settingsUiStyle || "CLASSIC") === "HORIZON") {
-          if (!this.moveContent("up")) {
-            this.syncNavFocusToActive();
-            this.focusZone = "nav";
-            this.applyFocus();
-          }
-          return;
-        }
         if (code === 37) {
           const moved = this.moveContent("left");
           if (!moved) {

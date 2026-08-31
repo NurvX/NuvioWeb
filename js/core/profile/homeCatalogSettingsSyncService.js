@@ -5,7 +5,6 @@ import { SupabaseApi } from "../../data/remote/supabase/supabaseApi.js";
 import { addonRepository } from "../../data/repository/addonRepository.js";
 import { HomeCatalogStore } from "../../data/local/homeCatalogStore.js";
 import { CollectionsStore, buildCollectionHomeKey } from "../../data/local/collectionsStore.js";
-import { LayoutPreferences } from "../../data/local/layoutPreferences.js";
 import { ProfileManager } from "./profileManager.js";
 import {
   buildCatalogDisableKey,
@@ -18,7 +17,6 @@ const PUSH_RPC = "sync_push_home_catalog_settings";
 const HOME_CATALOG_SHARED_SYNC_PLATFORM = "home_catalog_shared";
 const HOME_CATALOG_LEGACY_SYNC_PLATFORMS = ["tv", "mobile"];
 const PUSH_DEBOUNCE_MS = 500;
-const HIDE_UNRELEASED_CONTENT_KEY = "hide_unreleased_content";
 const HIDE_CATALOG_UNDERLINE_KEY = "hide_catalog_underline";
 const PENDING_PUSH_TOKENS_KEY = "homeCatalogSettingsPendingPushTokens";
 
@@ -232,7 +230,6 @@ function buildLocalPayload(profileId = null) {
     const resolvedProfileId = resolveProfileId(profileId);
     const collections = CollectionsStore.getForProfile(resolvedProfileId);
     const prefs = HomeCatalogStore.getForProfile(resolvedProfileId);
-    const layout = LayoutPreferences.getForProfile(resolvedProfileId);
     const customTitles = prefs.customTitles || {};
     const catalogEntries = buildCatalogEntries(addons);
     const collectionEntries = buildCollectionEntries(collections);
@@ -283,7 +280,6 @@ function buildLocalPayload(profileId = null) {
       .filter(Boolean);
 
     return {
-      hide_unreleased_content: Boolean(layout.hideUnreleasedContent),
       items
     };
   });
@@ -297,12 +293,6 @@ function decodePayload(settingsJson = {}, localPayload = {}) {
   const rawItems = Array.isArray(settingsJson.items) ? settingsJson.items : null;
   if (rawItems) {
     return {
-      hide_unreleased_content: Object.prototype.hasOwnProperty.call(
-        settingsJson,
-        HIDE_UNRELEASED_CONTENT_KEY
-      )
-        ? Boolean(settingsJson.hide_unreleased_content)
-        : Boolean(localPayload.hide_unreleased_content),
       hide_catalog_underline: Object.prototype.hasOwnProperty.call(
         settingsJson,
         HIDE_CATALOG_UNDERLINE_KEY
@@ -331,7 +321,6 @@ function decodePayload(settingsJson = {}, localPayload = {}) {
   ]);
   if (!order && !disabled) {
     return {
-      hide_unreleased_content: Boolean(localPayload.hide_unreleased_content),
       items: []
     };
   }
@@ -349,12 +338,6 @@ function decodePayload(settingsJson = {}, localPayload = {}) {
       .filter((key) => key && !savedSet.has(key))
   ];
   return {
-    hide_unreleased_content: Object.prototype.hasOwnProperty.call(
-      settingsJson,
-      HIDE_UNRELEASED_CONTENT_KEY
-    )
-      ? Boolean(settingsJson.hide_unreleased_content)
-      : Boolean(localPayload.hide_unreleased_content),
     items: mergedKeys
       .map((key, index) => {
         const item = cloneValue(localByKey.get(key));
@@ -373,7 +356,6 @@ function decodePayload(settingsJson = {}, localPayload = {}) {
 
 function payloadSignature(payload = {}) {
   return stableStringify({
-    hide_unreleased_content: Boolean(payload.hide_unreleased_content),
     items: (payload.items || []).map((item) => ({
       key: syncItemKey(item),
       enabled: item.enabled !== false,
@@ -415,10 +397,6 @@ async function fetchRemotePayload(profileId, platform, localPayload) {
     platform,
     payload,
     updatedAt: blob.updatedAt,
-    hasHideUnreleasedContent: Object.prototype.hasOwnProperty.call(
-      blob.settingsJson,
-      HIDE_UNRELEASED_CONTENT_KEY
-    ),
     hasHideCatalogUnderline: Object.prototype.hasOwnProperty.call(
       blob.settingsJson,
       HIDE_CATALOG_UNDERLINE_KEY
@@ -427,11 +405,6 @@ async function fetchRemotePayload(profileId, platform, localPayload) {
 }
 
 function withNewestStandaloneSettings(selected, rows) {
-  const hideUnreleasedSource = rows
-    .filter((row) => row.hasHideUnreleasedContent)
-    .sort((left, right) =>
-      String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""))
-    )[0];
   const hideUnderlineSource = rows
     .filter((row) => row.hasHideCatalogUnderline)
     .sort((left, right) =>
@@ -442,9 +415,6 @@ function withNewestStandaloneSettings(selected, rows) {
     ...selected,
     payload: {
       ...selected.payload,
-      hide_unreleased_content:
-        hideUnreleasedSource?.payload?.hide_unreleased_content ??
-        selected.payload.hide_unreleased_content,
       hide_catalog_underline:
         hideUnderlineSource?.payload?.hide_catalog_underline ??
         selected.payload.hide_catalog_underline
@@ -516,13 +486,6 @@ function applyPayload(profileId, payload = {}) {
       },
       { silentSync: true }
     );
-    if (Object.prototype.hasOwnProperty.call(payload, HIDE_UNRELEASED_CONTENT_KEY)) {
-      LayoutPreferences.setForProfile(
-        profileId,
-        { hideUnreleasedContent: Boolean(payload.hide_unreleased_content) },
-        { silentSync: true }
-      );
-    }
   } finally {
     HomeCatalogSettingsSyncService.syncingFromRemoteProfiles.delete(resolveProfileId(profileId));
   }

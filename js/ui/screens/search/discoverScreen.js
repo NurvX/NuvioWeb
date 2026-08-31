@@ -26,8 +26,6 @@ import {
   isRootSidebarNode,
   isSelectedSidebarAction,
   renderRootSidebar,
-  setModernSidebarExpanded,
-  setModernSidebarPillIconOnly,
   setLegacySidebarExpanded
 } from "../../components/sidebarNavigation.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
@@ -299,7 +297,7 @@ export const DiscoverScreen = {
         ? { ...snapshot.rowFocusedIndexByRow }
         : {};
     this.focusZone = String(snapshot.focusZone || "content");
-    this.sidebarExpanded = Boolean(this.layoutPrefs?.modernSidebar && snapshot.sidebarExpanded);
+    this.sidebarExpanded = false;
     this.sidebarFocusIndex = Number(snapshot.sidebarFocusIndex || 0);
     this.pillIconOnly = Boolean(snapshot.pillIconOnly);
     this.loading = false;
@@ -1083,9 +1081,7 @@ export const DiscoverScreen = {
     this.focusZone = "content";
     focusWithoutAutoScroll(target);
     this.scrollContentToTop();
-    if (!this.layoutPrefs?.modernSidebar) {
-      setLegacySidebarExpanded(this.container, false);
-    }
+    setLegacySidebarExpanded(this.container, false);
     this.lastFocusedAction = action;
   },
 
@@ -1123,9 +1119,7 @@ export const DiscoverScreen = {
     this.focusZone = "content";
     focusWithoutAutoScroll(target);
     this.scrollContentToTop();
-    if (!this.layoutPrefs?.modernSidebar) {
-      setLegacySidebarExpanded(this.container, false);
-    }
+    setLegacySidebarExpanded(this.container, false);
     this.lastFocusedAction = String(target.dataset.action || "discoverFilterType");
     return true;
   },
@@ -1275,9 +1269,7 @@ export const DiscoverScreen = {
     if (shouldLoadMore) {
       this.loadNextPage({ preserveViewport: true });
     }
-    if (!this.layoutPrefs?.modernSidebar) {
-      setLegacySidebarExpanded(this.container, false);
-    }
+    setLegacySidebarExpanded(this.container, false);
     return true;
   },
 
@@ -1396,25 +1388,18 @@ export const DiscoverScreen = {
         });
       }
     }
-    if (!this.layoutPrefs?.modernSidebar) {
-      setLegacySidebarExpanded(this.container, false);
-    }
+    setLegacySidebarExpanded(this.container, false);
     return true;
   },
 
   async closeSidebarToContent() {
     this.focusZone = "content";
-    if (this.layoutPrefs?.modernSidebar && this.sidebarExpanded) {
-      this.sidebarExpanded = false;
-      setModernSidebarExpanded(this.container, false);
-    } else if (!this.layoutPrefs?.modernSidebar) {
-      setLegacySidebarExpanded(this.container, false);
-    }
+    setLegacySidebarExpanded(this.container, false);
     return this.restoreContentFocus() || true;
   },
 
   isSidebarRootRoute() {
-    return String(this.layoutPrefs?.discoverLocation || "in_search") === "in_sidebar";
+    return false;
   },
 
   focusSidebarNode(preferredNode = null) {
@@ -1439,12 +1424,7 @@ export const DiscoverScreen = {
     if (!this.isSidebarRootRoute()) return false;
     this.captureViewState();
     this.focusZone = "sidebar";
-    if (this.layoutPrefs?.modernSidebar && !this.sidebarExpanded) {
-      this.sidebarExpanded = true;
-      setModernSidebarExpanded(this.container, true);
-    } else if (!this.layoutPrefs?.modernSidebar) {
-      setLegacySidebarExpanded(this.container, true);
-    }
+    setLegacySidebarExpanded(this.container, true);
     return this.focusSidebarNode();
   },
 
@@ -1689,15 +1669,6 @@ export const DiscoverScreen = {
       return;
     }
     const currentAction = String(current?.dataset?.action || "");
-    if (this.layoutPrefs?.modernSidebar && !this.sidebarExpanded) {
-      if (isDownKey(event)) {
-        this.pillIconOnly = true;
-        setModernSidebarPillIconOnly(this.container, true);
-      } else if (isUpKey(event)) {
-        this.pillIconOnly = false;
-        setModernSidebarPillIconOnly(this.container, false);
-      }
-    }
 
     if (this.focusZone === "sidebar") {
       const nodes = getRootSidebarNodes(this.container, this.layoutPrefs);

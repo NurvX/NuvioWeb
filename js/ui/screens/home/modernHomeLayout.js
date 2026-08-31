@@ -35,7 +35,6 @@ export function renderModernHomeLayout({
   rowItemLimit = 15,
   showHeroSection = false,
   showPosterLabels = true,
-  showCatalogTypeSuffix = true,
   preferLandscapePosters = false,
   focusedRowKey = "",
   focusedItemIndex = -1,
@@ -87,7 +86,7 @@ export function renderModernHomeLayout({
       : rowItems.slice(0, Math.max(maxItems, focusedItemLimit));
     const rowTitle = isCollectionRow
       ? String(rowData.collectionTitle || rowData.collection?.title || "Collection")
-      : formatCatalogRowTitle(rowData.catalogName, rowData.type, showCatalogTypeSuffix);
+      : formatCatalogRowTitle(rowData.catalogName, rowData.type);
     const deferRowImages =
       typeof shouldDeferRowImages === "function"
         ? shouldDeferRowImages(rowIndex, rowKey, focusedRowKey)

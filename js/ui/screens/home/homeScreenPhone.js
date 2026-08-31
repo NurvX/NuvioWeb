@@ -285,7 +285,7 @@ function buildCatalogRows(screen) {
       }
       const title = isCollectionRow
         ? String(row.collectionTitle || row.collection?.title || "Collection")
-        : formatCatalogRowTitle(row.catalogName, row.type, true);
+        : formatCatalogRowTitle(row.catalogName, row.type);
       const viewAll = isCollectionRow
         ? null
         : {

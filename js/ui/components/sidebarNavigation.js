@@ -68,26 +68,6 @@ const ROOT_SIDEBAR_ITEMS = [
   }
 ];
 
-const DISCOVER_SIDEBAR_ITEM = {
-  action: "gotoDiscover",
-  route: "discover",
-  labelKey: "discover_title",
-  iconType: "material",
-  iconName: "explore"
-};
-
-function sidebarItems(layout = {}) {
-  if (String(layout?.discoverLocation || "in_search") !== "in_sidebar") {
-    return ROOT_SIDEBAR_ITEMS;
-  }
-  return [
-    ROOT_SIDEBAR_ITEMS[0],
-    ROOT_SIDEBAR_ITEMS[1],
-    DISCOVER_SIDEBAR_ITEM,
-    ...ROOT_SIDEBAR_ITEMS.slice(2)
-  ];
-}
-
 let sidebarAvatarCatalogPromise = null;
 
 function profileInitial(name) {
@@ -241,28 +221,13 @@ function scheduleRootSidebarTextFit(container) {
 
 function getSelectedItem(routeName = "") {
   return (
-    [...ROOT_SIDEBAR_ITEMS, DISCOVER_SIDEBAR_ITEM].find(
-      (item) => item.route === String(routeName || "")
-    ) || ROOT_SIDEBAR_ITEMS[0]
+    ROOT_SIDEBAR_ITEMS.find((item) => item.route === String(routeName || "")) ||
+    ROOT_SIDEBAR_ITEMS[0]
   );
 }
 
 function getItemForAction(action = "") {
-  return (
-    [...ROOT_SIDEBAR_ITEMS, DISCOVER_SIDEBAR_ITEM].find(
-      (item) => item.action === String(action || "")
-    ) || null
-  );
-}
-
-function getModernSidebarPresentation(selectedRoute = "") {
-  const route = String(selectedRoute || "")
-    .trim()
-    .toLowerCase();
-  return {
-    showPill: true,
-    keepPillExpanded: route === "settings"
-  };
+  return ROOT_SIDEBAR_ITEMS.find((item) => item.action === String(action || "")) || null;
 }
 
 function getSidebarAvatarCatalog() {
@@ -312,10 +277,7 @@ export function activateLegacySidebarAction(action, currentRoute = "") {
     return;
   }
 
-  const target =
-    normalizedAction === "gotoDiscover"
-      ? DISCOVER_SIDEBAR_ITEM
-      : getItemForAction(normalizedAction);
+  const target = getItemForAction(normalizedAction);
   if (!target) {
     return;
   }
@@ -332,20 +294,19 @@ export function isSelectedSidebarAction(action, selectedRoute = "") {
   return getItemForAction(action)?.route === String(selectedRoute || "");
 }
 
-export function renderLegacySidebar({ selectedRoute = "home", profile = null, layout = {} } = {}) {
-  const items = sidebarItems(layout);
+export function renderLegacySidebar({ selectedRoute = "home", profile = null } = {}) {
+  const items = ROOT_SIDEBAR_ITEMS;
   const selectedItem = getSelectedItem(selectedRoute);
   const profileState = profile || {};
   const showProfileSelector = Boolean(
     profileState.showProfileSelector && profileState.activeProfileName
   );
-  const collapsible = Boolean(layout?.collapseSidebar);
   const performanceConstrained = Platform.isWebOS() || Platform.isTizen();
 
   return `
     <aside class="home-sidebar root-sidebar root-sidebar-legacy${performanceConstrained ? " performance-constrained" : ""}"
            data-selected-route="${selectedRoute}"
-           data-collapsible="${collapsible ? "true" : "false"}">
+           data-collapsible="false">
       ${
         showProfileSelector
           ? `
@@ -386,111 +347,8 @@ export function renderLegacySidebar({ selectedRoute = "home", profile = null, la
   `;
 }
 
-export function renderModernSidebar({
-  selectedRoute = "home",
-  profile = null,
-  expanded = false,
-  pillIconOnly = false,
-  blurEnabled = false,
-  layout = {}
-} = {}) {
-  const items = sidebarItems(layout);
-  const selectedItem = getSelectedItem(selectedRoute);
-  const profileState = profile || {};
-  const showProfileSelector = Boolean(
-    profileState.showProfileSelector && profileState.activeProfileName
-  );
-  const { keepPillExpanded } = getModernSidebarPresentation(selectedRoute);
-  const showPill = selectedItem.route !== "search";
-  const selectedLabel = itemLabel(selectedItem);
-  const performanceConstrained = Platform.isWebOS() || Platform.isTizen();
-
-  return `
-    <div class="modern-sidebar-shell${expanded ? " expanded panel-visible" : ""}${blurEnabled ? " blur-enabled" : ""}${keepPillExpanded ? " keep-pill-expanded" : ""}${performanceConstrained ? " performance-constrained" : ""}" data-selected-route="${selectedRoute}">
-      ${
-        showPill
-          ? `
-        <button class="modern-sidebar-pill${pillIconOnly && !keepPillExpanded ? " icon-only" : ""}"
-                data-nav-zone="sidebar"
-                data-nav-index="0"
-                data-action="expandSidebar"
-                aria-label="${t("sidebar.expandSidebar")}" aria-expanded="${expanded ? "true" : "false"}">
-          <img class="modern-sidebar-pill-chevron" src="assets/icons/ic_chevron_compact_left.png" alt="" aria-hidden="true" />
-          <span class="modern-sidebar-pill-chip">
-            <span class="modern-sidebar-pill-icon-wrap">${iconMarkup(selectedItem, "modern-sidebar-pill-icon")}</span>
-            <span class="modern-sidebar-pill-label">${selectedLabel}</span>
-          </span>
-        </button>
-      `
-          : ""
-      }
-      <aside class="modern-sidebar-panel" aria-hidden="${expanded ? "false" : "true"}">
-        ${
-          showProfileSelector
-            ? `
-          <button class="modern-sidebar-profile focusable"
-                  data-nav-zone="sidebar"
-                  data-nav-index="${showPill ? 1 : 0}"
-                  data-action="gotoAccount" aria-label="${t("sidebar.switchProfile")}">
-            <span class="modern-sidebar-profile-avatar" style="background:${profileState.activeProfileColorHex || getThemeAccentFallback()}">
-              ${
-                profileState.activeProfileAvatarUrl
-                  ? `<img class="sidebar-profile-avatar-image" src="${profileState.activeProfileAvatarUrl}" alt="${profileState.activeProfileName || t("sidebar.profileFallback")}" />`
-                  : profileState.activeProfileInitial || "P"
-              }
-            </span>
-            <span class="modern-sidebar-profile-name">${profileState.activeProfileName || t("sidebar.profileFallback")}</span>
-          </button>
-        `
-            : ""
-        }
-        <div class="modern-sidebar-nav-list">
-          ${items
-            .map(
-              (item, index) => `
-            <button class="modern-sidebar-nav-item focusable${selectedItem.action === item.action ? " selected" : ""}"
-                    data-nav-zone="sidebar"
-                    data-nav-index="${(showPill ? 1 : 0) + (showProfileSelector ? 1 : 0) + index}"
-                    data-action="${item.action}"
-                    aria-label="${itemLabel(item)}">
-              <span class="modern-sidebar-nav-icon-circle">
-                ${iconMarkup(item, "modern-sidebar-nav-icon")}
-              </span>
-              <span class="modern-sidebar-nav-label">${itemLabel(item)}</span>
-            </button>
-          `
-            )
-            .join("")}
-        </div>
-      </aside>
-    </div>
-  `;
-}
-
-export function isModernSidebarBlurAvailable() {
-  return Boolean(
-    globalThis.document?.documentElement?.classList?.contains("modern-sidebar-blur-capable")
-  );
-}
-
-export function renderRootSidebar({
-  selectedRoute = "home",
-  profile = null,
-  layout = {},
-  expanded = false,
-  pillIconOnly = false
-} = {}) {
-  if (layout?.modernSidebar) {
-    return renderModernSidebar({
-      selectedRoute,
-      profile,
-      expanded,
-      pillIconOnly,
-      blurEnabled: Boolean(layout?.modernSidebarBlur) && isModernSidebarBlurAvailable(),
-      layout
-    });
-  }
-  return renderLegacySidebar({ selectedRoute, profile, layout });
+export function renderRootSidebar({ selectedRoute = "home", profile = null } = {}) {
+  return renderLegacySidebar({ selectedRoute, profile });
 }
 
 export function bindRootSidebarEvents(
@@ -654,114 +512,16 @@ export function handleLegacySidebarBack(screen, event) {
   return false;
 }
 
-export function getModernSidebarNodes(container) {
-  return Array.from(container?.querySelectorAll(".modern-sidebar-panel .focusable") || []);
+export function getRootSidebarNodes(container) {
+  return getLegacySidebarNodes(container);
 }
 
-export function getModernSidebarSelectedNode(container) {
-  return (
-    container?.querySelector(".modern-sidebar-panel .modern-sidebar-nav-item.selected") ||
-    container?.querySelector(".modern-sidebar-panel .modern-sidebar-nav-item") ||
-    container?.querySelector(".modern-sidebar-panel .focusable") ||
-    null
-  );
-}
-
-export function getRootSidebarNodes(container, layout = {}) {
-  return layout?.modernSidebar
-    ? getModernSidebarNodes(container)
-    : getLegacySidebarNodes(container);
-}
-
-export function getRootSidebarSelectedNode(container, layout = {}) {
-  return layout?.modernSidebar
-    ? getModernSidebarSelectedNode(container)
-    : getLegacySidebarSelectedNode(container);
+export function getRootSidebarSelectedNode(container) {
+  return getLegacySidebarSelectedNode(container);
 }
 
 export function isRootSidebarNode(node) {
-  return Boolean(node?.closest?.(".home-sidebar, .modern-sidebar-panel"));
-}
-
-export function setModernSidebarPillIconOnly(container, iconOnly, keepExpanded = false) {
-  const shell = container?.querySelector(".modern-sidebar-shell");
-  const pill = container?.querySelector(".modern-sidebar-pill");
-  const shouldKeepExpanded = Boolean(
-    keepExpanded || shell?.classList?.contains("keep-pill-expanded")
-  );
-  if (!pill || shouldKeepExpanded) {
-    pill?.classList.remove("icon-only");
-    return;
-  }
-  pill.classList.toggle("icon-only", Boolean(iconOnly));
-}
-
-export function setModernSidebarExpanded(container, expanded) {
-  const shell = container?.querySelector(".modern-sidebar-shell");
-  if (!shell) {
-    return false;
-  }
-  const panel = shell.querySelector(".modern-sidebar-panel");
-  const pill = shell.querySelector(".modern-sidebar-pill");
-  if (shell._modernOpenTimer) {
-    clearTimeout(shell._modernOpenTimer);
-    shell._modernOpenTimer = null;
-  }
-  if (shell._modernCloseStartTimer) {
-    clearTimeout(shell._modernCloseStartTimer);
-    shell._modernCloseStartTimer = null;
-  }
-  if (shell._modernCloseEndTimer) {
-    clearTimeout(shell._modernCloseEndTimer);
-    shell._modernCloseEndTimer = null;
-  }
-
-  if (expanded) {
-    shell.classList.add("panel-visible", "opening");
-    shell.classList.remove("collapsing");
-    syncSidebarStateClasses(container);
-    if (panel) {
-      panel.setAttribute("aria-hidden", "false");
-    }
-    if (pill) {
-      pill.setAttribute("aria-expanded", "true");
-    }
-    requestAnimationFrame(() => {
-      shell.classList.add("expanded");
-      syncSidebarStateClasses(container);
-    });
-    shell._modernOpenTimer = setTimeout(() => {
-      shell.classList.remove("opening");
-      shell._modernOpenTimer = null;
-      scheduleRootSidebarTextFit(container);
-      syncSidebarStateClasses(container);
-    }, 365);
-    scheduleRootSidebarTextFit(container);
-    return true;
-  }
-
-  shell.classList.add("collapsing");
-  shell.classList.remove("opening");
-  syncSidebarStateClasses(container);
-  if (pill) {
-    pill.setAttribute("aria-expanded", "false");
-  }
-  shell._modernCloseStartTimer = setTimeout(() => {
-    shell.classList.remove("expanded");
-    shell._modernCloseStartTimer = null;
-    syncSidebarStateClasses(container);
-  }, 70);
-  shell._modernCloseEndTimer = setTimeout(() => {
-    shell.classList.remove("panel-visible", "collapsing");
-    if (panel) {
-      panel.setAttribute("aria-hidden", "true");
-    }
-    shell._modernCloseEndTimer = null;
-    scheduleRootSidebarTextFit(container);
-    syncSidebarStateClasses(container);
-  }, 430);
-  scheduleRootSidebarTextFit(container);
-  return true;
+  return Boolean(node?.closest?.(".home-sidebar"));
 }
 
 export function focusWithoutAutoScroll(node) {

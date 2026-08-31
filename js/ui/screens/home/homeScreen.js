@@ -25,7 +25,7 @@ import { AvatarRepository } from "../../../data/remote/supabase/avatarRepository
 import { Platform } from "../../../platform/index.js";
 import { isFastHorizontalNavigationEnabled } from "../../../platform/sharedKeys.js";
 import { LocalStore } from "../../../core/storage/localStore.js";
-import { TMDB_API_KEY, YOUTUBE_PROXY_URL } from "../../../config.js";
+import { TMDB_API_KEY } from "../../../config.js";
 import { I18n } from "../../../i18n/index.js";
 import {
   buildWatchedTitleIdSet,
@@ -47,13 +47,9 @@ import {
   bindRootSidebarEvents,
   getLegacySidebarNodes,
   getLegacySidebarSelectedNode,
-  getModernSidebarNodes,
-  getModernSidebarSelectedNode,
   getSidebarProfileState,
   focusWithoutAutoScroll,
   renderRootSidebar,
-  setModernSidebarExpanded,
-  setModernSidebarPillIconOnly,
   setLegacySidebarExpanded
 } from "../../components/sidebarNavigation.js";
 import { NuvioDialog } from "../../components/nuvioDialog.js";
@@ -135,7 +131,6 @@ export { escapeAttribute, escapeHtml, formatCatalogRowTitle } from "./homeUtils.
 /** @typedef {import("./homeTypes.js").HomeMediaSourceLike} HomeMediaSourceLike */
 /** @typedef {import("./homeTypes.js").HomeHeroDisplay} HomeHeroDisplay */
 
-const MODERN_SIDEBAR_PILL_AUTO_COLLAPSE_MS = 4000;
 const CW_RELEASE_ALERT_MAX_AGE_MS = 60 * 24 * 60 * 60 * 1000;
 const HOME_LAZY_IMAGE_SELECTOR =
   ".home-main .content-poster[data-src], .home-main .home-poster-landscape-logo[data-src], .home-main .home-continue-bg[data-src]";
@@ -840,145 +835,6 @@ function formatEpisodeCode(season, episode) {
   return "";
 }
 
-function resolveYoutubeId(value) {
-  const raw = String(value || "").trim();
-  if (!raw) {
-    return "";
-  }
-  const directMatch = raw.match(/^[A-Za-z0-9_-]{11}$/);
-  if (directMatch) {
-    return directMatch[0];
-  }
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/i,
-    /(?:youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/i
-  ];
-  for (const pattern of patterns) {
-    const match = raw.match(pattern);
-    if (match?.[1]) {
-      return match[1];
-    }
-  }
-  return "";
-}
-
-function buildYoutubeEmbedUrl(videoId, { muted = true } = {}) {
-  const cleanId = resolveYoutubeId(videoId);
-  if (!cleanId) {
-    return "";
-  }
-  const proxyBase = String(YOUTUBE_PROXY_URL || "").trim();
-  if (proxyBase) {
-    try {
-      const proxyUrl = new URL(proxyBase, globalThis?.location?.href || "https://example.com/");
-      proxyUrl.searchParams.set("v", cleanId);
-      proxyUrl.searchParams.set("autoplay", "1");
-      proxyUrl.searchParams.set("muted", muted ? "1" : "0");
-      proxyUrl.searchParams.set("controls", "0");
-      proxyUrl.searchParams.set("loop", "1");
-      proxyUrl.searchParams.set("playlist", cleanId);
-      proxyUrl.searchParams.set("playsinline", "1");
-      proxyUrl.searchParams.set("rel", "0");
-      proxyUrl.searchParams.set("cc_load_policy", "0");
-      if (Platform.isWebOS()) {
-        // Home previews do not need the controllable IFrame API. On webOS it
-        // commonly reaches the same direct-embed fallback only after the
-        // proxy watchdog expires, keeping the trailer hidden for several
-        // seconds after the focused poster has already expanded.
-        proxyUrl.searchParams.set("direct", "1");
-      }
-      proxyUrl.searchParams.set("_cb", `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-      return proxyUrl.toString();
-    } catch (_) {
-      return "";
-    }
-  }
-  if (typeof globalThis?.document === "undefined") {
-    return "";
-  }
-  const params = new URLSearchParams({
-    autoplay: "1",
-    mute: muted ? "1" : "0",
-    controls: "0",
-    loop: "1",
-    playlist: cleanId,
-    playsinline: "1",
-    rel: "0",
-    modestbranding: "1",
-    enablejsapi: "1",
-    cc_load_policy: "0",
-    iv_load_policy: "3"
-  });
-  const origin = String(globalThis?.location?.origin || "").trim();
-  if (/^https?:\/\//i.test(origin)) {
-    params.set("origin", origin);
-  }
-  return `https://www.youtube.com/embed/${cleanId}?${params.toString()}`;
-}
-
-function resolveTrailerSource(meta = {}) {
-  const trailerCandidates = [
-    ...(Array.isArray(meta?.trailers) ? meta.trailers : []),
-    ...(Array.isArray(meta?.videos) ? meta.videos : [])
-  ];
-  for (const entry of trailerCandidates) {
-    const ytId = resolveYoutubeId(
-      entry?.ytId || entry?.youtubeId || entry?.source || entry?.url || entry?.link || ""
-    );
-    if (ytId) {
-      const embedUrl = buildYoutubeEmbedUrl(ytId);
-      if (!embedUrl) {
-        continue;
-      }
-      return {
-        kind: "youtube",
-        ytId,
-        embedUrl
-      };
-    }
-  }
-  const fallbackId = resolveYoutubeId(
-    Array.isArray(meta?.trailerYtIds) ? meta.trailerYtIds[0] : ""
-  );
-  if (!fallbackId) {
-    return null;
-  }
-  const fallbackEmbedUrl = buildYoutubeEmbedUrl(fallbackId);
-  if (!fallbackEmbedUrl) {
-    return null;
-  }
-  return {
-    kind: "youtube",
-    ytId: fallbackId,
-    embedUrl: fallbackEmbedUrl
-  };
-}
-
-function applyTrailerAudioPreferences(source, prefs = {}) {
-  if (!source) {
-    return null;
-  }
-  const muted = Boolean(prefs.focusedPosterBackdropTrailerMuted);
-  if (source.kind === "youtube") {
-    const embedUrl = buildYoutubeEmbedUrl(source.ytId, { muted });
-    if (!embedUrl) {
-      return null;
-    }
-    return {
-      ...source,
-      embedUrl,
-      muted
-    };
-  }
-  if (source.kind === "video") {
-    return {
-      ...source,
-      muted
-    };
-  }
-  return source;
-}
-
 function withTimeout(promise, ms, fallbackValue) {
   let timer = null;
   return Promise.race([
@@ -991,54 +847,6 @@ function withTimeout(promise, ms, fallbackValue) {
       clearTimeout(timer);
     }
   });
-}
-
-async function resolveTrailerMetaWithTmdbFallback(meta = {}, itemType = "movie") {
-  const fallbackSource = resolveTrailerSource(meta);
-  if (fallbackSource) {
-    return fallbackSource;
-  }
-  const settings = TmdbSettingsStore.get();
-  if (!settings.enabled || !settings.useTrailers || !TMDB_API_KEY) {
-    return fallbackSource;
-  }
-  try {
-    const tmdbId = await withTimeout(TmdbService.ensureTmdbId(meta?.id, itemType), 1800, null);
-    if (!tmdbId) {
-      return null;
-    }
-    const enrichment = await withTimeout(
-      TmdbMetadataService.fetchEnrichment({
-        tmdbId,
-        contentType: itemType,
-        language: settings.language
-      }),
-      2200,
-      null
-    );
-    if (!enrichment) {
-      return fallbackSource;
-    }
-    const mergedMeta = {
-      ...meta,
-      trailers:
-        Array.isArray(meta?.trailers) && meta.trailers.length
-          ? meta.trailers
-          : Array.isArray(enrichment?.trailers)
-            ? enrichment.trailers
-            : [],
-      trailerYtIds:
-        Array.isArray(meta?.trailerYtIds) && meta.trailerYtIds.length
-          ? meta.trailerYtIds
-          : Array.isArray(enrichment?.trailerYtIds)
-            ? enrichment.trailerYtIds
-            : []
-    };
-    const enrichedFallbackSource = resolveTrailerSource(mergedMeta);
-    return enrichedFallbackSource || fallbackSource;
-  } catch (_) {
-    return fallbackSource;
-  }
 }
 
 function getContinueWatchingMetaTimeout(timeoutMs) {
@@ -2186,13 +1994,6 @@ function renderRowHeader(title, subtitle = "") {
   `;
 }
 
-function resolveContinueWatchingBlurNextUp(layoutPrefs) {
-  if (Platform.isTizen()) {
-    return false;
-  }
-  return Boolean(layoutPrefs?.blurContinueWatchingNextUp);
-}
-
 function renderContinueWatchingCard(item, index, options = {}) {
   const normalized = normalizeContinueWatchingItem(item);
   const subtitle = normalized.episodeTitle || "";
@@ -2395,7 +2196,6 @@ function renderLegacyCatalogRowsMarkup(rows = [], options = {}) {
     layoutMode = "classic",
     showPosterLabels = true,
     showCatalogAddonName = true,
-    showCatalogTypeSuffix = true,
     focusedRowKey = "",
     focusedItemIndex = -1,
     expandFocusedPoster = false,
@@ -2433,7 +2233,7 @@ function renderLegacyCatalogRowsMarkup(rows = [], options = {}) {
 
     const rowTitle = isCollectionRow
       ? String(rowData.collectionTitle || rowData.collection?.title || "Collection")
-      : formatCatalogRowTitle(rowData.catalogName, rowData.type, showCatalogTypeSuffix);
+      : formatCatalogRowTitle(rowData.catalogName, rowData.type);
     const rowSubtitle =
       layoutMode === "classic" && showCatalogAddonName && rowData.addonName
         ? `from ${rowData.addonName}`
@@ -3069,16 +2869,12 @@ export const HomeScreen = {
       return false;
     }
 
-    const nodes = this.layoutPrefs?.modernSidebar
-      ? getModernSidebarNodes(this.container)
-      : getLegacySidebarNodes(this.container);
+    const nodes = getLegacySidebarNodes(this.container);
     if (!nodes.length) {
       return false;
     }
 
-    let target = this.layoutPrefs?.modernSidebar
-      ? getModernSidebarSelectedNode(this.container)
-      : getLegacySidebarSelectedNode(this.container);
+    let target = getLegacySidebarSelectedNode(this.container);
 
     if (!target && focusState.sidebarAction) {
       target =
@@ -3612,22 +3408,6 @@ export const HomeScreen = {
     return this.isLegacyTvRuntime() && !Platform.isTizen();
   },
 
-  getFocusedPosterTrailerDelayMs() {
-    if (Platform.isTizen()) {
-      return 1600;
-    }
-    // The configured focused-poster delay already settles focus before this
-    // flow starts. Android begins resolving its preview during that dwell, so
-    // adding another delay after expansion only makes webOS visibly later.
-    if (Platform.isWebOS()) {
-      return 0;
-    }
-    if (this.isPerformanceConstrained()) {
-      return 1400;
-    }
-    return 0;
-  },
-
   isPerformanceConstrained() {
     return Boolean(globalThis.document?.body?.classList?.contains("performance-constrained"));
   },
@@ -4067,10 +3847,6 @@ export const HomeScreen = {
   },
 
   setSidebarExpanded(expanded) {
-    if (this.layoutPrefs?.modernSidebar) {
-      this.sidebarExpanded = Boolean(expanded);
-      return;
-    }
     setLegacySidebarExpanded(this.container, expanded);
   },
 
@@ -4486,9 +4262,7 @@ export const HomeScreen = {
 
   restoreContinueWatchingMenuFocus() {
     this.unlockHomeHoldFocus();
-    const rowKey = String(
-      this.pendingContinueWatchingFocusRowKey || "continue_watching"
-    );
+    const rowKey = String(this.pendingContinueWatchingFocusRowKey || "continue_watching");
     const cards = this.getNavigationRowNodes(rowKey);
     const target =
       cards[
@@ -4775,12 +4549,15 @@ export const HomeScreen = {
       normalizedAction === "confirmDestructiveSimklRemoval"
     ) {
       try {
-        await libraryRepository.applyMembershipChanges(this.posterListPicker.item, {
-          desiredMembership: this.posterListPicker.membership || {}
-        }, {
-          destructiveRemovalConfirmed:
-            normalizedAction === "confirmDestructiveSimklRemoval"
-        });
+        await libraryRepository.applyMembershipChanges(
+          this.posterListPicker.item,
+          {
+            desiredMembership: this.posterListPicker.membership || {}
+          },
+          {
+            destructiveRemovalConfirmed: normalizedAction === "confirmDestructiveSimklRemoval"
+          }
+        );
         this.posterListPicker = null;
         this.destroyHomeHoldDialog();
         this.restorePosterHoldMenuFocus();
@@ -5262,9 +5039,7 @@ export const HomeScreen = {
       return false;
     }
     const anchorIndex = Math.max(0, Number(this.continueWatchingMenu?.index || 0));
-    const anchorRowKey = String(
-      this.continueWatchingMenu?.rowKey || "continue_watching"
-    );
+    const anchorRowKey = String(this.continueWatchingMenu?.rowKey || "continue_watching");
     if (option.action === "resume") {
       return this.openContinueWatchingFromItem(item);
     }
@@ -5955,64 +5730,6 @@ export const HomeScreen = {
     container.classList.remove("is-active");
   },
 
-  restorePersistentHeroTrailer(node, options = {}) {
-    if (!this.isModernPosterNode(node)) {
-      return false;
-    }
-    const shouldExpand = Boolean(options?.shouldExpand);
-    const shouldPreviewTrailer = Boolean(options?.shouldPreviewTrailer);
-    const trailerTarget = String(options?.trailerTarget || "hero_media").toLowerCase();
-    const flowKey = String(options?.flowKey || this.getFocusedPosterFlowKey(node) || "");
-    if (shouldExpand) {
-      this.expandFocusedPoster(node);
-    }
-    if (!shouldPreviewTrailer || trailerTarget !== "hero_media" || !flowKey) {
-      return false;
-    }
-    const cachedState = this.heroTrailerPlaybackState;
-    if (!cachedState?.source || String(cachedState.key || "") !== flowKey) {
-      return false;
-    }
-    const heroLayer = this.container?.querySelector(".home-hero-trailer-layer");
-    const heroMedia = this.container?.querySelector(".home-modern-hero-media");
-    if (!heroLayer || !heroMedia) {
-      return false;
-    }
-    heroMedia.classList.remove("trailer-active");
-    this.mountTrailerLayer(heroLayer, cachedState.source, () => {
-      if (
-        node.classList.contains("focused") &&
-        String(this.getFocusedPosterFlowKey(node) || "") === flowKey
-      ) {
-        heroMedia.classList.add("trailer-active");
-      }
-    });
-    return true;
-  },
-
-  getFocusedPosterFlowConfig(prefs = this.layoutPrefs || {}) {
-    const useLandscapePosters = Boolean(prefs.modernLandscapePostersEnabled);
-    const expandSettingEnabled = Boolean(prefs.focusedPosterBackdropExpandEnabled);
-    const requestedTrailerTarget =
-      String(prefs.focusedPosterBackdropTrailerPlaybackTarget || "hero_media").toLowerCase() ===
-      "expanded_card"
-        ? "expanded_card"
-        : "hero_media";
-    const trailerEnabled =
-      Boolean(prefs.focusedPosterBackdropTrailerEnabled) &&
-      !this.shouldSuppressAutomaticTrailerPlayback();
-    const shouldPreviewTrailer = trailerEnabled && (useLandscapePosters || expandSettingEnabled);
-    const landscapeExpandedCardMode =
-      useLandscapePosters && shouldPreviewTrailer && requestedTrailerTarget === "expanded_card";
-    const shouldExpand =
-      (expandSettingEnabled && !useLandscapePosters) || landscapeExpandedCardMode;
-    return {
-      shouldExpand,
-      shouldPreviewTrailer,
-      trailerTarget: shouldExpand ? requestedTrailerTarget : "hero_media"
-    };
-  },
-
   mountTrailerLayer(container, source, onReady = null) {
     if (!container || !source) {
       return;
@@ -6243,47 +5960,6 @@ export const HomeScreen = {
     });
   },
 
-  async getTrailerSourceForItem(item) {
-    if (isCollectionFolderItem(item)) {
-      return null;
-    }
-    const itemId = String(item?.id || item?.contentId || "").trim();
-    const itemType = String(item?.type || item?.apiType || "movie").trim() || "movie";
-    if (!itemId) {
-      return null;
-    }
-    try {
-      const inlineSource = await withTimeout(
-        resolveTrailerMetaWithTmdbFallback(
-          { ...(item || {}), id: itemId, type: itemType },
-          itemType
-        ),
-        2200,
-        null
-      );
-      if (inlineSource) {
-        return inlineSource;
-      }
-
-      const result = await withTimeout(
-        metaRepository.getMetaFromAllAddons(itemType, itemId),
-        3200,
-        { status: "error", message: "timeout" }
-      );
-      const source =
-        result?.status === "success"
-          ? await resolveTrailerMetaWithTmdbFallback(
-              { ...(result?.data || {}), id: itemId, type: itemType },
-              itemType
-            )
-          : null;
-      return source || null;
-    } catch (error) {
-      console.warn("Home trailer preview lookup failed", error);
-      return null;
-    }
-  },
-
   async activateFocusedPosterFlow(node, flowToken = Number(this.focusedPosterFlowToken || 0)) {
     if (!this.isModernPosterNode(node) || !node.classList.contains("focused")) {
       return;
@@ -6305,71 +5981,7 @@ export const HomeScreen = {
       this.hydrateCollectionFocusGif(node, true);
       return;
     }
-    const prefs = this.layoutPrefs || {};
-    const { shouldExpand, shouldPreviewTrailer, trailerTarget } =
-      this.getFocusedPosterFlowConfig(prefs);
-    if (shouldExpand) {
-      this.expandFocusedPoster(node);
-    }
-    if (!shouldPreviewTrailer) {
-      return;
-    }
-    const trailerDelayMs = this.getFocusedPosterTrailerDelayMs();
-    if (trailerDelayMs > 0) {
-      await new Promise((resolve) => {
-        setTimeout(resolve, trailerDelayMs);
-      });
-      if (
-        Number(this.focusedPosterFlowToken || 0) !== Number(flowToken || 0) ||
-        !node.classList.contains("focused")
-      ) {
-        return;
-      }
-    }
-
-    const sourceItem = this.getNodeHeroSource(node);
-    const baseSource = await this.getTrailerSourceForItem(sourceItem);
-    if (Number(this.focusedPosterFlowToken || 0) !== Number(flowToken || 0)) {
-      return;
-    }
-    const source = applyTrailerAudioPreferences(baseSource, prefs);
-    if (!source || !node.classList.contains("focused")) {
-      return;
-    }
-    const flowKey = this.getFocusedPosterFlowKey(node);
-
-    if (trailerTarget === "expanded_card" && shouldExpand) {
-      this.heroTrailerPlaybackState = null;
-      const trailerLayer = node.querySelector(".home-poster-trailer-layer");
-      if (trailerLayer) {
-        this.mountTrailerLayer(trailerLayer, source, () => {
-          if (
-            node.classList.contains("focused") &&
-            Number(this.focusedPosterFlowToken || 0) === Number(flowToken || 0)
-          ) {
-            node.classList.add("is-trailer-active");
-          }
-        });
-      }
-      return;
-    }
-
-    const heroLayer = this.container?.querySelector(".home-hero-trailer-layer");
-    const heroMedia = this.container?.querySelector(".home-modern-hero-media");
-    if (heroLayer && heroMedia) {
-      this.heroTrailerPlaybackState = {
-        key: flowKey,
-        source
-      };
-      this.mountTrailerLayer(heroLayer, source, () => {
-        if (
-          node.classList.contains("focused") &&
-          Number(this.focusedPosterFlowToken || 0) === Number(flowToken || 0)
-        ) {
-          heroMedia.classList.add("trailer-active");
-        }
-      });
-    }
+    this.expandFocusedPoster(node);
   },
 
   cancelFocusedPosterFlow() {
@@ -6539,14 +6151,6 @@ export const HomeScreen = {
       return;
     }
     const prefs = this.layoutPrefs || {};
-    const { shouldExpand, shouldPreviewTrailer, trailerTarget } =
-      this.getFocusedPosterFlowConfig(prefs);
-    const shouldRun = Boolean(shouldExpand || shouldPreviewTrailer);
-    if (!shouldRun) {
-      this.clearFocusedPosterFlowState();
-      this.collapseFocusedPoster();
-      return;
-    }
     if (!this.isModernPosterNode(node)) {
       this.clearFocusedPosterFlowState();
       this.collapseFocusedPoster();
@@ -6575,17 +6179,8 @@ export const HomeScreen = {
       activated: Boolean(canReuseExistingState && existingState.activated),
       token: flowToken
     };
-    if (
-      canReuseExistingState &&
-      existingState.activated &&
-      this.restorePersistentHeroTrailer(node, {
-        shouldExpand,
-        shouldPreviewTrailer,
-        trailerTarget,
-        flowKey
-      })
-    ) {
-      return;
+    if (canReuseExistingState && existingState.activated) {
+      this.expandFocusedPoster(node);
     }
     this.focusedPosterTimer = setTimeout(() => {
       if (
@@ -6632,59 +6227,8 @@ export const HomeScreen = {
     this.collapseFocusedPoster();
   },
 
-  cancelModernSidebarPillAutoCollapse() {
-    if (!this.modernSidebarPillAutoCollapseTimer) {
-      return;
-    }
-    clearTimeout(this.modernSidebarPillAutoCollapseTimer);
-    this.modernSidebarPillAutoCollapseTimer = null;
-  },
-
-  scheduleModernSidebarPillAutoCollapse({ restart = false } = {}) {
-    const shouldSchedule = Boolean(
-      this.layoutPrefs?.modernSidebar &&
-      !this.sidebarExpanded &&
-      !this.pillIconOnly &&
-      Router.getCurrent() === "home"
-    );
-    if (!shouldSchedule) {
-      this.cancelModernSidebarPillAutoCollapse();
-      return;
-    }
-    if (this.modernSidebarPillAutoCollapseTimer && !restart) {
-      return;
-    }
-    this.cancelModernSidebarPillAutoCollapse();
-    this.modernSidebarPillAutoCollapseTimer = setTimeout(() => {
-      this.modernSidebarPillAutoCollapseTimer = null;
-      const shell = this.container?.querySelector(".modern-sidebar-shell");
-      if (
-        Router.getCurrent() !== "home" ||
-        !this.layoutPrefs?.modernSidebar ||
-        this.sidebarExpanded ||
-        !shell ||
-        shell.classList.contains("keep-pill-expanded")
-      ) {
-        return;
-      }
-      this.pillIconOnly = true;
-      setModernSidebarPillIconOnly(this.container, true);
-    }, MODERN_SIDEBAR_PILL_AUTO_COLLAPSE_MS);
-  },
-
   openSidebar({ openedByBack = false } = {}) {
     this.sidebarOpenedByBack = Boolean(openedByBack);
-    if (this.layoutPrefs?.modernSidebar) {
-      this.cancelModernSidebarPillAutoCollapse();
-      if (this.sidebarExpanded) {
-        return true;
-      }
-      this.sidebarExpanded = true;
-      setModernSidebarExpanded(this.container, true);
-      const target = getModernSidebarSelectedNode(this.container);
-      const current = this.getCurrentFocusedNode() || null;
-      return this.focusNode(current, target) || true;
-    }
     const target = getLegacySidebarSelectedNode(this.container);
     if (target) {
       this.setFocusedNode(target);
@@ -6696,20 +6240,6 @@ export const HomeScreen = {
 
   closeSidebarToContent() {
     this.sidebarOpenedByBack = false;
-    if (this.layoutPrefs?.modernSidebar) {
-      if (!this.sidebarExpanded) {
-        return false;
-      }
-      const target =
-        this.lastMainFocus && this.isMainNode(this.lastMainFocus)
-          ? this.lastMainFocus
-          : this.navModel?.rows?.[0]?.[0] || null;
-      this.sidebarExpanded = false;
-      setModernSidebarExpanded(this.container, false);
-      this.scheduleModernSidebarPillAutoCollapse({ restart: true });
-      const current = this.getCurrentFocusedNode() || null;
-      return this.focusNode(current, target, "right") || true;
-    }
     const current =
       this.getCurrentFocusedNode() ||
       this.container?.querySelector(".home-sidebar .focusable.focused") ||
@@ -7611,9 +7141,7 @@ export const HomeScreen = {
   },
 
   buildNavigationModel() {
-    const sidebar = this.layoutPrefs?.modernSidebar
-      ? Array.from(this.container?.querySelectorAll(".modern-sidebar-panel .focusable") || [])
-      : Array.from(this.container?.querySelectorAll(".home-sidebar .focusable") || []);
+    const sidebar = Array.from(this.container?.querySelectorAll(".home-sidebar .focusable") || []);
     const rows = [];
     const tracks = [];
     const rowSectionByKey = new Map();
@@ -7847,14 +7375,7 @@ export const HomeScreen = {
         return true;
       }
       const sidebarFallback =
-        getLegacySidebarSelectedNode(this.container) ||
-        getModernSidebarSelectedNode(this.container) ||
-        nav.sidebar[0] ||
-        null;
-      if (this.layoutPrefs?.modernSidebar && !this.sidebarExpanded) {
-        this.lastMainFocus = current;
-        return this.openSidebar();
-      }
+        getLegacySidebarSelectedNode(this.container) || nav.sidebar[0] || null;
       return this.focusNode(current, sidebarFallback, direction, inputMeta) || true;
     }
 
@@ -8039,10 +7560,6 @@ export const HomeScreen = {
     this.ensureDelegatedEventsBound();
     this.sidebarExpanded = false;
     this.sidebarOpenedByBack = false;
-    this.pillIconOnly = Boolean(
-      navigationContext?.isBackNavigation && returnFocusState?.focusKind !== "sidebar"
-    );
-    this.cancelModernSidebarPillAutoCollapse();
     this.homeRouteEnterPending = !(
       navigationContext?.isBackNavigation || returnFocusState?.layoutMode
     );
@@ -8119,8 +7636,6 @@ export const HomeScreen = {
       this.container.style.removeProperty("left");
       this.container.style.removeProperty("visibility");
       this.container.style.removeProperty("pointer-events");
-      setModernSidebarPillIconOnly(this.container, this.pillIconOnly);
-      this.scheduleModernSidebarPillAutoCollapse();
       this.homeLoadToken = (this.homeLoadToken || 0) + 1;
       this.bindHomeViewportEvents();
       this.setupContinueWatchingProgressiveRendering();
@@ -8228,7 +7743,7 @@ export const HomeScreen = {
     const preservedHeroIdentity = preserveHomeReturnState ? buildHeroIdentity(this.heroItem) : "";
     const prefs = LayoutPreferences.get();
     this.layoutPrefs = prefs;
-    this.sidebarExpanded = Boolean(this.layoutPrefs?.modernSidebar && this.sidebarExpanded);
+    this.sidebarExpanded = false;
     this.layoutMode = String(prefs.homeLayout || "classic").toLowerCase();
     const includeWatchedItemNextUpSeeds =
       watchProgressRepository.getContinueWatchingSource?.() !== "trakt";
@@ -8938,34 +8453,14 @@ export const HomeScreen = {
       this.heroItem = heroItem;
     }
     const showHeroSection = Boolean(this.layoutPrefs?.heroSectionEnabled) && Boolean(heroItem);
-    const modernLandscapePostersEnabled =
-      this.layoutMode === "modern" && Boolean(this.layoutPrefs?.modernLandscapePostersEnabled);
-    const modernLandscapeLayoutClass = modernLandscapePostersEnabled
-      ? " home-modern-landscape-posters"
-      : "";
-    const modernHeroFullScreenBackdropClass =
-      this.layoutMode === "modern" && Boolean(this.layoutPrefs?.modernHeroFullScreenBackdropEnabled)
-        ? " home-modern-fullscreen-backdrop"
-        : "";
-    const modernSidebarLayoutClass = this.layoutPrefs?.modernSidebar
-      ? " home-modern-sidebar-enabled"
-      : "";
-    const depthClass = this.layoutPrefs?.cardDepthEnabled
-      ? ` home-card-depth${this.layoutPrefs.cardDepthPostersEnabled !== false ? " depth-posters" : ""}${this.layoutPrefs.cardDepthContinueWatchingEnabled !== false ? " depth-continue-watching" : ""}`
-      : "";
-    const classicGradientClass = this.layoutMode === "classic" && this.layoutPrefs?.classicFocusGradientEnabled
-      ? " home-classic-focus-gradient"
-      : "";
-    const layoutClass = `home-layout-${this.layoutMode}${modernLandscapeLayoutClass}${modernHeroFullScreenBackdropClass}${modernSidebarLayoutClass}${depthClass}${classicGradientClass}`;
+    const layoutClass = `home-layout-${this.layoutMode}`;
     const sizingStyle = [
-      this.layoutMode === "modern" ? buildModernHomeSizingStyle(this.layoutPrefs) : "",
-      `--card-depth-edge:${Number(this.layoutPrefs?.cardDepthEdgeStrength ?? 28) / 100}`,
-      `--card-depth-sheen:${Number(this.layoutPrefs?.cardDepthSheenStrength ?? 10) / 100}`,
-      `--card-depth-coverage:${Number(this.layoutPrefs?.cardDepthEdgeCoverage ?? 0)}%`
-    ].filter(Boolean).join(";");
+      this.layoutMode === "modern" ? buildModernHomeSizingStyle(this.layoutPrefs) : ""
+    ]
+      .filter(Boolean)
+      .join(";");
     const showPosterLabels = this.layoutPrefs?.posterLabelsEnabled !== false;
     const showCatalogAddonName = this.layoutPrefs?.catalogAddonNameEnabled !== false;
-    const showCatalogTypeSuffix = this.layoutPrefs?.catalogTypeSuffixEnabled !== false;
     const pendingPosterFocusState = this.pendingPosterHoldFocus?.rowKey
       ? {
           rowKey: String(this.pendingPosterHoldFocus.rowKey),
@@ -9002,10 +8497,8 @@ export const HomeScreen = {
             continueWatchingFocusIndex >= 0 ? continueWatchingFocusIndex + 1 : 0
           )
         );
-    const focusedPosterFlowConfig = this.getFocusedPosterFlowConfig(this.layoutPrefs || {});
     const expandFocusedPoster =
       this.layoutMode === "modern" &&
-      Boolean(focusedPosterFlowConfig.shouldExpand) &&
       Number(this.layoutPrefs?.focusedPosterBackdropExpandDelaySeconds ?? 3) <= 0 &&
       Boolean(focusState);
     const rowItemLimit = this.getRowItemLimit();
@@ -9039,14 +8532,13 @@ export const HomeScreen = {
         continueWatchingLoading: Boolean(this.continueWatchingLoading),
         continueWatchingLoadingCount: effectiveContinueWatchingLoadingCount,
         continueWatchingRenderLimit,
-        useEpisodeThumbnailsInCw: this.layoutPrefs?.useEpisodeThumbnailsInCw !== false,
-        blurContinueWatchingNextUp: resolveContinueWatchingBlurNextUp(this.layoutPrefs),
-        continueWatchingCardStyle: this.layoutPrefs?.continueWatchingCardStyle || "card",
+        useEpisodeThumbnailsInCw: true,
+        blurContinueWatchingNextUp: false,
+        continueWatchingCardStyle: "card",
         rowItemLimit,
         showHeroSection,
         showPosterLabels,
-        showCatalogTypeSuffix,
-        preferLandscapePosters: modernLandscapePostersEnabled,
+        preferLandscapePosters: false,
         focusedRowKey: focusState?.rowKey || "",
         focusedItemIndex: Number.isFinite(focusState?.itemIndex) ? focusState.itemIndex : -1,
         expandFocusedPoster,
@@ -9069,9 +8561,9 @@ export const HomeScreen = {
         loading: Boolean(this.continueWatchingLoading),
         loadingCount: effectiveContinueWatchingLoadingCount,
         itemLimit: continueWatchingRenderLimit,
-        useEpisodeThumbnails: this.layoutPrefs?.useEpisodeThumbnailsInCw !== false,
-        blurNextUp: resolveContinueWatchingBlurNextUp(this.layoutPrefs),
-        cardStyle: this.layoutPrefs?.continueWatchingCardStyle || "card"
+        useEpisodeThumbnails: true,
+        blurNextUp: false,
+        cardStyle: "card"
       });
       const upcomingHtml = renderContinueWatchingSection(continueWatchingRows.upcoming, {
         rowKey: "upcoming_section",
@@ -9079,15 +8571,14 @@ export const HomeScreen = {
         title: "Upcoming",
         startIndex: continueWatchingRows.main.length,
         itemLimit: continueWatchingRows.upcoming.length,
-        useEpisodeThumbnails: this.layoutPrefs?.useEpisodeThumbnailsInCw !== false,
-        blurNextUp: resolveContinueWatchingBlurNextUp(this.layoutPrefs),
-        cardStyle: this.layoutPrefs?.continueWatchingCardStyle || "card"
+        useEpisodeThumbnails: true,
+        blurNextUp: false,
+        cardStyle: "card"
       });
       const legacyRowsPayload = renderLegacyCatalogRowsMarkup(this.rows, {
         layoutMode: this.layoutMode,
         showPosterLabels,
         showCatalogAddonName,
-        showCatalogTypeSuffix,
         focusedRowKey: focusState?.rowKey || "",
         focusedItemIndex: Number.isFinite(focusState?.itemIndex) ? focusState.itemIndex : -1,
         expandFocusedPoster: false,
@@ -9123,10 +8614,7 @@ export const HomeScreen = {
       <div class="home-shell home-screen-shell ${layoutClass}"${sizingStyle ? ` style="${escapeAttribute(sizingStyle)}"` : ""}>
         ${renderRootSidebar({
           selectedRoute: "home",
-          profile: this.sidebarProfile,
-          layout: this.layoutPrefs,
-          expanded: Boolean(this.sidebarExpanded),
-          pillIconOnly: Boolean(this.pillIconOnly)
+          profile: this.sidebarProfile
         })}
 
         <main class="home-main home-screen-main">
@@ -9155,11 +8643,7 @@ export const HomeScreen = {
       this.renderedMarkup = nextMarkup;
     }
 
-    if (modernLandscapePostersEnabled) {
-      this.applyCachedModernLandscapePosterMetrics(
-        this.container.querySelector(".home-screen-shell.home-modern-landscape-posters")
-      );
-    } else if (this.layoutMode === "modern") {
+    if (this.layoutMode === "modern") {
       this.applyCachedModernPortraitPosterMetrics(
         this.container.querySelector(
           ".home-screen-shell.home-layout-modern:not(.home-modern-landscape-posters)"
@@ -9171,7 +8655,6 @@ export const HomeScreen = {
       onSelectedAction: () => this.closeSidebarToContent(),
       onExpandSidebar: () => this.openSidebar()
     });
-    this.scheduleModernSidebarPillAutoCollapse();
 
     this.buildNavigationModel();
     this.bindHomeViewportEvents();
@@ -9223,9 +8706,7 @@ export const HomeScreen = {
       !backFocusState &&
       Number.isFinite(this.pendingContinueWatchingFocusIndex)
     ) {
-      const pendingRowKey = String(
-        this.pendingContinueWatchingFocusRowKey || "continue_watching"
-      );
+      const pendingRowKey = String(this.pendingContinueWatchingFocusRowKey || "continue_watching");
       const cards = this.getNavigationRowNodes(pendingRowKey);
       const target =
         cards[
@@ -9305,9 +8786,7 @@ export const HomeScreen = {
       this.clearFocusedPosterFlowState();
     }
     this.syncFocusedCollectionCardState();
-    if (!this.layoutPrefs?.modernSidebar) {
-      this.setSidebarExpanded(false);
-    }
+    this.setSidebarExpanded(false);
     if (this.layoutMode === "grid") {
       this.setupGridStickyHeader(showHeroSection);
     }
@@ -9364,9 +8843,7 @@ export const HomeScreen = {
 
   scheduleHomeLazyImageHydration(anchorNode = null, { refreshIndex = false } = {}) {
     const anchorRow =
-      anchorNode instanceof HTMLElement
-        ? anchorNode.closest(HOME_LAZY_IMAGE_ROW_SELECTOR)
-        : null;
+      anchorNode instanceof HTMLElement ? anchorNode.closest(HOME_LAZY_IMAGE_ROW_SELECTOR) : null;
     if (
       anchorRow instanceof HTMLElement &&
       anchorRow === this.lastHomeLazyImageHydrationAnchorRow &&
@@ -10439,18 +9916,6 @@ export const HomeScreen = {
       this.consumeBackRequest();
       return;
     }
-    if (this.layoutPrefs?.modernSidebar && !this.sidebarExpanded) {
-      if (code === 40) {
-        this.pillIconOnly = true;
-        this.cancelModernSidebarPillAutoCollapse();
-        setModernSidebarPillIconOnly(this.container, true);
-      } else if (code === 38) {
-        const wasIconOnly = Boolean(this.pillIconOnly);
-        this.pillIconOnly = false;
-        setModernSidebarPillIconOnly(this.container, false);
-        this.scheduleModernSidebarPillAutoCollapse({ restart: wasIconOnly });
-      }
-    }
     if (this.layoutMode === "modern" && [37, 38, 39, 40].includes(code)) {
       this.cancelFocusedPosterFlow();
     }
@@ -10606,8 +10071,8 @@ export const HomeScreen = {
     const nextItems = items.slice(startIndex, startIndex + batchSize);
     const rowKey = "continue_watching";
     const cardOptions = {
-      useEpisodeThumbnails: this.layoutPrefs?.useEpisodeThumbnailsInCw !== false,
-      blurNextUp: resolveContinueWatchingBlurNextUp(this.layoutPrefs),
+      useEpisodeThumbnails: true,
+      blurNextUp: false,
       rowKey
     };
     const markup = nextItems
@@ -10804,7 +10269,7 @@ export const HomeScreen = {
         const rowIndex = (this.rows || []).indexOf(rowData);
         const layoutPrefs = this.layoutPrefs || {};
         const showPosterLabels = Boolean(layoutPrefs.showPosterLabels !== false);
-        const preferLandscape = Boolean(layoutPrefs.modernLandscapePostersEnabled);
+        const preferLandscape = false;
         const chunkSize = Math.max(
           1,
           Number(this.getRowItemLimit?.() || HOME_MAX_ITEMS_PER_ROW_DEFAULT)
@@ -11052,7 +10517,6 @@ export const HomeScreen = {
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
     cleanupHomeScreenPhone(this);
-    this.cancelModernSidebarPillAutoCollapse();
     this.cancelPendingContinueWatchingEnter();
     this.cancelPendingContinueWatchingHold();
     this.suppressHoldMenuEnterUntilKeyUp = false;

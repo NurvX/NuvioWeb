@@ -1474,7 +1474,6 @@ export const FolderDetailScreen = {
     this.folderRouteEnterPending = false;
     this.expandedPosterNode = null;
     this.rows = buildFolderSourceRows(this.tabs || []);
-    const modernLandscapePostersEnabled = Boolean(this.layoutPrefs?.modernLandscapePostersEnabled);
     const rowItems = this.rows.flatMap((row) => row?.result?.data?.items || []);
     this.heroCandidates = [this.heroItem, ...rowItems].filter((item) => item?.id);
     const heroItem = this.heroItem || this.heroCandidates[0] || null;
@@ -1488,8 +1487,7 @@ export const FolderDetailScreen = {
       rowItemLimit: 50,
       showHeroSection: Boolean(heroItem),
       showPosterLabels: false,
-      showCatalogTypeSuffix: this.layoutPrefs?.catalogTypeSuffixEnabled !== false,
-      preferLandscapePosters: modernLandscapePostersEnabled,
+      preferLandscapePosters: false,
       focusedRowKey: "",
       focusedItemIndex: -1,
       expandFocusedPoster: false,
@@ -1504,11 +1502,8 @@ export const FolderDetailScreen = {
     });
     this.catalogSeeAllMap = payload.catalogSeeAllMap;
     const sizingStyle = buildModernHomeSizingStyle(this.layoutPrefs);
-    const fullScreenBackdropClass = this.layoutPrefs?.modernHeroFullScreenBackdropEnabled
-      ? " home-modern-fullscreen-backdrop"
-      : "";
     this.container.innerHTML = `
-      <div class="home-shell home-screen-shell home-layout-modern${modernLandscapePostersEnabled ? " home-modern-landscape-posters" : ""}${fullScreenBackdropClass} folder-detail-home-shell" style="${escapeAttribute(sizingStyle)}">
+      <div class="home-shell home-screen-shell home-layout-modern folder-detail-home-shell" style="${escapeAttribute(sizingStyle)}">
         <main class="home-main home-screen-main">
           <div class="home-route-content${enterClass}">
             ${payload.markup}
@@ -1519,19 +1514,12 @@ export const FolderDetailScreen = {
     ScreenUtils.indexFocusables(this.container);
     HomeScreen.buildNavigationModel.call(this);
     HomeScreen.bindHomeViewportEvents.call(this);
-    if (modernLandscapePostersEnabled) {
-      HomeScreen.applyCachedModernLandscapePosterMetrics.call(
-        this,
-        this.container.querySelector(".home-screen-shell.home-modern-landscape-posters")
-      );
-    } else {
-      HomeScreen.applyCachedModernPortraitPosterMetrics.call(
-        this,
-        this.container.querySelector(
-          ".home-screen-shell.home-layout-modern:not(.home-modern-landscape-posters)"
-        )
-      );
-    }
+    HomeScreen.applyCachedModernPortraitPosterMetrics.call(
+      this,
+      this.container.querySelector(
+        ".home-screen-shell.home-layout-modern:not(.home-modern-landscape-posters)"
+      )
+    );
     this.restoreFocus();
     this.setupModernTrackScrollPagination();
     HomeScreen.applyHeroToDom.call(this);
@@ -1614,9 +1602,6 @@ export const FolderDetailScreen = {
         rowData.result.data.currentPage = Number(result.page || nextPage);
       }
       if (incoming.length && track?.isConnected) {
-        const modernLandscapePostersEnabled = Boolean(
-          this.layoutPrefs?.modernLandscapePostersEnabled
-        );
         const startIndex = existing.length;
         const newMarkup = incoming
           .map((item, index) =>
@@ -1629,7 +1614,7 @@ export const FolderDetailScreen = {
               false,
               "modern",
               false,
-              modernLandscapePostersEnabled,
+              false,
               false,
               this.watchedTitleIds
             )
