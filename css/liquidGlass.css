@@ -1,0 +1,54 @@
+/*
+ * Liquid glass chrome — WebGL glass effect (js/ui/theme/liquidGlass.js, backed
+ * by @ybouane/liquidglass) on capable browsers, CSS-only backdrop-filter
+ * fallback everywhere else (Tizen/webOS/legacy/low-end — see
+ * `performance-constrained` / `no-backdrop-filter` in js/app.js).
+ *
+ * Targets are chrome surfaces only (sidebar, dialogs, player controls,
+ * settings panel) — never repeated grid items, see liquidGlass.js.
+ */
+
+.liquid-glass-active .home-sidebar,
+.liquid-glass-active .nuvio-dialog-panel,
+.liquid-glass-active .player-controls-bar,
+.liquid-glass-active .settings-slide-panel {
+  background: transparent;
+}
+
+.liquid-glass-active .nuvio-dialog-panel {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* CSS-only fallback glass for platforms where the WebGL controller declines
+   to run (see isEligible() in js/ui/theme/liquidGlass.js). */
+.performance-constrained .home-sidebar,
+.no-backdrop-filter .home-sidebar,
+.performance-constrained .nuvio-dialog-panel,
+.no-backdrop-filter .nuvio-dialog-panel,
+.performance-constrained .player-controls-bar,
+.no-backdrop-filter .player-controls-bar,
+.performance-constrained .settings-slide-panel,
+.no-backdrop-filter .settings-slide-panel {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body:not(.performance-constrained):not(.no-backdrop-filter):not(.liquid-glass-active) .home-sidebar,
+body:not(.performance-constrained):not(.no-backdrop-filter):not(.liquid-glass-active)
+  .player-controls-bar,
+body:not(.performance-constrained):not(.no-backdrop-filter):not(.liquid-glass-active)
+  .settings-slide-panel {
+  background:
+    linear-gradient(180deg, rgb(var(--bg-elevated-rgb) / 0.72), rgb(var(--bg-elevated-rgb) / 0.72)),
+    var(--bg-elevated);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+
+body:not(.performance-constrained):not(.no-backdrop-filter):not(.liquid-glass-active)
+  .nuvio-dialog-panel {
+  background: rgb(var(--bg-elevated-rgb) / 0.78);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border-color: rgba(255, 255, 255, 0.1);
+}

@@ -43,6 +43,8 @@
  *   dialog.destroy();              // animated exit then removes from DOM
  */
 
+import { LiquidGlassController } from "../theme/liquidGlass.js";
+
 export class NuvioDialog {
   constructor({
     title,
@@ -202,6 +204,8 @@ export class NuvioDialog {
       panel.classList.add("nuvio-dialog-panel-enter");
     });
 
+    LiquidGlassController.refresh();
+
     return this;
   }
 
@@ -354,6 +358,7 @@ export class NuvioDialog {
       if (!document.querySelector(".nuvio-dialog-backdrop")) {
         document.body?.classList?.remove("nuvio-modal-open");
       }
+      LiquidGlassController.refresh();
       if (typeof afterExit === "function") afterExit();
     }, 220);
   }

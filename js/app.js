@@ -13,6 +13,7 @@ import { ProfileSyncService } from "./core/profile/profileSyncService.js";
 import { StartupSyncService } from "./core/profile/startupSyncService.js";
 import { ProviderCredentialSyncService } from "./core/profile/providerCredentialSyncService.js";
 import { ThemeManager } from "./ui/theme/themeManager.js";
+import { LiquidGlassController } from "./ui/theme/liquidGlass.js";
 import { renderAppShell } from "./bootstrap/renderAppShell.js";
 import { renderAddonRemotePage } from "./bootstrap/renderAddonRemotePage.js";
 import { preloadStreamBadgeImages } from "./ui/screens/stream/streamScreen.js";
@@ -219,9 +220,7 @@ async function enterWithLastProfile({ restoreWebOsRoute = false } = {}) {
       console.warn("Stream badge image prerender failed", error);
     });
   }
-  const experienceRoute = activeProfile
-    ? await resolveExperienceRoute(activeProfile.id)
-    : "home";
+  const experienceRoute = activeProfile ? await resolveExperienceRoute(activeProfile.id) : "home";
   const resumeRoute =
     restoreWebOsRoute && typeof Router.consumeWebOsResumeRoute === "function"
       ? Router.consumeWebOsResumeRoute()
@@ -388,8 +387,7 @@ function setupWebOsAppLifecycle() {
 }
 
 function setupProviderCredentialForegroundLifecycle() {
-  let wasBackgrounded =
-    document.visibilityState === "hidden" || document.webkitHidden === true;
+  let wasBackgrounded = document.visibilityState === "hidden" || document.webkitHidden === true;
   const requestAfterBackground = () => {
     if (!wasBackgrounded) return;
     wasBackgrounded = false;
@@ -428,6 +426,7 @@ async function bootstrapApp() {
   markBootStage("Initializing TV platform");
   Platform.init();
   applyPerformanceMode();
+  void LiquidGlassController.init();
   markBootStage("Loading language resources");
   await I18n.init();
 
@@ -457,15 +456,15 @@ async function bootstrapApp() {
       StartupSyncService.stop();
       ProviderCredentialSyncService.cancelForegroundPull();
       hasSelectedProfileThisSession = false;
-  // Guest/anonymous access has been disabled: signed-out users must sign in
-            // with the owner account via the simple email/password screen. No bypass
-            // and no QR code flow anymore.
-            LocalStore.remove(GUEST_QR_BYPASS_KEY);
-            if (isSignedOutRouteAllowed()) {
-                      return;
-            }
-            Router.navigate("authSignIn");
-        }
+      // Guest/anonymous access has been disabled: signed-out users must sign in
+      // with the owner account via the simple email/password screen. No bypass
+      // and no QR code flow anymore.
+      LocalStore.remove(GUEST_QR_BYPASS_KEY);
+      if (isSignedOutRouteAllowed()) {
+        return;
+      }
+      Router.navigate("authSignIn");
+    }
 
     if (state === AuthState.AUTHENTICATED) {
       markBootStage("Loading profiles");
