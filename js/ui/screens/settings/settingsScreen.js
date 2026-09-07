@@ -79,8 +79,6 @@ import {
   setLegacySidebarExpanded
 } from "../../components/sidebarNavigation.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
-import { getLatestAppUpdate } from "../../../core/update/appUpdateService.js";
-import { showAppUpdatePrompt } from "../../components/appUpdatePrompt.js";
 import {
   renderSettingsScreenPhone,
   mountSettingsScreenPhone,
@@ -6700,20 +6698,6 @@ export const SettingsScreen = {
     });
     this.actionMap.set("about:supporters", () => Router.navigate("supportersContributors"));
     this.actionMap.set("about:licenses", () => Router.navigate("licensesAttributions"));
-    this.actionMap.set("about:checkUpdates", async () => {
-      this.aboutUpdateStatus = t("update_checking", {}, "Checking for updates…");
-      await this.render({ refreshModel: false });
-      try {
-        const update = await getLatestAppUpdate({ currentVersion: CURRENT_APP_VERSION });
-        this.aboutUpdateStatus = update
-          ? String(update.tag || "")
-          : t("update_up_to_date", {}, "System is up to date.");
-        if (update) showAppUpdatePrompt(update);
-      } catch (_) {
-        this.aboutUpdateStatus = t("update_error_check_failed", {}, "Update check failed");
-      }
-      await this.render({ refreshModel: false });
-    });
     this.actionMap.set("about:debugConsole", () => Router.navigate("debugConsole"));
 
     return `
@@ -6726,17 +6710,6 @@ export const SettingsScreen = {
           <p class="settings-about-copy">${t("settings.about.portedBy")}</p>
         </div>
         <div class="settings-stack">
-          ${this.renderActionRow({
-            focusKey: "about:checkUpdates",
-            title: t("about_check_updates", {}, "Check for updates"),
-            subtitle:
-              this.aboutUpdateStatus ||
-              t(
-                "about_check_updates_subtitle",
-                {},
-                "Check the latest release for manual installation"
-              )
-          })}
           ${this.renderActionRow({
             focusKey: "about:privacy",
             title: t("settings.about.privacyPolicy.title"),
