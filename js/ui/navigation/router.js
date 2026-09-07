@@ -357,28 +357,55 @@ export const Router = {
       bootGuard.stage(`Opening ${routeName} screen`);
     }
 
-    // Cleanup current
     const previousRoute = this.current;
-    const shouldSkipPush = skipStackPush || NON_BACKSTACK_ROUTES.has(previousRoute);
-    if (this.current && this.current !== routeName) {
-      this.captureCurrentRouteState();
-      this.routes[this.current].cleanup?.();
-      if (!shouldSkipPush) {
-        this.stack.push({
-          route: this.current,
-          params: this.currentParams || {}
-        });
+
+    const performDomSwap = async () => {
+      // Cleanup current
+      const shouldSkipPush = skipStackPush || NON_BACKSTACK_ROUTES.has(previousRoute);
+      if (this.current && this.current !== routeName) {
+        this.captureCurrentRouteState();
+        this.routes[this.current].cleanup?.();
+        if (!shouldSkipPush) {
+          this.stack.push({
+            route: this.current,
+            params: this.currentParams || {}
+          });
+        }
+      } else if (this.current === routeName) {
+        this.captureCurrentRouteState();
+        this.routes[this.current].cleanup?.();
       }
-    } else if (this.current === routeName) {
-      this.captureCurrentRouteState();
-      this.routes[this.current].cleanup?.();
+
+      this.current = routeName;
+      this.currentParams = targetParams;
+      const navigationContext = this.resolveNavigationContext(
+        routeName,
+        this.currentParams,
+        options
+      );
+
+      await Screen.mount(this.currentParams, navigationContext);
+    };
+
+    const useViewTransition =
+      Platform.isPhoneViewport() &&
+      typeof document.startViewTransition === "function" &&
+      this.current;
+    if (useViewTransition) {
+      document.documentElement.dataset.navDirection = options?.isBackNavigation
+        ? "back"
+        : "forward";
+      try {
+        const transition = document.startViewTransition(() => performDomSwap());
+        await transition.finished;
+      } catch (_) {
+        // Transition may be skipped (e.g. rapid navigations) — DOM swap
+        // already ran inside the callback regardless.
+      }
+    } else {
+      await performDomSwap();
     }
 
-    this.current = routeName;
-    this.currentParams = targetParams;
-    const navigationContext = this.resolveNavigationContext(routeName, this.currentParams, options);
-
-    await Screen.mount(this.currentParams, navigationContext);
     LiquidGlassController.refresh();
     this.completeRouteReturnBackGuard(routeReturnBackGuardNavigationId);
     logRouterPerf("navigate", {
