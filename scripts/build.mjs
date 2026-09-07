@@ -478,6 +478,9 @@ async function buildBundle() {
     sourcemap: debugBundle,
     target: [`chrome${compatibilityPolicy.chromiumVersion}`],
     metafile: true,
+    jsx: "automatic",
+    jsxImportSource: "preact",
+    loader: { ".jsx": "jsx" },
     define: {
       "process.env.NODE_ENV": '"production"',
       __NUVIO_APP_VERSION__: JSON.stringify(version)

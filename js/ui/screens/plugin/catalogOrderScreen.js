@@ -9,7 +9,9 @@ import {
 } from "../../../core/addons/homeCatalogs.js";
 import { Platform } from "../../../platform/index.js";
 import { ExperienceModeStore } from "../../../data/local/experienceModeStore.js";
-import { renderCatalogOrderScreenPhone } from "./catalogOrderScreenPhone.js";
+import { h } from "preact";
+import { CatalogOrderScreenPhone } from "./catalogOrderScreenPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -146,19 +148,29 @@ export const CatalogOrderScreen = {
   async render() {
     this.model = await this.collectModel();
     this.rowColumns = new Map();
-    const itemsHtml = this.model.items
-      .map((item, index) => {
-        const cols = [];
-        if (item.canMoveUp) {
-          cols.push(0);
-        }
-        if (item.canMoveDown) {
-          cols.push(1);
-        }
-        cols.push(2);
-        this.setRowColumns(index, cols);
 
-        return `
+    this.model.items.forEach((item, index) => {
+      const cols = [];
+      if (item.canMoveUp) cols.push(0);
+      if (item.canMoveDown) cols.push(1);
+      cols.push(2);
+      this.setRowColumns(index, cols);
+    });
+
+    if (Platform.isPhoneViewport()) {
+      if (this._unmountPhone) this._unmountPhone();
+      this._unmountPhone = mountPreact(
+        h(CatalogOrderScreenPhone, { screen: this }),
+        this.container
+      );
+      this.normalizeFocus();
+      this.applyFocus();
+      return;
+    }
+
+    const itemsHtml = this.model.items
+      .map(
+        (item, index) => `
         <article class="catalog-order-card">
           <div class="catalog-order-card-copy">
             <h2>${escapeHtml(item.catalogName)} - ${escapeHtml(toDisplayTypeLabel(item.type))}</h2>
@@ -185,13 +197,11 @@ export const CatalogOrderScreen = {
                     tabindex="-1">${item.isDisabled ? "Enable" : "Disable"}</button>
           </div>
         </article>
-      `;
-      })
+      `
+      )
       .join("");
 
-    this.container.innerHTML = Platform.isPhoneViewport()
-      ? `<div class="catalog-order-shell">${renderCatalogOrderScreenPhone(this)}</div>`
-      : `
+    this.container.innerHTML = `
       <div class="catalog-order-shell">
         <main class="catalog-order-main">
           <h1 class="catalog-order-title">Reorder Home Catalogs</h1>
@@ -276,6 +286,10 @@ export const CatalogOrderScreen = {
   },
 
   cleanup() {
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
     ScreenUtils.hide(this.container);
   }
 };
