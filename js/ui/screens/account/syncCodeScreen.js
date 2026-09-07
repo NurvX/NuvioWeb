@@ -3,7 +3,9 @@ import { ScreenUtils } from "../../navigation/screen.js";
 import { LocalStore } from "../../../core/storage/localStore.js";
 import { I18n } from "../../../i18n/index.js";
 import { Platform } from "../../../platform/index.js";
-import { renderSyncCodeScreenPhone } from "./syncCodeScreenPhone.js";
+import { h } from "preact";
+import { SyncCodeScreenPhone } from "./syncCodeScreenPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 const KEY = "manualSyncCode";
 
@@ -30,11 +32,15 @@ export const SyncCodeScreen = {
     const value = LocalStore.get(KEY, "");
 
     // Phone render path (ticket 05-03, mobile-parity epic). All markup lives in
-    // js/ui/screens/account/syncCodeScreenPhone.js; it keeps the same `data-action` attributes
+    // js/ui/screens/account/syncCodeScreenPhone.jsx; it keeps the same `data-action` attributes
     // and `.focusable` class the TV markup uses, so `onPointerActivate` below needs no
     // phone-specific branch — it already dispatches on `data-action` alone.
     if (Platform.isPhoneViewport()) {
-      this.container.innerHTML = renderSyncCodeScreenPhone(this, value);
+      if (this._unmountPhone) this._unmountPhone();
+      this._unmountPhone = mountPreact(
+        h(SyncCodeScreenPhone, { screen: this, value }),
+        this.container
+      );
       if (this.textDialog) {
         const input = this.container.querySelector("[data-action='textInput']");
         input?.focus?.();
@@ -202,6 +208,10 @@ export const SyncCodeScreen = {
   cleanup() {
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
     ScreenUtils.hide(this.container);
   }
 };

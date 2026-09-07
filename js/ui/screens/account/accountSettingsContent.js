@@ -1,6 +1,8 @@
-﻿import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
+﻿import { h } from "preact";
+import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
 import { Platform } from "../../../platform/index.js";
-import { renderAccountSettingsContentPhone } from "./accountSettingsContentPhone.js";
+import { AccountSettingsContentPhone } from "./accountSettingsContentPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 export class AccountSettingsContent {
   constructor(container) {
@@ -10,17 +12,18 @@ export class AccountSettingsContent {
 
   render(uiState, callbacks) {
     // Phone render path (ticket 05-03, mobile-parity epic) — all markup lives in
-    // js/ui/screens/account/accountSettingsContentPhone.js; this just hands it the same
+    // js/ui/screens/account/accountSettingsContentPhone.jsx; this just hands it the same
     // `uiState` and reuses `attachFocus(callbacks)` verbatim, so every tap still dispatches
     // through the exact same `callbacks[action]()` call TV rows already use.
     if (Platform.isPhoneViewport()) {
-      this.container.innerHTML = `
-        <section class="phone-settings-card">
-          <div class="phone-settings-card-body">${renderAccountSettingsContentPhone(uiState)}</div>
-        </section>
-      `;
+      if (this._unmountPhone) this._unmountPhone();
+      this._unmountPhone = mountPreact(h(AccountSettingsContentPhone, { uiState }), this.container);
       this.attachFocus(callbacks);
       return;
+    }
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
     }
 
     const { authState, syncOverview, isSyncOverviewLoading } = uiState;
@@ -204,5 +207,12 @@ export class AccountSettingsContent {
     current?.classList.remove("focused");
 
     items[newIndex].classList.add("focused");
+  }
+
+  cleanup() {
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
   }
 }

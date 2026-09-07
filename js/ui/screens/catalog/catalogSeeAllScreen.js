@@ -17,12 +17,14 @@ import {
   renderTitleWatchedBadge
 } from "../../components/watchedTitleBadge.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
+import { h } from "preact";
+import { mountPreact } from "../../phone/mountPreact.js";
 import {
-  renderCatalogSeeAllScreenPhone,
+  CatalogSeeAllScreenPhone,
   mountCatalogSeeAllScreenPhone,
   cleanupCatalogSeeAllScreenPhone,
   handleCatalogSeeAllPhonePointerActivate
-} from "./catalogSeeAllScreenPhone.js";
+} from "./catalogSeeAllScreenPhone.jsx";
 
 const POSTER_HOLD_DELAY_MS = 650;
 
@@ -697,7 +699,10 @@ export const CatalogSeeAllScreen = {
     if (!this.container) {
       return;
     }
-    this.container.innerHTML = renderCatalogSeeAllScreenPhone(this);
+    if (this._unmountPhone) {
+      this._unmountPhone();
+    }
+    this._unmountPhone = mountPreact(h(CatalogSeeAllScreenPhone, { screen: this }), this.container);
     mountCatalogSeeAllScreenPhone(this, this.container);
   },
 
@@ -806,6 +811,10 @@ export const CatalogSeeAllScreen = {
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
     cleanupCatalogSeeAllScreenPhone(this);
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
     this.loadToken = (this.loadToken || 0) + 1;
     this.cancelPendingPosterHold();
     this.posterOptionsController?.destroy?.({ restoreFocus: false });

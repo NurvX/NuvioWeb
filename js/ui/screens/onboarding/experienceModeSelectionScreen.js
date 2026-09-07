@@ -7,7 +7,9 @@ import { I18n } from "../../../i18n/index.js";
 import { Platform } from "../../../platform/index.js";
 import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
-import { renderExperienceModeSelectionScreenPhone } from "./experienceModeSelectionScreenPhone.js";
+import { h } from "preact";
+import { ExperienceModeSelectionScreenPhone } from "./experienceModeSelectionScreenPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 function t(key, fallback) {
   return I18n.t(key, {}, { fallback });
@@ -48,8 +50,16 @@ export const ExperienceModeSelectionScreen = {
 
   render() {
     if (Platform.isPhoneViewport()) {
-      this.container.innerHTML = renderExperienceModeSelectionScreenPhone(this);
+      if (this._unmountPhone) this._unmountPhone();
+      this._unmountPhone = mountPreact(
+        h(ExperienceModeSelectionScreenPhone, { screen: this }),
+        this.container
+      );
       return;
+    }
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
     }
     const isLayout = this.step === "layout";
     this.container.innerHTML = `
@@ -135,6 +145,10 @@ export const ExperienceModeSelectionScreen = {
   },
 
   cleanup() {
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
     document.removeEventListener("keydown", this.onKeyDownBound);

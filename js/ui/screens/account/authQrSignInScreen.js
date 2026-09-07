@@ -5,7 +5,9 @@ import { ScreenUtils } from "../../navigation/screen.js";
 import { AuthManager } from "../../../core/auth/authManager.js";
 import { I18n } from "../../../i18n/index.js";
 import { Platform } from "../../../platform/index.js";
-import { renderAuthQrSignInScreenPhone } from "./authQrSignInScreenPhone.js";
+import { h } from "preact";
+import { AuthQrSignInScreenPhone } from "./authQrSignInScreenPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 let pollInterval = null;
 let countdownInterval = null;
@@ -53,7 +55,11 @@ export const AuthQrSignInScreen = {
     }
 
     if (Platform.isPhoneViewport()) {
-      this.container.innerHTML = renderAuthQrSignInScreenPhone(this);
+      if (this._unmountPhone) this._unmountPhone();
+      this._unmountPhone = mountPreact(
+        h(AuthQrSignInScreenPhone, { screen: this }),
+        this.container
+      );
     } else {
       this.container.innerHTML = `
       <div class="qr-layout">
@@ -392,6 +398,10 @@ export const AuthQrSignInScreen = {
     this.stopIntervals();
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
     if (this.refreshButton) {
       this.refreshButton.onclick = null;
       this.refreshButton = null;

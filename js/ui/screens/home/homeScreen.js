@@ -119,12 +119,14 @@ import {
   uniqueNonEmptyValues
 } from "./homeUtils.js";
 
+import { h } from "preact";
+import { mountPreact } from "../../phone/mountPreact.js";
 import {
-  renderHomeScreenPhone,
+  HomeScreenPhone,
   mountHomeScreenPhone,
   cleanupHomeScreenPhone,
   handlePhoneHomePointerActivate
-} from "./homeScreenPhone.js";
+} from "./homeScreenPhone.jsx";
 
 export { escapeAttribute, escapeHtml, formatCatalogRowTitle } from "./homeUtils.js";
 
@@ -798,7 +800,7 @@ function buildCollectionHomeRow(collection = {}) {
   };
 }
 
-// Exported for js/ui/screens/home/homeScreenPhone.js (ticket 01-01): the phone render path
+// Exported for js/ui/screens/home/homeScreenPhone.jsx (ticket 01-01): the phone render path
 // needs the same row-item normalization TV rows already use (hero candidates, catalog/
 // collection shelves) rather than reimplementing it.
 export function normalizeHomeRowItem(row = null, item = null) {
@@ -8817,7 +8819,7 @@ export const HomeScreen = {
   },
 
   // Phone render path (ticket 01-01, mobile-parity epic) — all markup/interaction logic lives
-  // in js/ui/screens/home/homeScreenPhone.js; this just hands it the screen instance so it can
+  // in js/ui/screens/home/homeScreenPhone.jsx; this just hands it the screen instance so it can
   // read this.rows/this.heroCandidates/this.continueWatchingDisplay/this.sidebarProfile
   // (already populated by mount()'s existing data flow) and call this screen's own mutation
   // methods (togglePosterLibrary/togglePosterWatched/openPosterListPicker/
@@ -8826,7 +8828,10 @@ export const HomeScreen = {
     if (!this.container) {
       return;
     }
-    this.container.innerHTML = renderHomeScreenPhone(this);
+    if (this._unmountPhone) {
+      this._unmountPhone();
+    }
+    this._unmountPhone = mountPreact(h(HomeScreenPhone, { screen: this }), this.container);
     mountHomeScreenPhone(this, this.container);
   },
 
@@ -10517,6 +10522,10 @@ export const HomeScreen = {
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
     cleanupHomeScreenPhone(this);
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
     this.cancelPendingContinueWatchingEnter();
     this.cancelPendingContinueWatchingHold();
     this.suppressHoldMenuEnterUntilKeyUp = false;

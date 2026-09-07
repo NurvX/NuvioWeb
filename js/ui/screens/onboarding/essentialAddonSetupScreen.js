@@ -5,7 +5,9 @@ import { I18n } from "../../../i18n/index.js";
 import { Platform } from "../../../platform/index.js";
 import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
-import { renderEssentialAddonSetupScreenPhone } from "./essentialAddonSetupScreenPhone.js";
+import { h } from "preact";
+import { EssentialAddonSetupScreenPhone } from "./essentialAddonSetupScreenPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 function t(key, fallback) {
   return I18n.t(key, {}, { fallback });
@@ -34,9 +36,16 @@ function renderTvMarkup() {
 
 export const EssentialAddonSetupScreen = {
   render() {
-    this.container.innerHTML = Platform.isPhoneViewport()
-      ? renderEssentialAddonSetupScreenPhone()
-      : renderTvMarkup();
+    if (Platform.isPhoneViewport()) {
+      if (this._unmountPhone) this._unmountPhone();
+      this._unmountPhone = mountPreact(h(EssentialAddonSetupScreenPhone, {}), this.container);
+    } else {
+      if (this._unmountPhone) {
+        this._unmountPhone();
+        this._unmountPhone = null;
+      }
+      this.container.innerHTML = renderTvMarkup();
+    }
     ScreenUtils.setInitialFocus(this.container);
   },
 
@@ -86,6 +95,10 @@ export const EssentialAddonSetupScreen = {
   },
 
   cleanup() {
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
     document.removeEventListener("keydown", this.onKeyDownBound);

@@ -31,6 +31,17 @@ import {
 // `screen.sidebarProfile`/`screen.catalogSeeAllMap` are populated by the screen's existing
 // `mount()` data-fetching flow, independent of layoutMode — this module only reads them, it
 // does not fetch anything itself.
+//
+// Preact conversion note: the hero pager (drag/swipe via gestureEngine.attachPager),
+// per-shelf long-press-to-zoom (bindPhoneShelfEvents) and the floating nav bar's scroll-driven
+// collapse/blur (bindPhoneNavBarEvents) are all imperative DOM behaviors with no Preact
+// equivalent worth reimplementing here — they're untouched, called from `mountHomeScreenPhone`
+// exactly as before. `HomeScreenPhone` below only replaces the old `renderHomeScreenPhone`
+// string-template step: it renders the exact same markup (produced by the same
+// `renderHeroPager`/`renderCatalogShelves`/`renderPhoneShelf`/`renderPhoneNavBar` string
+// builders) via `dangerouslySetInnerHTML`, so every class/data-* attribute those imperative
+// binders and `css/phone.css` depend on is unchanged, and `mountHomeScreenPhone` can keep
+// wiring events with plain `querySelector` after Preact mounts.
 
 const HERO_AUTO_ADVANCE_MS = 8000;
 const CONTINUE_WATCHING_REMOVE_MS = 350;
@@ -431,10 +442,14 @@ function openZoomForItem(screen, cardElement, item, { isContinueWatching = false
 // Public entry points
 // ---------------------------------------------------------------------------------------
 
-/** Returns the full phone home screen markup. Reads `screen.heroCandidates`,
+/** Preact component for the phone home screen. Reads `screen.heroCandidates`,
  * `screen.continueWatchingDisplay`, `screen.rows` and `screen.sidebarProfile` directly — all
- * populated by `homeScreen.js`'s existing `mount()` data flow, unrelated to layoutMode. */
-export function renderHomeScreenPhone(screen) {
+ * populated by `homeScreen.js`'s existing `mount()` data flow, unrelated to layoutMode. Renders
+ * via `dangerouslySetInnerHTML` from the same string builders the old vanilla render used, so
+ * every class/data-* attribute `mountHomeScreenPhone`'s imperative binders (and css/phone.css)
+ * depend on is byte-for-byte unchanged; `mountHomeScreenPhone(screen, container)` must still be
+ * called after this mounts to wire interactivity. */
+export function HomeScreenPhone({ screen }) {
   const heroItems = Array.isArray(screen.heroCandidates) ? screen.heroCandidates : [];
   const continueWatchingItems = Array.isArray(screen.continueWatchingDisplay)
     ? screen.continueWatchingDisplay
@@ -450,22 +465,34 @@ export function renderHomeScreenPhone(screen) {
       })
     : "";
 
-  return `
-    <div class="phone-home-scroll" data-phone-home-scroll>
-      ${renderHeroPager(heroItems)}
-      <div class="phone-home-shelves">
-        ${continueWatchingMarkup}
-        ${renderCatalogShelves(catalogRows)}
-      </div>
+  const scrollInnerHtml = `
+    ${renderHeroPager(heroItems)}
+    <div class="phone-home-shelves">
+      ${continueWatchingMarkup}
+      ${renderCatalogShelves(catalogRows)}
     </div>
-    ${renderPhoneNavBar({ selectedRoute: "home", profileState: screen.sidebarProfile })}
   `;
+  const navBarHtml = renderPhoneNavBar({
+    selectedRoute: "home",
+    profileState: screen.sidebarProfile
+  });
+
+  return (
+    <>
+      <div
+        class="phone-home-scroll"
+        data-phone-home-scroll
+        dangerouslySetInnerHTML={{ __html: scrollInnerHtml }}
+      />
+      <div dangerouslySetInnerHTML={{ __html: navBarHtml }} />
+    </>
+  );
 }
 
-/** Wires the phone home screen's interactivity after `renderHomeScreenPhone`'s markup has
- * been inserted into `container`. Returns a teardown function; also stores it on
- * `screen._phoneHomeTeardown` so `cleanupHomeScreenPhone(screen)` can call it without the
- * caller needing to keep the reference itself. */
+/** Wires the phone home screen's interactivity after `HomeScreenPhone` has mounted its markup
+ * into `container`. Returns a teardown function; also stores it on `screen._phoneHomeTeardown`
+ * so `cleanupHomeScreenPhone(screen)` can call it without the caller needing to keep the
+ * reference itself. */
 export function mountHomeScreenPhone(screen, container) {
   cleanupHomeScreenPhone(screen);
 

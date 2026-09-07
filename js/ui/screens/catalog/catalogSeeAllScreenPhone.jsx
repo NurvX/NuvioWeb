@@ -19,23 +19,31 @@ import {
 } from "../../components/posterOptionsMenu.js";
 
 // Phone render path for js/ui/screens/catalog/catalogSeeAllScreen.js (ticket 03-03, see
-// .scratch/mobile-parity/spec.md). This module owns everything about the phone layout's
+// .scratch/mobile-parity/spec.md), converted to a Preact component as part of the incremental
+// phone-screen JSX migration (see js/ui/screens/plugin/catalogOrderScreenPhone.jsx for the
+// reference conversion). This module still owns everything about the phone layout's
 // markup/interaction; catalogSeeAllScreen.js's own `render()` only has a guard clause that
-// dispatches here when `Platform.isPhoneViewport()` is true, and its `mount()`/`cleanup()` add
-// a `Platform.watchPhoneViewport()` subscription so a live resize across the breakpoint
-// re-renders.
+// dispatches here (via `mountPreact`) when `Platform.isPhoneViewport()` is true, and its
+// `mount()`/`cleanup()` add a `Platform.watchPhoneViewport()` subscription so a live resize
+// across the breakpoint re-renders.
 //
 // Pagination reuses `screen.loadNextPage(...)` — the TV screen's own existing async method —
 // completely unchanged: our own scroll-near-bottom listener just calls
 // `screen.loadNextPage({ preserveViewport: true })`, exactly the same call TV's own D-pad/scroll
 // auto-load paths already make. That method itself calls `screen.render()` at a couple of points
 // (to show a loading state, then again once new items land) which, in phone mode, re-dispatches
-// back into this module's own `renderCatalogSeeAllScreenPhone`/`mountCatalogSeeAllScreenPhone` —
-// a full markup rebuild, same as every other phone module. Because that rebuild can be triggered
-// mid-scroll (by `loadNextPage` itself, not by anything this module calls directly), this module
-// persists the scroll container's `scrollTop` on `screen._phoneCatalogSeeAllScrollTop` on every
-// scroll event and re-applies it immediately after every mount, so an infinite-scroll page load
-// never visibly resets the user's scroll position.
+// back into this module's own `mountCatalogSeeAllScreenPhone` — a full Preact re-render, same as
+// every other phone module. Because that rebuild can be triggered mid-scroll (by `loadNextPage`
+// itself, not by anything this module calls directly), this module persists the scroll
+// container's `scrollTop` on `screen._phoneCatalogSeeAllScrollTop` on every scroll event and
+// re-applies it immediately after every mount, so an infinite-scroll page load never visibly
+// resets the user's scroll position.
+//
+// Tap dispatch for the poster grid / back button stays on the existing app-wide delegated
+// `data-action`/`data-id` contract (`FocusEngine` calls `currentScreen.onPointerActivate(target)`
+// on every click; see `handleCatalogSeeAllPhonePointerActivate` below) rather than Preact
+// `onClick` handlers, since that delegated click handling is attached once, globally, outside of
+// this component's lifecycle.
 //
 // The floating header sits outside the scroll container (`position: absolute` within the
 // screen's own `position: relative` root, not `position: fixed` against the viewport — see
@@ -52,21 +60,19 @@ import {
 // `bottomSheet.js` checklist) instead of `NuvioDialog`, the same substitution
 // `libraryScreenPhone.js` makes for its own poster long-press menu. `extractReleaseYear` is the
 // one pure helper this module needs from the TV screen file, so it was exported there rather
-// than duplicated here (see this ticket's diff to catalogSeeAllScreen.js).
+// than duplicated here.
+//
+// `renderPosterCard`/`renderSkeletonPosterCard`/`renderLoadingIndicator` are shared markup
+// helpers used by several other (non-Preact) phone screens too, so they still return HTML
+// strings rather than JSX — this component injects that markup via `dangerouslySetInnerHTML`,
+// preserving the exact DOM those helpers already produce instead of duplicating/reimplementing
+// them as JSX.
 
 const SCROLL_LOAD_THRESHOLD_PX = 640;
 const DISCOVER_INITIAL_SKELETON_COUNT = 9;
 
 function t(key, params = {}, fallback = key) {
   return I18n.t(key, params, { fallback });
-}
-
-function escapeHtml(value = "") {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function backIconMarkup() {
@@ -236,90 +242,93 @@ async function openCatalogItemZoomMenu(screen, cardElement, item) {
 }
 
 // ---------------------------------------------------------------------------------------
-// Markup
+// Markup (JSX)
 // ---------------------------------------------------------------------------------------
 
-function renderHeader(descriptor, title, subtitle) {
-  return `
+function Header({ descriptor, title, subtitle }) {
+  return (
     <header class="phone-catalog-seeall-header" data-phone-catalog-seeall-header>
       <button
         type="button"
         class="phone-catalog-seeall-back focusable"
         data-action="phoneCatalogSeeAllBack"
-        aria-label="${escapeHtml(t("common.back", {}, "Back"))}"
+        aria-label={t("common.back", {}, "Back")}
       >
-        ${backIconMarkup()}
+        <span dangerouslySetInnerHTML={{ __html: backIconMarkup() }} />
       </button>
       <div class="phone-catalog-seeall-header-text">
-        <h1 class="phone-catalog-seeall-title">${escapeHtml(title)}</h1>
-        ${subtitle ? `<div class="phone-catalog-seeall-subtitle">${escapeHtml(subtitle)}</div>` : ""}
+        <h1 class="phone-catalog-seeall-title">{title}</h1>
+        {subtitle ? <div class="phone-catalog-seeall-subtitle">{subtitle}</div> : null}
       </div>
     </header>
-  `;
+  );
 }
 
-function renderSkeletonGrid() {
-  const cards = Array.from({ length: DISCOVER_INITIAL_SKELETON_COUNT })
+function SkeletonGrid() {
+  const cardsHtml = Array.from({ length: DISCOVER_INITIAL_SKELETON_COUNT })
     .map(() => renderSkeletonPosterCard({ aspect: "portrait" }))
     .join("");
-  return `<div class="phone-catalog-seeall-grid">${cards}</div>`;
+  return <div class="phone-catalog-seeall-grid" dangerouslySetInnerHTML={{ __html: cardsHtml }} />;
 }
 
-function renderEmptyState() {
-  return `
+function EmptyState() {
+  return (
     <div class="phone-catalog-seeall-empty-state">
-      <h3 class="phone-catalog-seeall-empty-title">${escapeHtml(t("catalog_see_all_empty_title", {}, "No items available"))}</h3>
+      <h3 class="phone-catalog-seeall-empty-title">
+        {t("catalog_see_all_empty_title", {}, "No items available")}
+      </h3>
     </div>
-  `;
+  );
 }
 
-function renderBody(screen) {
+function Body({ screen }) {
   const items = Array.isArray(screen.items) ? screen.items : [];
   if (!items.length && screen.loading) {
-    return renderSkeletonGrid();
+    return <SkeletonGrid />;
   }
   if (!items.length) {
-    return renderEmptyState();
+    return <EmptyState />;
   }
   itemsById(screen);
-  return `
-    <div class="phone-catalog-seeall-grid" data-phone-catalog-seeall-grid>
-      ${items.map((item) => renderPosterCard(toPosterItem(screen, item))).join("")}
-    </div>
-    ${
-      screen.loading
-        ? `
-      <div class="phone-catalog-seeall-loading-footer">
-        ${renderLoadingIndicator()}
-        <span>${escapeHtml(t("discover_loading", {}, "Loading..."))}</span>
-      </div>
-    `
-        : ""
-    }
-  `;
+  const gridHtml = items.map((item) => renderPosterCard(toPosterItem(screen, item))).join("");
+  return (
+    <>
+      <div
+        class="phone-catalog-seeall-grid"
+        data-phone-catalog-seeall-grid
+        dangerouslySetInnerHTML={{ __html: gridHtml }}
+      />
+      {screen.loading ? (
+        <div class="phone-catalog-seeall-loading-footer">
+          <span dangerouslySetInnerHTML={{ __html: renderLoadingIndicator() }} />
+          <span>{t("discover_loading", {}, "Loading...")}</span>
+        </div>
+      ) : null}
+    </>
+  );
 }
 
-/** Returns the full phone catalog "see all" screen markup. Reads `screen.params`/`screen.items`/
+/** The full phone catalog "see all" screen component. Reads `screen.params`/`screen.items`/
  * `screen.loading`/`screen.hasMore`/`screen.layoutPrefs`/`screen.watchedTitleIds` directly — all
  * populated by `catalogSeeAllScreen.js`'s existing `mount()`/`loadNextPage()` data flow, unrelated
  * to the TV-only `.seeall-*` DOM this module never touches. */
-export function renderCatalogSeeAllScreenPhone(screen) {
+export function CatalogSeeAllScreenPhone({ screen }) {
   const descriptor = screen.params || {};
   const title = descriptor.catalogName || "Catalog";
   const subtitle =
     screen.layoutPrefs?.catalogAddonNameEnabled !== false && descriptor.addonName
       ? t("catalog_see_all_from", [descriptor.addonName], `from ${descriptor.addonName}`)
       : "";
-  return `
+  return (
     <div class="phone-catalog-seeall-root" data-phone-catalog-seeall-root>
-      ${renderHeader(descriptor, title, subtitle)}
+      <Header descriptor={descriptor} title={title} subtitle={subtitle} />
       <div class="phone-catalog-seeall-scroll" data-phone-catalog-seeall-scroll>
         <div class="phone-catalog-seeall-grid-wrap" data-phone-catalog-seeall-grid-wrap>
-          ${renderBody(screen)}
+          <Body screen={screen} />
         </div>
       </div>
     </div>
-  `;
+  );
 }
 
 // ---------------------------------------------------------------------------------------
@@ -346,7 +355,7 @@ export function handleCatalogSeeAllPhonePointerActivate(screen, target) {
 }
 
 // ---------------------------------------------------------------------------------------
-// Mount / measure / scroll-preserve / cleanup
+// Post-mount measure / scroll-preserve / long-press wiring / cleanup
 // ---------------------------------------------------------------------------------------
 
 function applyHeaderPadding(container) {
@@ -369,8 +378,9 @@ function bindGridLongPress(screen, container) {
   });
 }
 
-/** Wires the phone catalog "see all" screen's interactivity after
- * `renderCatalogSeeAllScreenPhone`'s markup has been inserted into `container`. Returns a
+/** Wires the phone catalog "see all" screen's imperative post-mount interactivity (header
+ * padding measurement, scroll-position persistence + infinite-scroll pagination, poster
+ * long-press) after Preact has rendered `CatalogSeeAllScreenPhone` into `container`. Returns a
  * teardown function; also stores it on `screen._phoneCatalogSeeAllTeardown` so
  * `cleanupCatalogSeeAllScreenPhone(screen)` can call it without the caller needing to keep the
  * reference itself. */

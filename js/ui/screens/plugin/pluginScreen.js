@@ -7,7 +7,9 @@ import { Platform } from "../../../platform/index.js";
 import { QrCodeGenerator } from "../../../core/qr/qrCodeGenerator.js";
 import { ExperienceModeStore } from "../../../data/local/experienceModeStore.js";
 import { I18n } from "../../../i18n/index.js";
-import { renderPluginScreenPhone } from "./pluginScreenPhone.js";
+import { h } from "preact";
+import { PluginScreenPhone } from "./pluginScreenPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 function t(key, fallback) {
   return I18n.t(key, {}, { fallback });
@@ -229,15 +231,30 @@ export const PluginScreen = {
     });
 
     const enterClass = this.pluginRouteEnterPending ? " nuvio-route-slide-enter" : "";
-    this.container.innerHTML = Platform.isPhoneViewport()
-      ? `
-      <div class="addons-shell addons-route-shell">
-        <div class="addons-route-content${enterClass}">
-          ${renderPluginScreenPhone(this)}
+    const isPhone = Platform.isPhoneViewport();
+
+    if (isPhone) {
+      this.container.innerHTML = `
+        <div class="addons-shell addons-route-shell">
+          <div class="addons-route-content${enterClass}" data-phone-mount-root></div>
         </div>
-      </div>
-    `
-      : `
+      `;
+      const mountRoot = this.container.querySelector("[data-phone-mount-root]");
+      if (this._unmountPhone) this._unmountPhone();
+      this._unmountPhone = mountPreact(h(PluginScreenPhone, { screen: this }), mountRoot);
+      this.pluginRouteEnterPending = false;
+      this.normalizeFocus();
+      this.applyFocus();
+      this.renderQrCode();
+      return;
+    }
+
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
+
+    this.container.innerHTML = `
       <div class="addons-shell addons-route-shell">
         <div class="addons-route-content${enterClass}">
           <main class="home-main addons-main addons-main-centered">
@@ -480,6 +497,10 @@ export const PluginScreen = {
     if (this.initialRefreshTimer) {
       clearTimeout(this.initialRefreshTimer);
       this.initialRefreshTimer = null;
+    }
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
     }
     ScreenUtils.hide(this.container);
   }

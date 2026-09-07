@@ -55,12 +55,9 @@ import {
 } from "../../../core/streams/streamBadgeRules.js";
 import { normalizeMathematicalAlphanumericSymbols } from "../../../core/streams/streamDisplayText.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
-import {
-  renderStreamScreenPhone,
-  mountStreamScreenPhone,
-  cleanupStreamScreenPhone,
-  handlePhoneStreamPointerActivate
-} from "./streamScreenPhone.js";
+import { h } from "preact";
+import { StreamScreenPhone } from "./streamScreenPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 const STREAM_BADGE_LIMIT = 9;
 // Number of rows on each side of the focused source to keep badge-hydrated.
@@ -413,7 +410,7 @@ function mergeStreamItems(existing = [], incoming = []) {
   return order.map((key) => byKey.get(key));
 }
 
-// Exported for js/ui/screens/stream/streamScreenPhone.js (ticket 04-01): the phone streams
+// Exported for js/ui/screens/stream/streamScreenPhone.jsx (ticket 04-01): the phone streams
 // screen's addon avatar (group header + per-row trailing column) reuses the exact same
 // initials-fallback logic TV's addon logo chip already uses, rather than reimplementing it.
 export function getAddonBadgeLabel(name = "") {
@@ -476,7 +473,7 @@ async function preloadMatchedStreamBadgeImages(
   await preloadAddonLogoUrls(urls);
 }
 
-// Exported for js/ui/screens/stream/streamScreenPhone.js (ticket 04-01) — the phone streams
+// Exported for js/ui/screens/stream/streamScreenPhone.jsx (ticket 04-01) — the phone streams
 // screen's row markup reuses this exact headline/quality/description text derivation rather
 // than reimplementing it.
 export function getStreamHeadline(stream = {}) {
@@ -1968,7 +1965,7 @@ export const StreamScreen = {
   },
 
   // Extracted verbatim from tryOpenInExternalPlayer's body (mobile-parity ticket 04-01) so the
-  // phone streams screen's long-press action menu (streamScreenPhone.js) can resolve a
+  // phone streams screen's long-press action menu (streamScreenPhone.jsx) can resolve a
   // direct/copyable/downloadable URL for Copy Link / Download without duplicating the
   // header-check -> stream.url/externalUrl -> DirectDebridResolver fallback chain. No logic
   // changed from the original inline body other than returning `null` instead of the caller
@@ -2208,7 +2205,7 @@ export const StreamScreen = {
   },
 
   // Phone render path (ticket 04-01, mobile-parity epic) — all markup/interaction logic lives
-  // in js/ui/screens/stream/streamScreenPhone.js; this just hands it the screen instance so it
+  // in js/ui/screens/stream/streamScreenPhone.jsx; this just hands it the screen instance so it
   // can read this.streams/this.sourceChips/this.addonFilter/this.params/this.loading/this.error
   // (already populated by mount()'s/loadStreams()'s existing data flow) and call this screen's
   // own methods (playStream/playStreamInternal/tryOpenInExternalPlayer/setAddonFilter/
@@ -2218,8 +2215,10 @@ export const StreamScreen = {
     if (!this.container) {
       return;
     }
-    this.container.innerHTML = renderStreamScreenPhone(this);
-    mountStreamScreenPhone(this, this.container);
+    if (this._unmountPhone) {
+      this._unmountPhone();
+    }
+    this._unmountPhone = mountPreact(h(StreamScreenPhone, { screen: this }), this.container);
   },
 
   renderChip(name, selected, status) {
@@ -2636,7 +2635,7 @@ export const StreamScreen = {
   },
 
   // Extracted verbatim from playStream's body (mobile-parity ticket 04-01) so the phone
-  // streams screen's long-press action menu (streamScreenPhone.js) can offer an explicit
+  // streams screen's long-press action menu (streamScreenPhone.jsx) can offer an explicit
   // "Open in internal player" action that navigates straight to the in-app player for an
   // already-resolved stream, bypassing the external-player handoff `tryOpenInExternalPlayer`
   // performs for the normal tap flow. No logic changed from the original inline body; `selected`
@@ -2758,7 +2757,10 @@ export const StreamScreen = {
 
   onPointerActivate(target) {
     if (Platform.isPhoneViewport()) {
-      return handlePhoneStreamPointerActivate(this, target);
+      // The phone markup (js/ui/screens/stream/streamScreenPhone.jsx) is a Preact component
+      // wired with its own onClick handlers, so FocusEngine's shared click-delegation contract
+      // is a no-op here — unlike the TV dispatch below.
+      return false;
     }
     if (!target || !this.container?.contains(target)) {
       return false;
@@ -2943,7 +2945,10 @@ export const StreamScreen = {
   cleanup() {
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
-    cleanupStreamScreenPhone(this);
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
     this.cancelAutoPlayCountdown();
     this.cancelAutoPlaySelectionWait();
     this.loadToken = (this.loadToken || 0) + 1;

@@ -3,7 +3,9 @@ import { ScreenUtils } from "../../navigation/screen.js";
 import { AuthManager } from "../../../core/auth/authManager.js";
 import { I18n } from "../../../i18n/index.js";
 import { Platform } from "../../../platform/index.js";
-import { renderAuthSignInScreenPhone } from "./authSignInScreenPhone.js";
+import { h } from "preact";
+import { AuthSignInScreenPhone } from "./authSignInScreenPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -32,16 +34,22 @@ export const AuthSignInScreen = {
 
   render() {
     // Phone render path (ticket 05-03, mobile-parity epic). All markup lives in
-    // js/ui/screens/account/authSignInScreenPhone.js; it keeps the same `data-action`
+    // js/ui/screens/account/authSignInScreenPhone.jsx; it keeps the same `data-action`
     // attributes the TV markup uses, so this screen's own container-level click listener
     // (bound once in `mount()`) keeps dispatching every tap unmodified.
     if (Platform.isPhoneViewport()) {
-      this.container.innerHTML = renderAuthSignInScreenPhone(this);
+      if (this._unmountPhone) this._unmountPhone();
+      this._unmountPhone = mountPreact(h(AuthSignInScreenPhone, { screen: this }), this.container);
       if (this.textDialog) {
         const input = this.container.querySelector("[data-action='textInput']");
         input?.focus?.();
       }
       return;
+    }
+
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
     }
 
     this.container.innerHTML = `
@@ -242,6 +250,10 @@ export const AuthSignInScreen = {
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
     this.container?.removeEventListener("click", this.onClickBound);
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
     ScreenUtils.hide(this.container);
   }
 };

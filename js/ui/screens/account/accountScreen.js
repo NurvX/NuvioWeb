@@ -3,7 +3,9 @@ import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { I18n } from "../../../i18n/index.js";
 import { Platform } from "../../../platform/index.js";
-import { renderAccountScreenPhone } from "./accountScreenPhone.js";
+import { h } from "preact";
+import { AccountScreenPhone } from "./accountScreenPhone.jsx";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 export const AccountScreen = {
   async mount() {
@@ -37,6 +39,11 @@ export const AccountScreen = {
     this.phoneViewportUnsubscribe?.();
     this.phoneViewportUnsubscribe = null;
 
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
+
     if (this.container) {
       this.container.style.display = "none";
       this.container.innerHTML = "";
@@ -54,10 +61,15 @@ export const AccountScreen = {
     }
 
     // Phone render path (ticket 05-03, mobile-parity epic) — all markup lives in
-    // js/ui/screens/account/accountScreenPhone.js; this just hands it the screen instance so
+    // js/ui/screens/account/accountScreenPhone.jsx; this just hands it the screen instance so
     // it can read this.state directly, same as the TV branches below.
     if (Platform.isPhoneViewport()) {
       return this.renderPhone();
+    }
+
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
     }
 
     if (this.state.authState === "loading") {
@@ -98,7 +110,8 @@ export const AccountScreen = {
   // (re)index focusables the same way TV does — `onPointerActivate` below is already generic
   // over any markup carrying `data-action`, so it needs no phone-specific branch.
   renderPhone() {
-    this.container.innerHTML = renderAccountScreenPhone(this);
+    if (this._unmountPhone) this._unmountPhone();
+    this._unmountPhone = mountPreact(h(AccountScreenPhone, { screen: this }), this.container);
     this.attachFocus();
   },
 
