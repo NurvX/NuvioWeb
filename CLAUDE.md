@@ -2,6 +2,20 @@
 
 Guidance for Claude Code working in this repository.
 
+## Workflow
+
+For every user input, follow this sequence:
+
+1. **`/wayfinder`** — orient on the request, understand what's being asked and where it fits
+2. **`/to-spec`** — turn the understanding into a spec and create/update a GitHub project
+3. **`/to-tickets`** — break the spec into GitHub Issues with clear acceptance criteria
+4. **`/implement`** — execute the work, referencing the issues created above
+
+Always start with `/wayfinder`. Skip steps that don't apply (e.g., a quick bug fix may not need
+a full spec or new project, but still start with `/wayfinder` to orient).
+
+For **bug fixes**, use `/diagnosing-bugs` after `/wayfinder` instead of the spec/tickets flow.
+
 ## Project overview
 
 Nuvio Web is a mobile-first web app — a browser-delivered companion to
@@ -188,9 +202,13 @@ with JSX-aware rules.
 
 ### Issue tracking
 
-Issues and specs are tracked in GitHub Issues on this repository. The local `.scratch/`
-directory contains historical specs from earlier efforts — these are being migrated to GitHub
-Issues and will be removed.
+Issues and specs are tracked in **GitHub Issues** on this repository. The migration is tracked
+in the [Mobile Migration](https://github.com/users/NurvX/projects/2) GitHub Project.
+
+Before starting work, check open issues (`gh issue list`) and the project board for context on
+what's planned, in progress, or blocked. When picking up a task, reference the relevant issue
+number. When completing work that closes an issue, note it in the commit message
+(`Closes #<number>`).
 
 ### Domain docs
 
