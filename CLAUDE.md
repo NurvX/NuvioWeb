@@ -56,6 +56,19 @@ access in app code.
 There is no CI job that runs lint/tests/build; the only check is `pr-template-check.yml`
 (validates PR descriptions against CONTRIBUTING.md's required sections).
 
+### Deployment
+
+Vercel auto-deploys every push to `main` via the `vercel[bot]` GitHub integration on the
+**NurvX/NuvioWeb** repo. Two Vercel projects are linked:
+
+- **`nuvioweb`** — Production
+- **`nuvioweb-web`** — Production
+
+Each commit to `main` triggers two parallel production deployments (one per project). The
+integration is configured through GitHub (not the Vercel team dashboard), so these projects
+don't appear in `vercel.com` team project listings. Deployment status is visible via GitHub
+deployment events (`gh api repos/NurvX/NuvioWeb/deployments`).
+
 ## Architecture
 
 ### Target state

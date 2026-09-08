@@ -21,7 +21,7 @@ import { PluginsScreen } from "../screens/plugin/pluginsScreen.js";
 import { CatalogOrderScreen } from "../screens/plugin/catalogOrderScreen.js";
 import { StreamScreen } from "../screens/stream/streamScreen.js";
 import { CastDetailScreen } from "../screens/cast/castDetailScreen.js";
-import { CatalogSeeAllScreen } from "../screens/catalog/catalogSeeAllScreen.js";
+import { CatalogSeeAllScreen } from "../screens/catalog/catalogSeeAllScreen.jsx";
 import { FolderDetailScreen } from "../screens/collection/folderDetailScreen.js";
 import { Platform } from "../../platform/index.js";
 import { RouteStateStore } from "./routeStateStore.js";

@@ -1,11 +1,17 @@
 import { Router } from "../../navigation/router.js";
+import { ScreenUtils } from "../../navigation/screen.js";
+import { catalogRepository } from "../../../data/repository/catalogRepository.js";
+import { watchedItemsRepository } from "../../../data/repository/watchedItemsRepository.js";
+import { Environment } from "../../../platform/environment.js";
+import { LayoutPreferences } from "../../../data/local/layoutPreferences.js";
+import { buildWatchedTitleIdSet, isTitleItemWatched } from "../../components/watchedTitleBadge.js";
+import { h } from "preact";
+import { mountPreact } from "../../phone/mountPreact.js";
 import { I18n } from "../../../i18n/index.js";
-import { extractReleaseYear } from "./catalogSeeAllScreen.js";
 import { renderPosterCard, bindPosterCardEvents } from "../../components/posterCard.js";
 import { renderSkeletonPosterCard } from "../../components/phoneSkeleton.js";
 import { openPosterZoomOverlay } from "../../components/posterZoomOverlay.js";
 import { openBottomSheet, closeActiveBottomSheet } from "../../components/bottomSheet.js";
-import { isTitleItemWatched } from "../../components/watchedTitleBadge.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
 import {
   libraryRepository,
@@ -18,55 +24,32 @@ import {
   getPosterListPickerOptions
 } from "../../components/posterOptionsMenu.js";
 
-// Phone render path for js/ui/screens/catalog/catalogSeeAllScreen.js (ticket 03-03, see
-// .scratch/mobile-parity/spec.md), converted to a Preact component as part of the incremental
-// phone-screen JSX migration (see js/ui/screens/plugin/catalogOrderScreenPhone.jsx for the
-// reference conversion). This module still owns everything about the phone layout's
-// markup/interaction; catalogSeeAllScreen.js's own `render()` only has a guard clause that
-// dispatches here (via `mountPreact`) when `Platform.isPhoneViewport()` is true, and its
-// `mount()`/`cleanup()` add a `Platform.watchPhoneViewport()` subscription so a live resize
-// across the breakpoint re-renders.
-//
-// Pagination reuses `screen.loadNextPage(...)` — the TV screen's own existing async method —
-// completely unchanged: our own scroll-near-bottom listener just calls
-// `screen.loadNextPage({ preserveViewport: true })`, exactly the same call TV's own D-pad/scroll
-// auto-load paths already make. That method itself calls `screen.render()` at a couple of points
-// (to show a loading state, then again once new items land) which, in phone mode, re-dispatches
-// back into this module's own `mountCatalogSeeAllScreenPhone` — a full Preact re-render, same as
-// every other phone module. Because that rebuild can be triggered mid-scroll (by `loadNextPage`
-// itself, not by anything this module calls directly), this module persists the scroll
-// container's `scrollTop` on `screen._phoneCatalogSeeAllScrollTop` on every scroll event and
-// re-applies it immediately after every mount, so an infinite-scroll page load never visibly
-// resets the user's scroll position.
-//
-// Tap dispatch for the poster grid / back button stays on the existing app-wide delegated
-// `data-action`/`data-id` contract (`FocusEngine` calls `currentScreen.onPointerActivate(target)`
-// on every click; see `handleCatalogSeeAllPhonePointerActivate` below) rather than Preact
-// `onClick` handlers, since that delegated click handling is attached once, globally, outside of
-// this component's lifecycle.
-//
-// The floating header sits outside the scroll container (`position: absolute` within the
-// screen's own `position: relative` root, not `position: fixed` against the viewport — see
-// css/phone.css) so the grid can scroll underneath its transparent-to-opaque gradient. Its
-// height is measured after every mount and applied as the grid wrap's `padding-top` so the
-// first row of posters starts just below the header on initial paint.
-//
-// Long-press opens the same `posterZoomOverlay.js` ticket 01-01 introduced, with an actions list
-// built from `posterOptionsMenu.js`'s exported, screen-agnostic helpers
-// (`createPosterOptionsState`/`getPosterOptions`/`activatePosterOption`/
-// `getPosterListPickerOptions`) — the exact same functions `catalogSeeAllScreen.js`'s own TV
-// long-press menu (`openPosterOptionsMenu`, via `PosterOptionsDialogController`) already calls,
-// rendered through the zoom overlay (and, for the rare multi-Trakt/Simkl-list case, a
-// `bottomSheet.js` checklist) instead of `NuvioDialog`, the same substitution
-// `libraryScreenPhone.js` makes for its own poster long-press menu. `extractReleaseYear` is the
-// one pure helper this module needs from the TV screen file, so it was exported there rather
-// than duplicated here.
-//
-// `renderPosterCard`/`renderSkeletonPosterCard`/`renderLoadingIndicator` are shared markup
-// helpers used by several other (non-Preact) phone screens too, so they still return HTML
-// strings rather than JSX — this component injects that markup via `dangerouslySetInnerHTML`,
-// preserving the exact DOM those helpers already produce instead of duplicating/reimplementing
-// them as JSX.
+function isBackEvent(event) {
+  return Environment.isBackEvent(event);
+}
+
+export function extractReleaseYear(item = {}) {
+  const candidates = [
+    item?.released,
+    item?.releaseDate,
+    item?.release_date,
+    item?.releaseInfo,
+    item?.year
+  ].filter(Boolean);
+
+  for (const value of candidates) {
+    const match = String(value).match(/\b(19|20)\d{2}\b/);
+    if (match) {
+      return match[0];
+    }
+  }
+
+  return "";
+}
+
+// ---------------------------------------------------------------------------
+// Phone UI constants and helpers
+// ---------------------------------------------------------------------------
 
 const SCROLL_LOAD_THRESHOLD_PX = 640;
 const DISCOVER_INITIAL_SKELETON_COUNT = 9;
@@ -83,9 +66,9 @@ function checkmarkIconMarkup() {
   return `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>`;
 }
 
-// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Item shaping, navigation, poster card / zoom-overlay lookups
-// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
 function itemsById(screen) {
   const map = new Map();
@@ -134,10 +117,9 @@ function toPosterItem(screen, item) {
   };
 }
 
-// ---------------------------------------------------------------------------------------
-// Poster long-press -> zoom overlay (reuses posterOptionsMenu.js's own business logic, see
-// file header comment).
-// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Poster long-press -> zoom overlay
+// ---------------------------------------------------------------------------
 
 function openCatalogListPickerSheet(screen, listPickerState) {
   const options = getPosterListPickerOptions(listPickerState);
@@ -177,7 +159,7 @@ async function handleCatalogListPickerOption(screen, listPickerState, action) {
       );
       closeActiveBottomSheet();
     } catch (error) {
-      console.warn("catalogSeeAllScreenPhone: failed to save list membership", error);
+      console.warn("catalogSeeAllScreen: failed to save list membership", error);
       listPickerState.destructiveRemovalRequired =
         error?.code === "SIMKL_DESTRUCTIVE_REMOVAL_REQUIRED";
       openCatalogListPickerSheet(screen, listPickerState);
@@ -241,9 +223,9 @@ async function openCatalogItemZoomMenu(screen, cardElement, item) {
   });
 }
 
-// ---------------------------------------------------------------------------------------
-// Markup (JSX)
-// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// JSX components
+// ---------------------------------------------------------------------------
 
 function Header({ descriptor: _descriptor, title, subtitle }) {
   return (
@@ -308,11 +290,7 @@ function Body({ screen }) {
   );
 }
 
-/** The full phone catalog "see all" screen component. Reads `screen.params`/`screen.items`/
- * `screen.loading`/`screen.hasMore`/`screen.layoutPrefs`/`screen.watchedTitleIds` directly — all
- * populated by `catalogSeeAllScreen.js`'s existing `mount()`/`loadNextPage()` data flow, unrelated
- * to the TV-only `.seeall-*` DOM this module never touches. */
-export function CatalogSeeAllScreenPhone({ screen }) {
+function CatalogSeeAllScreenPhone({ screen }) {
   const descriptor = screen.params || {};
   const title = descriptor.catalogName || "Catalog";
   const subtitle =
@@ -331,11 +309,11 @@ export function CatalogSeeAllScreenPhone({ screen }) {
   );
 }
 
-// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Tap dispatch (shared onPointerActivate contract)
-// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
-export function handleCatalogSeeAllPhonePointerActivate(screen, target) {
+function handlePointerActivate(screen, target) {
   const action = String(target?.dataset?.action || "");
   if (!action) {
     return false;
@@ -354,9 +332,9 @@ export function handleCatalogSeeAllPhonePointerActivate(screen, target) {
   return false;
 }
 
-// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Post-mount measure / scroll-preserve / long-press wiring / cleanup
-// ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
 function applyHeaderPadding(container) {
   const header = container.querySelector("[data-phone-catalog-seeall-header]");
@@ -378,14 +356,8 @@ function bindGridLongPress(screen, container) {
   });
 }
 
-/** Wires the phone catalog "see all" screen's imperative post-mount interactivity (header
- * padding measurement, scroll-position persistence + infinite-scroll pagination, poster
- * long-press) after Preact has rendered `CatalogSeeAllScreenPhone` into `container`. Returns a
- * teardown function; also stores it on `screen._phoneCatalogSeeAllTeardown` so
- * `cleanupCatalogSeeAllScreenPhone(screen)` can call it without the caller needing to keep the
- * reference itself. */
-export function mountCatalogSeeAllScreenPhone(screen, container) {
-  cleanupCatalogSeeAllScreenPhone(screen);
+function mountPhoneInteractivity(screen, container) {
+  cleanupPhoneInteractivity(screen);
 
   applyHeaderPadding(container);
 
@@ -418,11 +390,199 @@ export function mountCatalogSeeAllScreenPhone(screen, container) {
   return teardown;
 }
 
-/** Tears down whatever `mountCatalogSeeAllScreenPhone` last wired up, if anything. Safe to call
- * when nothing is mounted. Deliberately does not touch `screen._phoneCatalogSeeAllScrollTop` —
- * that value needs to survive across the repeated mount/teardown cycles `loadNextPage`'s own
- * `render()` calls trigger mid-scroll. */
-export function cleanupCatalogSeeAllScreenPhone(screen) {
+function cleanupPhoneInteractivity(screen) {
   screen._phoneCatalogSeeAllTeardown?.();
   screen._phoneCatalogSeeAllTeardown = null;
 }
+
+// ---------------------------------------------------------------------------
+// Screen singleton
+// ---------------------------------------------------------------------------
+
+export const CatalogSeeAllScreen = {
+  getRouteStateKey(params = {}) {
+    const addonBaseUrl = String(params?.addonBaseUrl || "").trim();
+    const catalogId = String(params?.catalogId || "").trim();
+    const type = String(params?.type || "movie").trim() || "movie";
+    if (!addonBaseUrl || !catalogId) {
+      return null;
+    }
+    return `catalogSeeAll:${addonBaseUrl}:${catalogId}:${type}`;
+  },
+
+  captureRouteState() {
+    this.captureViewState();
+    return {
+      params: this.params ? { ...this.params } : {},
+      items: Array.isArray(this.items) ? [...this.items] : [],
+      nextSkip: Number(this.nextSkip || 0),
+      hasMore: Boolean(this.hasMore),
+      lastFocusedKey: this.lastFocusedKey ? String(this.lastFocusedKey) : null,
+      savedScrollTop: Number(this.savedScrollTop || 0)
+    };
+  },
+
+  hydrateFromRouteState(restoredState = null, params = {}) {
+    const snapshot = restoredState && typeof restoredState === "object" ? restoredState : null;
+    if (!snapshot?.params) {
+      return false;
+    }
+    const currentKey = this.getRouteStateKey(params);
+    const snapshotKey = this.getRouteStateKey(snapshot.params);
+    if (!currentKey || !snapshotKey || currentKey !== snapshotKey) {
+      return false;
+    }
+    this.params = params || {};
+    this.items = Array.isArray(snapshot.items) ? [...snapshot.items] : [];
+    this.nextSkip = Number(snapshot.nextSkip || 0);
+    this.hasMore = Boolean(snapshot.hasMore);
+    this.lastFocusedKey = snapshot.lastFocusedKey ? String(snapshot.lastFocusedKey) : null;
+    this.savedScrollTop = Number(snapshot.savedScrollTop || 0);
+    this.pendingRestoreFocus = true;
+    this.preserveViewportOnNextRender = false;
+    return true;
+  },
+
+  async refreshWatchedTitleIds() {
+    const watchedItems = await watchedItemsRepository.getAll(5000).catch(() => []);
+    this.watchedTitleIds = buildWatchedTitleIdSet(watchedItems);
+  },
+
+  async mount(params = {}, navigationContext = {}) {
+    this.container = document.getElementById("catalogSeeAll");
+    ScreenUtils.show(this.container);
+    this.params = params || {};
+    this.items = Array.isArray(params?.initialItems) ? [...params.initialItems] : [];
+    this.nextSkip = this.items.length ? 100 : 0;
+    this.layoutPrefs = LayoutPreferences.get();
+    this.loading = false;
+    this.hasMore = true;
+    this.lastFocusedKey = this.items[0]?.id ? `item:${this.items[0].id}` : null;
+    this.pendingRestoreFocus = false;
+    this.preserveViewportOnNextRender = false;
+    this.savedScrollTop = 0;
+    this.loadToken = (this.loadToken || 0) + 1;
+    await this.refreshWatchedTitleIds();
+
+    if (
+      navigationContext?.isBackNavigation &&
+      this.hydrateFromRouteState(navigationContext?.restoredState || null, params)
+    ) {
+      this.loading = false;
+      this.render();
+      return;
+    }
+
+    this.render();
+    if (!this.items.length) {
+      await this.loadNextPage();
+    }
+  },
+
+  async loadNextPage({ preserveViewport = false } = {}) {
+    if (this.loading || !this.hasMore) {
+      return;
+    }
+    const descriptor = this.params || {};
+    if (!descriptor.addonBaseUrl || !descriptor.catalogId || !descriptor.type) {
+      this.hasMore = false;
+      this.render();
+      return;
+    }
+    this.loading = true;
+    this.captureViewState();
+    this.pendingRestoreFocus = true;
+    this.preserveViewportOnNextRender = Boolean(preserveViewport);
+    if (!preserveViewport) {
+      this.render();
+    }
+    const token = this.loadToken;
+    const skip = Math.max(0, Number(this.nextSkip || 0));
+    const result = await catalogRepository.getCatalog({
+      addonBaseUrl: descriptor.addonBaseUrl,
+      addonId: descriptor.addonId,
+      addonName: descriptor.addonName,
+      catalogId: descriptor.catalogId,
+      catalogName: descriptor.catalogName,
+      type: descriptor.type,
+      skip,
+      supportsSkip: true
+    });
+    if (token !== this.loadToken) {
+      return;
+    }
+    if (result.status !== "success") {
+      this.loading = false;
+      this.hasMore = false;
+      this.preserveViewportOnNextRender = false;
+      this.render();
+      return;
+    }
+    const incoming = Array.isArray(result?.data?.items) ? result.data.items : [];
+    let addedCount = 0;
+    if (incoming.length) {
+      const seen = new Set(this.items.map((item) => item.id));
+      incoming.forEach((item) => {
+        if (!item?.id || seen.has(item.id)) {
+          return;
+        }
+        seen.add(item.id);
+        this.items.push(item);
+        addedCount += 1;
+      });
+      this.nextSkip = skip + 100;
+    }
+    this.hasMore = incoming.length > 0;
+    this.loading = false;
+    this.pendingRestoreFocus = true;
+    this.preserveViewportOnNextRender = Boolean(preserveViewport && addedCount > 0);
+    this.render();
+  },
+
+  captureViewState() {
+    const shell = this.container?.querySelector(".seeall-shell");
+    if (shell) {
+      this.savedScrollTop = shell.scrollTop;
+    }
+    const focused = this.container?.querySelector(".seeall-card.focused");
+    if (focused?.dataset?.focusKey) {
+      this.lastFocusedKey = focused.dataset.focusKey;
+    }
+  },
+
+  render() {
+    if (!this.container) {
+      return;
+    }
+    if (this._unmountPhone) {
+      this._unmountPhone();
+    }
+    this._unmountPhone = mountPreact(h(CatalogSeeAllScreenPhone, { screen: this }), this.container);
+    mountPhoneInteractivity(this, this.container);
+  },
+
+  async onKeyDown(event) {
+    if (isBackEvent(event)) {
+      event?.preventDefault?.();
+      Router.back();
+    }
+  },
+
+  onPointerActivate(target) {
+    return handlePointerActivate(this, target);
+  },
+
+  consumeBackRequest() {
+    return false;
+  },
+
+  cleanup() {
+    cleanupPhoneInteractivity(this);
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
+    this.loadToken = (this.loadToken || 0) + 1;
+    ScreenUtils.hide(this.container);
+  }
+};
