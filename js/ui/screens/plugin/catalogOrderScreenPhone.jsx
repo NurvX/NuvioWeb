@@ -83,12 +83,7 @@ export function CatalogOrderScreenPhone({ screen }) {
           <div class="phone-settings-card-body">
             {items.length ? (
               items.map((item, index) => (
-                <CatalogOrderRow
-                  key={item.key}
-                  item={item}
-                  index={index}
-                  onAction={handleAction}
-                />
+                <CatalogOrderRow key={item.key} item={item} index={index} onAction={handleAction} />
               ))
             ) : (
               <p

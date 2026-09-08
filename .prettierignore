@@ -8,6 +8,7 @@ services/**/runtime
 *.wgt
 
 # Local agent state is not project source.
+.agents
 .claude
 .opencode
 .orchestration
