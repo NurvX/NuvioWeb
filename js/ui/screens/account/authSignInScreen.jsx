@@ -1,10 +1,70 @@
+import { Fragment } from "preact";
 import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { AuthManager } from "../../../core/auth/authManager.js";
 import { I18n } from "../../../i18n/index.js";
 import { h } from "preact";
-import { AuthSignInScreenPhone } from "./authSignInScreenPhone.jsx";
 import { mountPreact } from "../../phone/mountPreact.js";
+
+function TextDialog({ dialog }) {
+  if (!dialog) {
+    return null;
+  }
+  return (
+    <div class="phone-settings-dialog-backdrop">
+      <div class="phone-settings-dialog" role="dialog" aria-modal="true">
+        <div class="phone-settings-dialog-title">{dialog.title || ""}</div>
+        <input
+          class="phone-settings-dialog-field"
+          data-action="textInput"
+          type={dialog.type === "password" ? "password" : "text"}
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          value={dialog.value || ""}
+        />
+        <div class="phone-settings-dialog-actions">
+          <button type="button" class="phone-settings-dialog-button" data-action="cancelText">
+            {I18n.t("common.cancel", {}, { fallback: "Cancel" })}
+          </button>
+          <button
+            type="button"
+            class="phone-settings-dialog-button is-primary"
+            data-action="saveText"
+          >
+            {I18n.t("common.save", {}, { fallback: "Save" })}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AuthSignInScreenComponent({ screen }) {
+  return (
+    <Fragment>
+      <div class="phone-auth-shell" data-phone-auth-root>
+        <div class="phone-auth-scroll" data-phone-auth-scroll>
+          <img src="assets/brand/app_logo_wordmark.png" class="phone-auth-logo" alt="Nuvio" />
+          <h2 class="phone-auth-title">{I18n.t("auth.signIn.title")}</h2>
+          <p class="phone-auth-subtitle">{I18n.t("auth.signIn.description")}</p>
+          <div class="phone-auth-actions">
+            <button type="button" class="phone-auth-action-btn is-primary" data-action="signIn">
+              {I18n.t("auth.signIn.openQrLogin")}
+            </button>
+            {screen.hasBackDestination ? (
+              <button type="button" class="phone-auth-action-btn" data-action="back">
+                {I18n.t("auth.signIn.back")}
+              </button>
+            ) : null}
+          </div>
+          {screen.errorMessage ? <p class="phone-auth-error">{screen.errorMessage}</p> : null}
+        </div>
+      </div>
+      <TextDialog dialog={screen.textDialog} />
+    </Fragment>
+  );
+}
 
 export const AuthSignInScreen = {
   async mount() {
@@ -21,7 +81,10 @@ export const AuthSignInScreen = {
 
   render() {
     if (this._unmountPhone) this._unmountPhone();
-    this._unmountPhone = mountPreact(h(AuthSignInScreenPhone, { screen: this }), this.container);
+    this._unmountPhone = mountPreact(
+      h(AuthSignInScreenComponent, { screen: this }),
+      this.container
+    );
     if (this.textDialog) {
       const input = this.container.querySelector("[data-action='textInput']");
       input?.focus?.();

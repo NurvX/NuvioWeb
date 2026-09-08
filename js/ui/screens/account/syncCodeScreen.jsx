@@ -1,19 +1,11 @@
+import { Router } from "../../navigation/router.js";
+import { ScreenUtils } from "../../navigation/screen.js";
+import { LocalStore } from "../../../core/storage/localStore.js";
 import { I18n } from "../../../i18n/index.js";
+import { h } from "preact";
+import { mountPreact } from "../../phone/mountPreact.js";
 
-// Phone render path for js/ui/screens/account/syncCodeScreen.js (ticket 05-03, see
-// .scratch/mobile-parity/spec.md). syncCodeScreen.js's own `render()` mounts this Preact
-// component when `Platform.isPhoneViewport()` is true — all markup for the phone layout lives
-// in this module.
-//
-// This is a visual-only rebuild: every element keeps the exact same `data-action` attribute
-// the existing TV markup used (`setCode`/`clearCode`/`back`/`textInput`/`saveText`/
-// `cancelText`) plus the `.focusable` class, so `SyncCodeScreen.onPointerActivate` (already
-// wired for touch by a prior, separate effort) keeps dispatching through
-// `FocusEngine.handlePointerClick` -> `getPointerFocusable` (which requires a `.focusable`
-// ancestor) exactly as it already does for the TV cards — nothing here re-implements or
-// touches that dispatch, so no onClick handlers are added here on top of it. The action list
-// and text dialog reuse the shared `phone-auth-*`/`phone-settings-dialog*` chrome introduced
-// for 05-03's sign-in screen for visual consistency.
+const KEY = "manualSyncCode";
 
 function TextDialog({ value }) {
   return (
@@ -50,10 +42,7 @@ function TextDialog({ value }) {
   );
 }
 
-/** Renders the full phone sync-code screen, reading `screen.textDialog` and the current stored
- * code (`value`, passed in verbatim by `syncCodeScreen.js`'s own `render()`) — the exact same
- * state TV's own `render()` reads. */
-export function SyncCodeScreenPhone({ screen, value }) {
+function SyncCodeScreenComponent({ screen, value }) {
   return (
     <>
       <div class="phone-auth-shell" data-phone-auth-root>
@@ -85,3 +74,81 @@ export function SyncCodeScreenPhone({ screen, value }) {
     </>
   );
 }
+
+export const SyncCodeScreen = {
+  async mount() {
+    this.container = document.getElementById("account");
+    ScreenUtils.show(this.container);
+    this.render();
+  },
+
+  render() {
+    const value = LocalStore.get(KEY, "");
+    if (this._unmountPhone) this._unmountPhone();
+    this._unmountPhone = mountPreact(
+      h(SyncCodeScreenComponent, { screen: this, value }),
+      this.container
+    );
+    if (this.textDialog) {
+      const input = this.container.querySelector("[data-action='textInput']");
+      input?.focus?.();
+    }
+  },
+
+  onPointerActivate(target) {
+    const actionTarget = target?.closest?.("[data-action]");
+    const action = String(actionTarget?.dataset?.action || "");
+    if (!action) {
+      return false;
+    }
+
+    if (this.textDialog) {
+      if (action === "cancelText") {
+        this.textDialog = false;
+        this.render();
+        return true;
+      }
+      if (action === "saveText") {
+        const input = this.container.querySelector("[data-action='textInput']");
+        LocalStore.set(KEY, String(input?.value || "").trim());
+        this.textDialog = false;
+        this.render();
+        return true;
+      }
+      return false;
+    }
+
+    if (action === "setCode") {
+      this.textDialog = true;
+      this.render();
+      return true;
+    }
+    if (action === "clearCode") {
+      LocalStore.remove(KEY);
+      this.render();
+      return true;
+    }
+    if (action === "back") {
+      Router.back();
+      return true;
+    }
+    return false;
+  },
+
+  consumeBackRequest() {
+    if (!this.textDialog) {
+      return false;
+    }
+    this.textDialog = false;
+    this.render();
+    return true;
+  },
+
+  cleanup() {
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
+    ScreenUtils.hide(this.container);
+  }
+};

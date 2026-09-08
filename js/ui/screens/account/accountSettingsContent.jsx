@@ -1,16 +1,5 @@
-// Phone render path for js/ui/screens/account/accountSettingsContent.js (ticket 05-03, see
-// .scratch/mobile-parity/spec.md). `AccountSettingsContent.render()` only gets a guard clause
-// that dispatches to `AccountSettingsContentPhone` here when `Platform.isPhoneViewport()` is
-// true — all markup for the phone layout lives in this module.
-//
-// This is a visual-only rebuild: rows keep the exact same `data-action`/`focusable` contract
-// the existing TV markup used, so `attachFocus(callbacks)` (already reused verbatim, unchanged,
-// called by the TV controller after mounting this component) keeps wiring the exact same
-// `callbacks[action]()` dispatch on Enter, and taps route through the existing global
-// focus-engine pointer-click handling — no click handlers are added here, matching the original
-// vanilla markup which had none either. Rows reuse the `phone-settings-card`/`phone-settings-row*`
-// family from 05-01 for the card/list chrome; the per-profile sync rows get a small round avatar
-// chip matching 05-02's profile-card avatar language (initial-letter, profile-colored).
+import { h } from "preact";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 function ChevronIcon() {
   return (
@@ -160,9 +149,6 @@ function SignOutButton() {
   );
 }
 
-/** Renders the phone body markup for whichever of the three states
- * (`uiState.authState`) is currently active — the same three states TV's own `render()` already
- * branches on. */
 function AccountSettingsContentBody({ uiState }) {
   const { authState, syncOverview, isSyncOverviewLoading } = uiState;
 
@@ -207,7 +193,7 @@ function AccountSettingsContentBody({ uiState }) {
   return null;
 }
 
-export function AccountSettingsContentPhone({ uiState }) {
+function AccountSettingsContentComponent({ uiState }) {
   return (
     <section class="phone-settings-card">
       <div class="phone-settings-card-body">
@@ -215,4 +201,66 @@ export function AccountSettingsContentPhone({ uiState }) {
       </div>
     </section>
   );
+}
+
+export class AccountSettingsContent {
+  constructor(container) {
+    this.container = container;
+    this.focusIndex = 0;
+  }
+
+  render(uiState, callbacks) {
+    if (this._unmountPhone) this._unmountPhone();
+    this._unmountPhone = mountPreact(
+      h(AccountSettingsContentComponent, { uiState }),
+      this.container
+    );
+    this.attachFocus(callbacks);
+  }
+
+  attachFocus(callbacks) {
+    const items = this.container.querySelectorAll(".focusable");
+
+    items.forEach((el, i) => {
+      el.dataset.index = i;
+    });
+
+    items[0]?.classList.add("focused");
+
+    this.container.onkeydown = (event) => {
+      const current = this.container.querySelector(".focused");
+      if (!current) return;
+
+      const index = parseInt(current.dataset.index, 10);
+
+      if (event.keyCode === 40) {
+        this.moveFocus(items, index + 1);
+      }
+
+      if (event.keyCode === 38) {
+        this.moveFocus(items, index - 1);
+      }
+
+      if (event.keyCode === 13) {
+        const action = current.dataset.action;
+        callbacks?.[action]?.();
+      }
+    };
+  }
+
+  moveFocus(items, newIndex) {
+    if (newIndex < 0 || newIndex >= items.length) return;
+
+    const current = this.container.querySelector(".focused");
+    current?.classList.remove("focused");
+
+    items[newIndex].classList.add("focused");
+  }
+
+  cleanup() {
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
+  }
 }

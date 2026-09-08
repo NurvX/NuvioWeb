@@ -1,9 +1,9 @@
 import { HomeScreen } from "../screens/home/homeScreen.js";
 import { PlayerScreen } from "../screens/player/playerScreen.js";
-import { AccountScreen } from "../screens/account/accountScreen.js";
-import { AuthQrSignInScreen } from "../screens/account/authQrSignInScreen.js";
-import { AuthSignInScreen } from "../screens/account/authSignInScreen.js";
-import { SyncCodeScreen } from "../screens/account/syncCodeScreen.js";
+import { AccountScreen } from "../screens/account/accountScreen.jsx";
+import { AuthQrSignInScreen } from "../screens/account/authQrSignInScreen.jsx";
+import { AuthSignInScreen } from "../screens/account/authSignInScreen.jsx";
+import { SyncCodeScreen } from "../screens/account/syncCodeScreen.jsx";
 import { ProfileSelectionScreen } from "../../core/profile/profileSelectionScreen.js";
 import { MetaDetailsScreen } from "../screens/detail/metaDetailsScreen.js";
 import { LibraryScreen } from "../screens/library/libraryScreen.js";

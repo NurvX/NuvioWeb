@@ -1,20 +1,8 @@
+import { AuthManager } from "../../../core/auth/authManager.js";
+import { Router } from "../../navigation/router.js";
 import { I18n } from "../../../i18n/index.js";
-
-// Phone render path for js/ui/screens/account/accountScreen.js (ticket 05-03, see
-// .scratch/mobile-parity/spec.md). accountScreen.js's own `render()` only gets a guard clause
-// that dispatches to `renderPhone()` here when `Platform.isPhoneViewport()` is true — all
-// markup for the phone layout lives in this module.
-//
-// This is a visual-only rebuild: every row still carries the exact same `data-action`/
-// `focusable` contract the existing TV markup used, so `AccountScreen.onPointerActivate`
-// (already wired for touch by a prior, separate effort) keeps dispatching through
-// `FocusEngine.handlePointerClick` -> `getPointerFocusable` (which requires a `.focusable`
-// ancestor) exactly as it already does for the TV cards — nothing here re-implements or
-// touches that dispatch, so no onClick handlers are added below (that dispatch is a single
-// document-level listener, not per-node wiring; adding onClick here would double-fire it).
-// Rows reuse the `phone-settings-card`/`phone-settings-row*` family from 05-01 for the
-// card/list chrome, and the signed-in identity row gets a small round avatar chip matching
-// 05-02's profile-card avatar language (initial-letter, accent-colored).
+import { h } from "preact";
+import { mountPreact } from "../../phone/mountPreact.js";
 
 function t(key, params = {}, fallback = key) {
   return I18n.t(key, params, { fallback });
@@ -131,10 +119,7 @@ function AuthenticatedBody({ screen }) {
   );
 }
 
-/** Renders the phone account screen for whichever of the three states
- * (`screen.state.authState`) is currently active — the same three states TV's own `render()`
- * already branches on. */
-export function AccountScreenPhone({ screen }) {
+function AccountScreenComponent({ screen }) {
   if (screen.state.authState === "loading") {
     return <LoadingBody />;
   }
@@ -143,3 +128,66 @@ export function AccountScreenPhone({ screen }) {
   }
   return <AuthenticatedBody screen={screen} />;
 }
+
+export const AccountScreen = {
+  async mount() {
+    this.container = document.getElementById("account");
+    this.container.style.display = "block";
+    this.state = {
+      authState: AuthManager.getAuthState(),
+      email: null,
+      linkedDevices: []
+    };
+
+    this.unsubscribe = AuthManager.subscribe((state) => {
+      this.state.authState = state;
+      this.render();
+    });
+
+    this.render();
+  },
+
+  cleanup() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+
+    if (this._unmountPhone) {
+      this._unmountPhone();
+      this._unmountPhone = null;
+    }
+
+    if (this.container) {
+      this.container.style.display = "none";
+      this.container.innerHTML = "";
+    }
+  },
+
+  async signOut() {
+    await AuthManager.signOut();
+    Router.navigate("authSignIn");
+  },
+
+  render() {
+    if (!this.container) {
+      return;
+    }
+    if (this._unmountPhone) this._unmountPhone();
+    this._unmountPhone = mountPreact(h(AccountScreenComponent, { screen: this }), this.container);
+  },
+
+  onPointerActivate(target) {
+    const actionTarget = target?.closest?.("[data-action]");
+    const action = String(actionTarget?.dataset?.action || "");
+    if (action === "signin") {
+      Router.navigate("authSignIn");
+      return true;
+    }
+    if (action === "logout") {
+      this.signOut();
+      return true;
+    }
+    return false;
+  }
+};

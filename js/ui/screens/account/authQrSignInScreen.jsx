@@ -5,13 +5,42 @@ import { ScreenUtils } from "../../navigation/screen.js";
 import { AuthManager } from "../../../core/auth/authManager.js";
 import { I18n } from "../../../i18n/index.js";
 import { h } from "preact";
-import { AuthQrSignInScreenPhone } from "./authQrSignInScreenPhone.jsx";
 import { mountPreact } from "../../phone/mountPreact.js";
 
 let pollInterval = null;
 let countdownInterval = null;
 let activeQrSessionId = 0;
 const GUEST_QR_BYPASS_KEY = "skipAuthQrGate";
+
+function AuthQrSignInScreenComponent({ screen }) {
+  return (
+    <div class="phone-qr-shell" data-phone-qr-root>
+      <div class="phone-qr-scroll" data-phone-qr-scroll>
+        <img src="assets/brand/app_logo_wordmark.png" class="phone-auth-logo" alt="Nuvio" />
+        <h2 class="phone-auth-title">{I18n.t("auth.qr.title")}</h2>
+        <p class="phone-auth-subtitle">{screen.getLeftDescription()}</p>
+
+        <div class="phone-qr-card" aria-label={I18n.t("auth.qr.cardAriaLabel")}>
+          <p class="phone-auth-subtitle">{screen.getCardSubtitle()}</p>
+          <div id="qr-container" class="phone-qr-frame"></div>
+          <div id="qr-code-text" class="phone-qr-code-text"></div>
+          <div id="qr-status" class="phone-auth-status">
+            {I18n.t("auth.qr.waitingApproval")}
+          </div>
+        </div>
+
+        <div class="phone-auth-actions">
+          <button type="button" id="qr-refresh-btn" class="phone-auth-action-btn is-primary">
+            {I18n.t("auth.qr.refresh")}
+          </button>
+          <button type="button" id="qr-back-btn" class="phone-auth-action-btn">
+            {screen.getBackButtonLabel()}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export const AuthQrSignInScreen = {
   async mount({ onboardingMode = false } = {}) {
@@ -27,19 +56,15 @@ export const AuthQrSignInScreen = {
     await this.startQr();
   },
 
-  // Builds the screen's markup and wires the refresh/back buttons — extracted verbatim from
-  // the previous body of `mount()` (ticket 05-03, mobile-parity epic) only so a phone-viewport
-  // guard clause can pick `authQrSignInScreenPhone.js`'s markup instead of the TV template
-  // below; every id the rest of this file queries (`#qr-container`/`#qr-code-text`/
-  // `#qr-status`/`#qr-refresh-btn`/`#qr-back-btn`) is unchanged in both templates, so
-  // `renderQr()`/`clearQr()`/`setStatus()`/`updateActionButtons()` and the button wiring here
-  // work identically either way.
   renderShell() {
     if (!this.container) {
       return;
     }
     if (this._unmountPhone) this._unmountPhone();
-    this._unmountPhone = mountPreact(h(AuthQrSignInScreenPhone, { screen: this }), this.container);
+    this._unmountPhone = mountPreact(
+      h(AuthQrSignInScreenComponent, { screen: this }),
+      this.container
+    );
 
     this.refreshButton = this.container.querySelector("#qr-refresh-btn");
     this.backButton = this.container.querySelector("#qr-back-btn");
