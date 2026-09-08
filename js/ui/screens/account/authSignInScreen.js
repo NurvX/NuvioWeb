@@ -2,18 +2,9 @@ import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { AuthManager } from "../../../core/auth/authManager.js";
 import { I18n } from "../../../i18n/index.js";
-import { Platform } from "../../../platform/index.js";
 import { h } from "preact";
 import { AuthSignInScreenPhone } from "./authSignInScreenPhone.jsx";
 import { mountPreact } from "../../phone/mountPreact.js";
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 export const AuthSignInScreen = {
   async mount() {
@@ -23,88 +14,17 @@ export const AuthSignInScreen = {
     this.pendingEmail = "";
     this.errorMessage = "";
     ScreenUtils.show(this.container);
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
-    this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render());
     this.render();
     this.onClickBound = this.onClick.bind(this);
     this.container.addEventListener("click", this.onClickBound);
   },
 
   render() {
-    // Phone render path (ticket 05-03, mobile-parity epic). All markup lives in
-    // js/ui/screens/account/authSignInScreenPhone.jsx; it keeps the same `data-action`
-    // attributes the TV markup uses, so this screen's own container-level click listener
-    // (bound once in `mount()`) keeps dispatching every tap unmodified.
-    if (Platform.isPhoneViewport()) {
-      if (this._unmountPhone) this._unmountPhone();
-      this._unmountPhone = mountPreact(h(AuthSignInScreenPhone, { screen: this }), this.container);
-      if (this.textDialog) {
-        const input = this.container.querySelector("[data-action='textInput']");
-        input?.focus?.();
-      }
-      return;
-    }
-
-    if (this._unmountPhone) {
-      this._unmountPhone();
-      this._unmountPhone = null;
-    }
-
-    this.container.innerHTML = `
-                <div class="auth-simple-shell">
-                        <div class="auth-simple-hero">
-                                  <h2 class="auth-simple-title">${I18n.t("auth.signIn.title")}</h2>
-                                            <p class="auth-simple-subtitle">${I18n.t("auth.signIn.description")}</p>
-                                                    </div>
-                                                            <div class="auth-simple-actions">
-                                                                      <div class="auth-simple-card focusable" data-action="signIn">${I18n.t("auth.signIn.openQrLogin")}</div>
-                                                                                ${
-                                                                                  this
-                                                                                    .hasBackDestination
-                                                                                    ? `<div class="auth-simple-card focusable" data-action="back">${I18n.t("auth.signIn.back")}</div>`
-                                                                                    : ""
-                                                                                }
-                                                                                        </div>
-                                                                                                ${this.errorMessage ? `<p class="auth-simple-subtitle" style="color:#ff6b6b;">${escapeHtml(this.errorMessage)}</p>` : ""}
-                                                                                                      </div>
-                                                                                                            ${
-                                                                                                              this
-                                                                                                                .textDialog
-                                                                                                                ? `
-                                                                                                                                <div class="settings-dialog-backdrop">
-                                                                                                                                          <div class="settings-dialog settings-text-dialog">
-                                                                                                                                                      <div class="settings-dialog-title">${escapeHtml(this.textDialog.title || "")}</div>
-                                                                                                                                                                  <input class="settings-text-dialog-field settings-text-dialog-input focusable"
-                                                                                                                                                                                     data-action="textInput"
-                                                                                                                                                                                                        type="${this.textDialog.type === "password" ? "password" : "text"}"
-                                                                                                                                                                                                                           autocomplete="off"
-                                                                                                                                                                                                                                              autocapitalize="none"
-                                                                                                                                                                                                                                                                 spellcheck="false"
-                                                                                                                                                                                                                                                                                    value="${escapeHtml(this.textDialog.value || "")}" />
-                                                                                                                                                                                                                                                                                                <div class="settings-text-dialog-actions">
-                                                                                                                                                                                                                                                                                                              <button class="settings-dialog-option settings-text-dialog-button focusable" data-action="saveText">
-                                                                                                                                                                                                                                                                                                                              <span class="settings-dialog-option-label">${escapeHtml(I18n.t("common.save", {}, { fallback: "Save" }))}</span>
-                                                                                                                                                                                                                                                                                                                                            </button>
-                                                                                                                                                                                                                                                                                                                                                          <button class="settings-dialog-option settings-text-dialog-button focusable" data-action="cancelText">
-                                                                                                                                                                                                                                                                                                                                                                          <span class="settings-dialog-option-label">${escapeHtml(I18n.t("common.cancel", {}, { fallback: "Cancel" }))}</span>
-                                                                                                                                                                                                                                                                                                                                                                                        </button>
-                                                                                                                                                                                                                                                                                                                                                                                                    </div>
-                                                                                                                                                                                                                                                                                                                                                                                                              </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                      </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                            `
-                                                                                                                : ""
-                                                                                                            }
-                                                                                                                  `;
-
-    ScreenUtils.indexFocusables(this.container);
+    if (this._unmountPhone) this._unmountPhone();
+    this._unmountPhone = mountPreact(h(AuthSignInScreenPhone, { screen: this }), this.container);
     if (this.textDialog) {
       const input = this.container.querySelector("[data-action='textInput']");
       input?.focus?.();
-      input?.classList?.add("focused");
-    } else {
-      ScreenUtils.setInitialFocus(this.container);
     }
   },
 
@@ -185,55 +105,6 @@ export const AuthSignInScreen = {
     }
   },
 
-  async onKeyDown(event) {
-    if (this.textDialog) {
-      if (event.keyCode === 27 || event.keyCode === 461) {
-        this.textDialog = null;
-        this.pendingEmail = "";
-        this.render();
-        return;
-      }
-      if (ScreenUtils.handleDpadNavigation(event, this.container)) {
-        return;
-      }
-      if (event.keyCode !== 13) {
-        return;
-      }
-      const current = this.container.querySelector(".focusable.focused");
-      const action = current?.dataset?.action || "";
-      if (action === "cancelText") {
-        this.textDialog = null;
-        this.pendingEmail = "";
-        this.render();
-        return;
-      }
-      if (action === "saveText" || action === "textInput") {
-        await this.submitTextDialog();
-      }
-      return;
-    }
-
-    if (ScreenUtils.handleDpadNavigation(event, this.container)) {
-      return;
-    }
-    if (event.keyCode !== 13) {
-      return;
-    }
-
-    const current = this.container.querySelector(".focusable.focused");
-    if (!current) {
-      return;
-    }
-    const action = current.dataset.action;
-    if (action === "signIn") {
-      this.openEmailDialog();
-      return;
-    }
-    if (action === "back") {
-      Router.back();
-    }
-  },
-
   consumeBackRequest() {
     if (this.textDialog) {
       this.textDialog = null;
@@ -247,8 +118,6 @@ export const AuthSignInScreen = {
   cleanup() {
     this.textDialog = null;
     this.pendingEmail = "";
-    this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = null;
     this.container?.removeEventListener("click", this.onClickBound);
     if (this._unmountPhone) {
       this._unmountPhone();

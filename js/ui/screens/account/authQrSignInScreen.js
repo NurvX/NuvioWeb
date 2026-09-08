@@ -4,7 +4,6 @@ import { LocalStore } from "../../../core/storage/localStore.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { AuthManager } from "../../../core/auth/authManager.js";
 import { I18n } from "../../../i18n/index.js";
-import { Platform } from "../../../platform/index.js";
 import { h } from "preact";
 import { AuthQrSignInScreenPhone } from "./authQrSignInScreenPhone.jsx";
 import { mountPreact } from "../../phone/mountPreact.js";
@@ -24,20 +23,6 @@ export const AuthQrSignInScreen = {
     this.isStartingQr = false;
     this.isLeaving = false;
     ScreenUtils.show(this.container);
-
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
-    this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => {
-      // renderShell() rebuilds fresh #qr-container/#qr-status nodes for the new layout, so the
-      // in-flight QR session (whose image/status live only in those DOM nodes, not on `this`)
-      // needs restarting rather than just leaving those nodes empty.
-      this.renderShell();
-      if (this.isMounted && !this.isLeaving) {
-        void this.startQr();
-      }
-    });
-
     this.renderShell();
     await this.startQr();
   },
@@ -53,46 +38,8 @@ export const AuthQrSignInScreen = {
     if (!this.container) {
       return;
     }
-
-    if (Platform.isPhoneViewport()) {
-      if (this._unmountPhone) this._unmountPhone();
-      this._unmountPhone = mountPreact(
-        h(AuthQrSignInScreenPhone, { screen: this }),
-        this.container
-      );
-    } else {
-      this.container.innerHTML = `
-      <div class="qr-layout">
-        <section class="qr-left-panel">
-          <div class="qr-brand-lockup">
-            <img src="assets/brand/app_logo_wordmark.png" class="qr-logo" alt="Nuvio" />
-          </div>
-
-          <div class="qr-copy-block">
-            <h1 class="qr-title">${I18n.t("auth.qr.title")}</h1>
-            <p id="qr-description" class="qr-description">${this.getLeftDescription()}</p>
-          </div>
-        </section>
-
-        <section class="qr-card-panel" aria-label="${I18n.t("auth.qr.cardAriaLabel")}">
-          <div class="qr-card">
-            <header class="qr-card-header">
-              <h2 class="qr-card-title">${I18n.t("auth.qr.cardTitle")}</h2>
-              <p id="qr-card-subtitle" class="qr-card-subtitle">${this.getCardSubtitle()}</p>
-            </header>
-
-            <div id="qr-container" class="qr-code-frame"></div>
-            <div id="qr-code-text" class="qr-code-text"></div>
-            <div id="qr-status" class="qr-status">${I18n.t("auth.qr.waitingApproval")}</div>
-            <div class="qr-actions">
-              <button type="button" id="qr-refresh-btn" class="qr-action-btn qr-action-btn-primary focusable" data-action="refresh">${I18n.t("auth.qr.refresh")}</button>
-              <button type="button" id="qr-back-btn" class="qr-action-btn qr-action-btn-secondary focusable" data-action="back">${this.getBackButtonLabel()}</button>
-            </div>
-          </div>
-        </section>
-      </div>
-      `;
-    }
+    if (this._unmountPhone) this._unmountPhone();
+    this._unmountPhone = mountPreact(h(AuthQrSignInScreenPhone, { screen: this }), this.container);
 
     this.refreshButton = this.container.querySelector("#qr-refresh-btn");
     this.backButton = this.container.querySelector("#qr-back-btn");
@@ -105,11 +52,6 @@ export const AuthQrSignInScreen = {
       this.backButton.onclick = () => {
         this.handleContinueAction();
       };
-    }
-
-    if (!Platform.isPhoneViewport()) {
-      ScreenUtils.indexFocusables(this.container);
-      ScreenUtils.setInitialFocus(this.container);
     }
   },
 
@@ -357,29 +299,6 @@ export const AuthQrSignInScreen = {
     return I18n.t("auth.qr.continueWithoutAccount");
   },
 
-  onKeyDown(event) {
-    if (ScreenUtils.handleDpadNavigation(event, this.container)) {
-      return;
-    }
-    if (Number(event?.keyCode || 0) !== 13) {
-      return;
-    }
-
-    const current = this.container?.querySelector(".focusable.focused");
-    if (!current) {
-      return;
-    }
-
-    const action = current.dataset.action;
-    if (action === "refresh") {
-      this.handleRefreshAction();
-      return;
-    }
-    if (action === "back") {
-      this.handleContinueAction();
-    }
-  },
-
   consumeBackRequest() {
     this.handleContinueAction();
     return true;
@@ -396,8 +315,6 @@ export const AuthQrSignInScreen = {
     this.isMounted = false;
     activeQrSessionId += 1;
     this.stopIntervals();
-    this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = null;
     if (this._unmountPhone) {
       this._unmountPhone();
       this._unmountPhone = null;
