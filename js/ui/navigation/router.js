@@ -19,7 +19,7 @@ import { LicensesAttributionsScreen } from "../screens/settings/licensesAttribut
 import { PluginScreen } from "../screens/plugin/pluginScreen.jsx";
 import { PluginsScreen } from "../screens/plugin/pluginsScreen.js";
 import { CatalogOrderScreen } from "../screens/plugin/catalogOrderScreen.jsx";
-import { StreamScreen } from "../screens/stream/streamScreen.js";
+import { StreamScreen } from "../screens/stream/streamScreen.jsx";
 import { CastDetailScreen } from "../screens/cast/castDetailScreen.js";
 import { CatalogSeeAllScreen } from "../screens/catalog/catalogSeeAllScreen.jsx";
 import { FolderDetailScreen } from "../screens/collection/folderDetailScreen.js";

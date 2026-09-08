@@ -15,7 +15,7 @@ import { ThemeManager } from "./ui/theme/themeManager.js";
 import { LiquidGlassController } from "./ui/theme/liquidGlass.js";
 import { renderAppShell } from "./bootstrap/renderAppShell.js";
 import { renderAddonRemotePage } from "./bootstrap/renderAddonRemotePage.js";
-import { preloadStreamBadgeImages } from "./ui/screens/stream/streamScreen.js";
+import { preloadStreamBadgeImages } from "./ui/screens/stream/streamScreen.jsx";
 import { warmStreamingLibs } from "./runtime/loadStreamingLibs.js";
 import { Platform } from "./platform/index.js";
 import { LocalStore } from "./core/storage/localStore.js";

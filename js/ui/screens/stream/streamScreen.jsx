@@ -55,8 +55,10 @@ import {
 import { normalizeMathematicalAlphanumericSymbols } from "../../../core/streams/streamDisplayText.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
 import { h } from "preact";
-import { StreamScreenPhone } from "./streamScreenPhone.jsx";
+import { useEffect, useRef } from "preact/hooks";
 import { mountPreact } from "../../phone/mountPreact.js";
+import { attachLongPress } from "../../navigation/gestureEngine.js";
+import { openBottomSheet, closeActiveBottomSheet } from "../../components/bottomSheet.js";
 
 const STREAM_BADGE_LIMIT = 9;
 // Number of rows on each side of the focused source to keep badge-hydrated.
@@ -409,9 +411,6 @@ function mergeStreamItems(existing = [], incoming = []) {
   return order.map((key) => byKey.get(key));
 }
 
-// Exported for js/ui/screens/stream/streamScreenPhone.jsx (ticket 04-01): the phone streams
-// screen's addon avatar (group header + per-row trailing column) reuses the exact same
-// initials-fallback logic TV's addon logo chip already uses, rather than reimplementing it.
 export function getAddonBadgeLabel(name = "") {
   const cleaned = String(name || "").trim();
   if (!cleaned) {
@@ -465,9 +464,6 @@ async function preloadMatchedStreamBadgeImages(
   await preloadAddonLogoUrls(urls);
 }
 
-// Exported for js/ui/screens/stream/streamScreenPhone.jsx (ticket 04-01) — the phone streams
-// screen's row markup reuses this exact headline/quality/description text derivation rather
-// than reimplementing it.
 export function getStreamHeadline(stream = {}) {
   const primary = [stream.name, stream.title, stream.description].find((value) =>
     String(value || "").trim()
@@ -1927,13 +1923,6 @@ export const StreamScreen = {
     return requestHeaders && typeof requestHeaders === "object" ? { ...requestHeaders } : {};
   },
 
-  // Extracted verbatim from tryOpenInExternalPlayer's body (mobile-parity ticket 04-01) so the
-  // phone streams screen's long-press action menu (streamScreenPhone.jsx) can resolve a
-  // direct/copyable/downloadable URL for Copy Link / Download without duplicating the
-  // header-check -> stream.url/externalUrl -> DirectDebridResolver fallback chain. No logic
-  // changed from the original inline body other than returning `null` instead of the caller
-  // handling a magnet-fallback branch itself — magnet fallback is a `tryOpenInExternalPlayer`
-  // and `downloadStream`/`copyStreamLink` deep-link concern, not part of "resolve a direct URL".
   async resolveDirectStreamUrl(stream = {}) {
     const requestHeaders = this.getStreamRequestHeaders(stream);
     if (Object.keys(requestHeaders).length) {
@@ -2109,13 +2098,6 @@ export const StreamScreen = {
 
   async openStreamInNativePlayer(_streamId) {},
 
-  // Phone render path (ticket 04-01, mobile-parity epic) — all markup/interaction logic lives
-  // in js/ui/screens/stream/streamScreenPhone.jsx; this just hands it the screen instance so it
-  // can read this.streams/this.sourceChips/this.addonFilter/this.params/this.loading/this.error
-  // (already populated by mount()'s/loadStreams()'s existing data flow) and call this screen's
-  // own methods (playStream/playStreamInternal/tryOpenInExternalPlayer/setAddonFilter/
-  // loadStreams/navigateBackFromStream/getFilteredStreams/getOrderedFilterNames/
-  // hasPendingSourceLoads/showStreamToast/launchExternalPlayerHref) directly.
   renderPhone() {
     if (!this.container) {
       return;
@@ -2429,12 +2411,6 @@ export const StreamScreen = {
     return this.playStreamInternal(selected);
   },
 
-  // Extracted verbatim from playStream's body (mobile-parity ticket 04-01) so the phone
-  // streams screen's long-press action menu (streamScreenPhone.jsx) can offer an explicit
-  // "Open in internal player" action that navigates straight to the in-app player for an
-  // already-resolved stream, bypassing the external-player handoff `tryOpenInExternalPlayer`
-  // performs for the normal tap flow. No logic changed from the original inline body; `selected`
-  // is the same already-resolved stream object `playStream` used to pass through unchanged.
   async playStreamInternal(selected) {
     const playerStreamCandidates = this.getFilteredStreams();
     const itemType = normalizeType(this.params?.itemType);
@@ -2741,3 +2717,665 @@ export const StreamScreen = {
     ScreenUtils.hide(this.container);
   }
 };
+
+// ---------------------------------------------------------------------------
+// Phone stream screen component
+// ---------------------------------------------------------------------------
+
+function phoneT(key, params = {}, fallback = key) {
+  return I18n.t(key, params, { fallback });
+}
+
+function Html({ html, tag = "span", ...rest }) {
+  const Tag = tag;
+  return <Tag {...rest} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+function IconBack() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M15 18l-6-6 6-6"
+      />
+    </svg>
+  );
+}
+
+function IconPlay() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function IconRefresh() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M4 4v6h6M20 20v-6h-6M4.5 15a8 8 0 0 0 14.5 3M19.5 9A8 8 0 0 0 5 6"
+      />
+    </svg>
+  );
+}
+
+function iconCopyHtml() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>`;
+}
+
+function iconExternalHtml() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 4h6v6M10 14 20 4M19 13v6a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg>`;
+}
+
+function iconInternalHtml() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path fill="currentColor" d="M10 8.5v6l5-3z"/></svg>`;
+}
+
+function iconDownloadHtml() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>`;
+}
+
+function formatResumeClock(positionMs = 0) {
+  const totalSeconds = Math.max(0, Math.floor(Number(positionMs || 0) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (value) => String(value).padStart(2, "0");
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
+function PhoneHero({ screen }) {
+  const { isSeries, title, subtitle, episodeLabel, detailLine } = screen.getHeaderMeta();
+  const backdrop = screen.getBackdropUrl();
+  const logo = screen.params?.logo || "";
+
+  if (isSeries) {
+    return (
+      <section class="phone-stream-hero">
+        {backdrop ? (
+          <img class="phone-stream-hero-thumb" src={backdrop} alt="" loading="eager" />
+        ) : (
+          <div class="phone-stream-hero-thumb phone-stream-hero-thumb-empty" aria-hidden="true" />
+        )}
+        {episodeLabel ? <div class="phone-stream-hero-badge">{episodeLabel}</div> : null}
+        <h1 class="phone-stream-hero-title">{title}</h1>
+        {subtitle ? <div class="phone-stream-hero-subtitle">{subtitle}</div> : null}
+      </section>
+    );
+  }
+
+  return (
+    <section class="phone-stream-hero phone-stream-hero-movie">
+      {logo ? (
+        <img class="phone-stream-hero-logo" src={logo} alt={title} />
+      ) : (
+        <h1 class="phone-stream-hero-title centered">{title}</h1>
+      )}
+      {detailLine ? <div class="phone-stream-hero-meta">{detailLine}</div> : null}
+    </section>
+  );
+}
+
+function PhoneResumePill({ screen, filtered, onPlay }) {
+  if (screen.params?.startFromBeginning) {
+    return null;
+  }
+  const hasResume = isWatchProgressInProgress({
+    positionMs: Number(screen.params?.resumePositionMs || 0) || 0,
+    progressPercent: screen.params?.resumeProgressPercent,
+    durationMs: Number(screen.params?.resumeDurationMs || 0) || 0
+  });
+  if (!hasResume || !filtered.length) {
+    return null;
+  }
+  const preferredId = String(screen.params?.preferredStreamId || "").trim();
+  const target =
+    (preferredId && filtered.find((stream) => stream.id === preferredId)) || filtered[0];
+  if (!target?.id) {
+    return null;
+  }
+  const positionLabel = formatResumeClock(Number(screen.params?.resumePositionMs || 0));
+  return (
+    <button
+      type="button"
+      class="phone-stream-resume-pill focusable"
+      data-action="resumePlay"
+      data-stream-id={target.id}
+      onClick={() => onPlay(target.id)}
+    >
+      <IconPlay />
+      <span>{phoneT("stream_resume_from", [positionLabel], `Resume from ${positionLabel}`)}</span>
+    </button>
+  );
+}
+
+function PhoneChip({ addon, label, selected, status, onSelect }) {
+  const chipStatus = String(status || "success");
+  const classes = [
+    "phone-stream-chip",
+    "focusable",
+    selected ? "selected" : "",
+    chipStatus !== "success" ? chipStatus : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <button
+      type="button"
+      class={classes}
+      data-action="setFilter"
+      data-addon={addon}
+      onClick={() => onSelect(addon)}
+    >
+      {chipStatus === "loading" ? (
+        <Html
+          tag="span"
+          html={renderLoadingIndicator({ className: "phone-stream-chip-spinner" })}
+        />
+      ) : null}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function PhoneFilterRow({ screen, onSelectFilter, onRefresh }) {
+  const ordered = screen.getOrderedFilterNames();
+  return (
+    <div class="phone-stream-chip-row-wrap">
+      <div class="phone-stream-chip-row" data-phone-stream-chip-row>
+        <button
+          type="button"
+          class="phone-stream-chip phone-stream-chip-refresh focusable"
+          data-action="refreshStreams"
+          aria-label={phoneT("common.refresh", {}, "Refresh")}
+          onClick={onRefresh}
+        >
+          <IconRefresh />
+        </button>
+        <PhoneChip
+          addon="all"
+          label={phoneT("common.all", {}, "All")}
+          selected={screen.addonFilter === "all"}
+          status="success"
+          onSelect={onSelectFilter}
+        />
+        {ordered.map((name) => {
+          const chip = screen.sourceChips.find((entry) => entry.name === name) || {
+            name,
+            status: "success"
+          };
+          return (
+            <PhoneChip
+              key={name}
+              addon={name}
+              label={name}
+              selected={screen.addonFilter === name}
+              status={chip.status}
+              onSelect={onSelectFilter}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function buildPhoneSubgroups(streams) {
+  const distinct = new Set(
+    streams.map((stream) => String(stream.sourceProviderId || "").trim()).filter(Boolean)
+  );
+  if (distinct.size < 2) {
+    return [{ label: "", streams }];
+  }
+  const order = [];
+  const bySource = new Map();
+  streams.forEach((stream) => {
+    const key = String(stream.sourceProviderId || "").trim() || "__other__";
+    if (!bySource.has(key)) {
+      bySource.set(key, []);
+      order.push(key);
+    }
+    bySource.get(key).push(stream);
+  });
+  return order.map((key) => ({
+    label: key === "__other__" ? "" : key,
+    streams: bySource.get(key)
+  }));
+}
+
+function buildPhoneGroups(screen, filtered) {
+  const order = [];
+  const byAddon = new Map();
+  filtered.forEach((stream) => {
+    const addonName =
+      String(stream.addonName || "").trim() || phoneT("common.unknown", {}, "Unknown");
+    if (!byAddon.has(addonName)) {
+      byAddon.set(addonName, []);
+      order.push(addonName);
+    }
+    byAddon.get(addonName).push(stream);
+  });
+  const groups = order.map((addonName) => {
+    const streams = byAddon.get(addonName);
+    const chip = screen.sourceChips.find((entry) => entry.name === addonName);
+    return {
+      addonName,
+      logo: chip?.logo || streams[0]?.addonLogo || "",
+      streams,
+      subgroups: buildPhoneSubgroups(streams),
+      pending: false
+    };
+  });
+  const includedNames = new Set(order);
+  screen.sourceChips.forEach((chip) => {
+    if (chip.status === "loading" && !includedNames.has(chip.name)) {
+      groups.push({
+        addonName: chip.name,
+        logo: chip.logo || "",
+        streams: [],
+        subgroups: [],
+        pending: true
+      });
+    }
+  });
+  return groups;
+}
+
+function PhoneAddonAvatar({ screen, name, logoHint }) {
+  const logo = normalizeAddonLogoUrl(logoHint) || resolveAddonLogo(name, screen.addonLogoLookup);
+  const cached = logo ? getCachedAddonLogoDisplayUrl(logo) : "";
+  if (logo && !cached && !hasFailedAddonLogo(logo)) {
+    requestAddonLogo(logo, () => screen.requestRender({ delayMs: 160 }));
+  }
+  return cached ? (
+    <img src={cached} alt={name} loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+  ) : (
+    <span>{getAddonBadgeLabel(name)}</span>
+  );
+}
+
+function PhoneStreamRow({
+  screen,
+  stream,
+  badgeSettings,
+  streamBadgesEnabled,
+  selectedStreamId,
+  onPlay
+}) {
+  const headline = getStreamHeadline(stream);
+  const quality = getStreamQuality(stream);
+  const badges = renderStreamBadges(stream, streamBadgesEnabled, badgeSettings);
+  const badgePlacement = resolveStreamBadgePlacement(badgeSettings);
+  const topBadges = badgePlacement === "TOP" ? badges : "";
+  const bottomBadges = badgePlacement === "BOTTOM" ? badges : "";
+  const descriptionLines = getStreamDescriptionLines(stream);
+  const isSelected = Boolean(selectedStreamId) && String(stream.id || "") === selectedStreamId;
+  const showAddonLogo = badgeSettings?.showAddonLogo === true;
+
+  return (
+    <button
+      type="button"
+      class={`phone-stream-row focusable${isSelected ? " selected" : ""}`}
+      data-action="playStream"
+      data-stream-id={stream.id}
+      onClick={() => onPlay(stream.id)}
+    >
+      <div class="phone-stream-row-main">
+        <div class="phone-stream-row-heading">{headline}</div>
+        {topBadges ? <Html html={topBadges} /> : null}
+        {!badges ? <div class="phone-stream-row-quality">{quality}</div> : null}
+        {descriptionLines.map((line, index) => (
+          <div key={index} class={`phone-stream-row-line${index > 0 ? " secondary" : ""}`}>
+            {line}
+          </div>
+        ))}
+        {bottomBadges ? <Html html={bottomBadges} /> : null}
+      </div>
+      {showAddonLogo ? (
+        <div class="phone-stream-row-side">
+          <div class="phone-stream-row-badge">
+            <PhoneAddonAvatar
+              screen={screen}
+              name={stream.addonName || "Addon"}
+              logoHint={stream.addonLogo}
+            />
+          </div>
+          <div class="phone-stream-row-addon-name">{stream.addonName || "Addon"}</div>
+        </div>
+      ) : null}
+    </button>
+  );
+}
+
+function PhoneGroup({
+  screen,
+  group,
+  badgeSettings,
+  streamBadgesEnabled,
+  selectedStreamId,
+  onPlay
+}) {
+  return (
+    <section class="phone-stream-group">
+      <div class="phone-stream-group-header">
+        <div class="phone-stream-group-avatar">
+          <PhoneAddonAvatar screen={screen} name={group.addonName} logoHint={group.logo} />
+        </div>
+        <div class="phone-stream-group-name">{group.addonName}</div>
+        {group.pending ? (
+          <>
+            <Html html={renderLoadingIndicator({ className: "phone-stream-group-spinner-icon" })} />
+            <span class="phone-stream-group-status">
+              {phoneT("stream_fetching", {}, "Fetching…")}
+            </span>
+          </>
+        ) : null}
+      </div>
+      {group.subgroups.map((subgroup, index) => (
+        <div key={subgroup.label || index}>
+          {subgroup.label ? <div class="phone-stream-subgroup-header">{subgroup.label}</div> : null}
+          {subgroup.streams.map((stream) => (
+            <PhoneStreamRow
+              key={stream.id}
+              screen={screen}
+              stream={stream}
+              badgeSettings={badgeSettings}
+              streamBadgesEnabled={streamBadgesEnabled}
+              selectedStreamId={selectedStreamId}
+              onPlay={onPlay}
+            />
+          ))}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function PhoneFullListSpinner() {
+  return (
+    <div class="phone-stream-full-spinner">
+      <Html html={renderLoadingIndicator({ className: "phone-stream-full-spinner-icon" })} />
+      <span>{phoneT("stream_loading_sources", {}, "Finding sources…")}</span>
+    </div>
+  );
+}
+
+function PhoneFooterSpinner() {
+  return (
+    <div class="phone-stream-footer-spinner">
+      <Html html={renderLoadingIndicator({ className: "phone-stream-footer-spinner-icon" })} />
+      <span>{phoneT("stream_loading_more_sources", {}, "Still looking for more sources…")}</span>
+    </div>
+  );
+}
+
+function PhoneEmptyState({ title, message }) {
+  return (
+    <div class="phone-stream-empty-state">
+      <div class="phone-stream-empty-title">{title}</div>
+      <div class="phone-stream-empty-message">{message}</div>
+    </div>
+  );
+}
+
+function PhoneBody({
+  screen,
+  filtered,
+  badgeSettings,
+  streamBadgesEnabled,
+  selectedStreamId,
+  onPlay
+}) {
+  const hasAnyStreams = screen.streams.length > 0;
+  const hasPendingForFilter = screen.hasPendingSourceLoads();
+
+  if (screen.error) {
+    return (
+      <PhoneEmptyState
+        title={phoneT("stream_fetch_failed_title", {}, "Couldn't load streams")}
+        message={String(screen.error)}
+      />
+    );
+  }
+  if (screen.loading && !hasAnyStreams) {
+    return <PhoneFullListSpinner />;
+  }
+  if (!filtered.length) {
+    if (!hasAnyStreams && !screen.loading) {
+      const installedAddons = addonRepository.getCachedInstalledAddons() || [];
+      if (!installedAddons.length) {
+        return (
+          <PhoneEmptyState
+            title={phoneT("stream_no_addons_title", {}, "No addons installed")}
+            message={phoneT(
+              "stream_no_addons_message",
+              {},
+              "Install a content addon in Settings to see sources here."
+            )}
+          />
+        );
+      }
+      if (!screen.sourceChips.length) {
+        return (
+          <PhoneEmptyState
+            title={phoneT("stream_no_compatible_title", {}, "No compatible addons")}
+            message={phoneT(
+              "stream_no_compatible_message",
+              {},
+              "None of your installed addons support this title."
+            )}
+          />
+        );
+      }
+    }
+    if (hasPendingForFilter) {
+      return <PhoneFullListSpinner />;
+    }
+    return (
+      <PhoneEmptyState
+        title={phoneT("stream_no_streams_title", {}, "No sources found")}
+        message={phoneT(
+          "stream_no_streams_message",
+          {},
+          "Try a different filter, or check back later."
+        )}
+      />
+    );
+  }
+
+  const groups = buildPhoneGroups(screen, filtered);
+  return (
+    <>
+      {groups.map((group) => (
+        <PhoneGroup
+          key={group.addonName}
+          screen={screen}
+          group={group}
+          badgeSettings={badgeSettings}
+          streamBadgesEnabled={streamBadgesEnabled}
+          selectedStreamId={selectedStreamId}
+          onPlay={onPlay}
+        />
+      ))}
+      {hasPendingForFilter ? <PhoneFooterSpinner /> : null}
+    </>
+  );
+}
+
+async function copyPhoneStreamLink(screen, stream) {
+  const url = (await screen.resolveDirectStreamUrl(stream)) || buildMagnetFallback(stream) || "";
+  if (!url) {
+    screen.showStreamToast(
+      phoneT("stream_link_unavailable", {}, "No link available for this stream")
+    );
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    screen.showStreamToast(phoneT("stream_link_copied", {}, "Link copied"));
+  } catch (_) {
+    screen.showStreamToast(phoneT("stream_link_copy_failed", {}, "Could not copy link"));
+  }
+}
+
+async function openPhoneStreamExternally(screen, stream) {
+  const opened = await screen.tryOpenInExternalPlayer(stream);
+  if (!opened) {
+    screen.showStreamToast(
+      phoneT("stream_no_external_player", {}, "No external player configured — set one in Settings")
+    );
+  }
+}
+
+async function downloadPhoneStream(screen, stream) {
+  const url = await screen.resolveDirectStreamUrl(stream);
+  if (!url) {
+    screen.showStreamToast(
+      phoneT("stream_download_unavailable", {}, "This stream can't be downloaded")
+    );
+    return;
+  }
+  const filename = `${getStreamHeadline(stream) || "Nuvio"}`.trim();
+  screen.launchExternalPlayerHref(
+    url,
+    filename,
+    phoneT("stream_download_started", {}, "Download started")
+  );
+}
+
+function openPhoneStreamActionSheet(screen, stream) {
+  openBottomSheet({
+    items: [
+      {
+        icon: iconCopyHtml(),
+        title: phoneT("stream_action_copy_link", {}, "Copy Link"),
+        onSelect: () => void copyPhoneStreamLink(screen, stream)
+      },
+      {
+        icon: iconExternalHtml(),
+        title: phoneT("stream_action_open_external", {}, "Open in External Player"),
+        onSelect: () => void openPhoneStreamExternally(screen, stream)
+      },
+      {
+        icon: iconInternalHtml(),
+        title: phoneT("stream_action_open_internal", {}, "Open in Internal Player"),
+        onSelect: () => void screen.playStreamInternal(stream)
+      },
+      {
+        icon: iconDownloadHtml(),
+        title: phoneT("stream_action_download", {}, "Download as File"),
+        onSelect: () => void downloadPhoneStream(screen, stream)
+      }
+    ]
+  });
+}
+
+function StreamScreenPhone({ screen }) {
+  const containerRef = useRef(null);
+
+  const backdrop = screen.getBackdropUrl();
+  const backdropStyle = backdrop
+    ? { backgroundImage: `url('${String(backdrop).replace(/'/g, "%27")}')` }
+    : undefined;
+
+  const filtered = screen.autoResumeUiActive ? [] : screen.getFilteredStreams();
+  const badgeSettings = StreamBadgeSettingsStore.snapshot();
+  const streamBadgesEnabled = DebridSettingsStore.get().streamBadgesEnabled !== false;
+  const selectedStreamId = String(screen.params?.preferredStreamId || "").trim();
+
+  const handlePlay = (streamId) => {
+    void screen.playStream(streamId);
+  };
+  const handleSelectFilter = (addon) => {
+    screen.setAddonFilter(addon);
+  };
+  const handleRefresh = () => {
+    void screen.loadStreams();
+  };
+  const handleBack = () => {
+    if (!screen.navigateBackFromStream()) {
+      Router.back();
+    }
+  };
+
+  useEffect(() => {
+    closeActiveBottomSheet();
+    const container = containerRef.current;
+    if (!container) {
+      return undefined;
+    }
+    const rows = Array.from(container.querySelectorAll(".phone-stream-row"));
+    const currentFiltered = screen.getFilteredStreams();
+    const detachers = rows.map((row) =>
+      attachLongPress(row, {
+        onLongPress: () => {
+          const streamId = String(row.dataset.streamId || "");
+          const stream = currentFiltered.find((entry) => String(entry.id) === streamId);
+          if (stream) {
+            openPhoneStreamActionSheet(screen, stream);
+          }
+        }
+      })
+    );
+    return () => detachers.forEach((detach) => detach());
+  });
+
+  useEffect(() => {
+    return () => closeActiveBottomSheet();
+  }, []);
+
+  return (
+    <div class="phone-stream-shell" data-phone-stream-shell ref={containerRef}>
+      <div class="phone-stream-backdrop" style={backdropStyle} />
+      <div class="phone-stream-backdrop-dim" />
+      {!screen.autoResumeUiActive ? (
+        <div class="phone-stream-scroll" data-phone-stream-scroll>
+          <header class="phone-stream-topbar">
+            <button
+              type="button"
+              class="phone-stream-back-btn focusable"
+              data-action="back"
+              aria-label={phoneT("common.back", {}, "Back")}
+              onClick={handleBack}
+            >
+              <IconBack />
+            </button>
+          </header>
+          <PhoneHero screen={screen} />
+          <PhoneResumePill screen={screen} filtered={filtered} onPlay={handlePlay} />
+          <PhoneFilterRow
+            screen={screen}
+            onSelectFilter={handleSelectFilter}
+            onRefresh={handleRefresh}
+          />
+          <div class="phone-stream-list" data-phone-stream-list>
+            <PhoneBody
+              screen={screen}
+              filtered={filtered}
+              badgeSettings={badgeSettings}
+              streamBadgesEnabled={streamBadgesEnabled}
+              selectedStreamId={selectedStreamId}
+              onPlay={handlePlay}
+            />
+          </div>
+        </div>
+      ) : null}
+      {screen.renderContinueWatchingResumeOverlay() ? (
+        <Html tag="div" html={screen.renderContinueWatchingResumeOverlay()} />
+      ) : null}
+      {screen.renderAutoPlayOverlay() ? (
+        <Html tag="div" html={screen.renderAutoPlayOverlay()} />
+      ) : null}
+    </div>
+  );
+}
