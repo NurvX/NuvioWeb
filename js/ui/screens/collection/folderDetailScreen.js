@@ -846,13 +846,7 @@ export const FolderDetailScreen = {
   async mount(params = {}, navigationContext = {}) {
     this.container = document.getElementById("folderDetail");
     ScreenUtils.show(this.container);
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => {
-      this.refreshUseHomeFollowLayout();
-      this.render();
-    });
     this.params = params || {};
     this.layoutPrefs = LayoutPreferences.get();
     this.collection =
@@ -1248,26 +1242,16 @@ export const FolderDetailScreen = {
     return candidates[0];
   },
 
-  // The follow layout is a TV/desktop hero presentation — it must never be selected on a
-  // phone viewport even when the user's Home Layout preference is "modern", or this screen
-  // renders TV-sized markup on phone instead of dispatching to renderPhone().
   refreshUseHomeFollowLayout() {
-    const preferredHomeLayout = String(this.layoutPrefs?.homeLayout || "classic").toLowerCase();
-    this.useHomeFollowLayout =
-      !Platform.isPhoneViewport() &&
-      (this.viewMode === "FOLLOW_LAYOUT" || preferredHomeLayout === "modern");
+    this.useHomeFollowLayout = false;
   },
 
   render() {
-    if (this.useHomeFollowLayout) {
-      this.renderFollowLayout();
-      return;
-    }
-    if (Platform.isPhoneViewport()) {
-      return this.renderPhone();
-    }
+    this.renderPhone();
+  },
+
+  _tvRender() {
     const enterClass = this.folderRouteEnterPending ? " nuvio-route-slide-enter" : "";
-    this.folderRouteEnterPending = false;
     const sourceRows =
       this.viewMode === "TABBED_GRID"
         ? this.sourceTabs || []
@@ -1935,42 +1919,8 @@ export const FolderDetailScreen = {
     return this.focusNode(target);
   },
 
-  // Phone dispatch (ticket 03-04, mobile-parity epic): delegates to
-  // folderDetailScreenPhone.js's own handler, which understands that module's own markup
-  // (data-action via posterCard.js/its own chrome, not the TV `.seeall-card`/
-  // `.folder-detail-tab` dataset convention below).
   onPointerActivate(target) {
-    if (this.useHomeFollowLayout) {
-      return false;
-    }
-    if (Platform.isPhoneViewport()) {
-      return handleFolderDetailPhonePointerActivate(this, target);
-    }
-    const actionTarget = target?.closest?.("[data-action]");
-    const action = String(actionTarget?.dataset?.action || "");
-    if (action === "selectTab") {
-      this.selectedTabIndex = Math.max(0, Number(actionTarget.dataset.tabIndex || 0));
-      this.lastFocusedKey = `tab:${this.selectedTabIndex}`;
-      this.savedScrollTop = 0;
-      this.render();
-      return true;
-    }
-    if (action === "openDetail") {
-      this.lastFocusedKey = String(actionTarget.dataset.focusKey || this.lastFocusedKey || "");
-      Router.navigate("detail", {
-        itemId: actionTarget.dataset.itemId || "",
-        itemType: actionTarget.dataset.itemType || actionTarget.dataset.catalogType || "movie",
-        fallbackTitle: actionTarget.dataset.itemTitle || "Untitled",
-        fallbackPoster: actionTarget.dataset.posterSrc || "",
-        fallbackBackground: actionTarget.dataset.backdropSrc || "",
-        addonBaseUrl: actionTarget.dataset.addonBaseUrl || "",
-        addonId: actionTarget.dataset.addonId || "",
-        addonName: actionTarget.dataset.addonName || "",
-        catalogType: actionTarget.dataset.catalogType || actionTarget.dataset.itemType || "movie"
-      });
-      return true;
-    }
-    return false;
+    return handleFolderDetailPhonePointerActivate(this, target);
   },
 
   consumeBackRequest() {
@@ -1989,22 +1939,7 @@ export const FolderDetailScreen = {
   },
 
   cleanup() {
-    this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = null;
     cleanupFolderDetailScreenPhone(this);
-    if (this.useHomeFollowLayout) {
-      HomeScreen.cancelModernCameraFollow.call(this, { stopAnimations: true });
-      HomeScreen.stopHeroRotation.call(this);
-      HomeScreen.cancelPendingHeroFocus.call(this);
-      HomeScreen.cancelFocusedPosterFlow.call(this);
-      HomeScreen.clearFocusedPosterFlowState.call(this);
-      HomeScreen.collapseFocusedPoster.call(this);
-      HomeScreen.teardownModernTrackScrollPagination.call(this);
-      if (this.boundHomeViewport && this.boundHomeViewportScrollHandler) {
-        this.boundHomeViewport.removeEventListener("scroll", this.boundHomeViewportScrollHandler);
-      }
-      this.boundHomeViewport = null;
-    }
     ScreenUtils.hide(this.container);
   }
 };

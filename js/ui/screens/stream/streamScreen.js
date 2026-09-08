@@ -45,7 +45,6 @@ import {
   resolveAddonLogo
 } from "../../../core/media/addonLogoCache.js";
 import { Environment } from "../../../platform/environment.js";
-import { Platform } from "../../../platform/index.js";
 
 import { I18n } from "../../../i18n/index.js";
 import {
@@ -941,10 +940,7 @@ export const StreamScreen = {
 
   async mount(params = {}, navigationContext = {}) {
     this.container = document.getElementById("stream");
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.requestRender());
     ScreenUtils.show(this.container);
     this.params = params || {};
     this.loadToken = (this.loadToken || 0) + 1;
@@ -2235,117 +2231,7 @@ export const StreamScreen = {
   },
 
   render() {
-    if (Platform.isPhoneViewport()) {
-      return this.renderPhone();
-    }
-    this.cancelScheduledRender();
-    // Rebuilt markup means the memoised filtered-stream list may be stale.
-    this._filteredStreamsCache = null;
-    const { isSeries, title, subtitle, episodeLabel, detailLine } = this.getHeaderMeta();
-    const backdrop = this.getBackdropUrl();
-    const logo = this.params?.logo || "";
-    const shellStableClass = this.hasRenderedStreamRouteShell ? " stable" : "";
-    const orderedFilters = this.getOrderedFilterNames();
-    const chips = [
-      this.renderChip("all", this.addonFilter === "all", "success"),
-      ...orderedFilters.map((name) => {
-        const chip = this.sourceChips.find((entry) => entry.name === name) || {
-          name,
-          status: "success"
-        };
-        return this.renderChip(name, this.addonFilter === name, chip.status);
-      })
-    ].join("");
-    const filtered = this.getFilteredStreams();
-    const hasPendingForFilter = this.hasPendingSourceLoads();
-    const hasAnyStreams = this.streams.length > 0;
-    const streamBadgesEnabled = DebridSettingsStore.get().streamBadgesEnabled !== false;
-    const badgeSettings = StreamBadgeSettingsStore.snapshot();
-    const showAddonLogo = badgeSettings.showAddonLogo === true;
-    const addonLogosReady = !showAddonLogo || !filtered.length || this.areAddonLogosReady(filtered);
-
-    let body = "";
-    if (filtered.length && addonLogosReady) {
-      body = filtered
-        .map((stream, index) =>
-          this.renderStreamCard(stream, index, streamBadgesEnabled, badgeSettings)
-        )
-        .join("");
-      if (hasPendingForFilter) {
-        body += this.renderLoadingCards(1);
-      }
-    } else if (filtered.length && showAddonLogo) {
-      this.requestAddonLogoPrerender(filtered);
-      body = this.renderLoadingCards(Math.min(3, filtered.length));
-    } else if ((this.loading && !hasAnyStreams) || hasPendingForFilter) {
-      body = this.renderLoadingCards();
-    } else if (this.error) {
-      body = `<div class="stream-route-empty">${escapeHtml(this.error)}</div>`;
-    } else if (!filtered.length) {
-      body = `<div class="stream-route-empty">No sources found for this filter.</div>`;
-    }
-
-    const routeContent = this.autoResumeUiActive
-      ? ""
-      : `
-        <div class="stream-route-content">
-          <section class="stream-route-left">
-            <div class="stream-route-left-inner">
-              ${logo ? `<img src="${logo}" class="stream-route-logo" alt="${escapeHtml(title)}" />` : `<h1 class="stream-route-title">${escapeHtml(title)}</h1>`}
-              ${episodeLabel ? `<div class="stream-route-episode-code">${escapeHtml(episodeLabel)}</div>` : ""}
-              ${subtitle ? `<div class="stream-route-subtitle">${escapeHtml(subtitle)}</div>` : ""}
-              ${detailLine ? `<div class="stream-route-detail-line">${escapeHtml(detailLine)}</div>` : !isSeries && subtitle ? `<div class="stream-route-detail-line">${escapeHtml(subtitle)}</div>` : ""}
-            </div>
-          </section>
-          <section class="stream-route-right">
-            <div class="stream-route-chip-wrap">
-              <div class="stream-route-chip-track">${chips}</div>
-            </div>
-            <div class="stream-route-panel-shell">
-              <div class="stream-route-panel">
-                <div class="stream-route-list">${body}</div>
-              </div>
-            </div>
-          </section>
-        </div>`;
-
-    const nextMarkup = `
-      <div class="stream-route-shell${shellStableClass}">
-        <div class="stream-route-backdrop"${backdrop ? ` style="background-image:url('${String(backdrop).replace(/'/g, "%27")}')"` : ""}></div>
-        <div class="stream-route-backdrop-dim"></div>
-        <div class="stream-route-left-gradient"></div>
-        <div class="stream-route-right-gradient"></div>
-        ${routeContent}
-        ${this.renderContinueWatchingResumeOverlay()}
-        ${this.renderAutoPlayOverlay()}
-      </div>
-    `;
-
-    // Addon logos and the webOS image proxy each schedule their own render once
-    // they resolve, so a settled list is rebuilt several times over. Measured on
-    // a 407-source list: three consecutive renders produced byte-identical
-    // markup at ~1s each, so two of them were pure parse/layout/paint cost.
-    // Keep the exact generated markup. Fixed-width hashes are not sufficient
-    // here because stream/addon text is part of the string and collisions could
-    // otherwise cause a genuinely changed list to retain stale DOM.
-    const shellMounted = Boolean(this.container.querySelector(".stream-route-shell"));
-    const markupUnchanged = shellMounted && this.renderedMarkup === nextMarkup;
-
-    if (!markupUnchanged) {
-      this.container.innerHTML = nextMarkup;
-      this.renderedMarkup = nextMarkup;
-      this.streamFocusDomCache = null;
-      this.focusedElement = null;
-    }
-
-    this.restoreScrollPosition();
-    this.hydrateVisibleStreamBadges();
-    this.bindAddonLogoFallbacks();
-    ScreenUtils.indexFocusables(this.container);
-    this.restoreScrollPosition();
-    this.applyFocus();
-    this.bindListScrollState();
-    this.hasRenderedStreamRouteShell = true;
+    this.renderPhone();
   },
 
   bindListScrollState() {
@@ -2671,33 +2557,7 @@ export const StreamScreen = {
     return false;
   },
 
-  onPointerActivate(target) {
-    if (Platform.isPhoneViewport()) {
-      // The phone markup (js/ui/screens/stream/streamScreenPhone.jsx) is a Preact component
-      // wired with its own onClick handlers, so FocusEngine's shared click-delegation contract
-      // is a no-op here — unlike the TV dispatch below.
-      return false;
-    }
-    if (!target || !this.container?.contains(target)) {
-      return false;
-    }
-    const actionTarget = target.closest?.("[data-action]") || target;
-    this.onPointerFocus(actionTarget);
-    const action = String(actionTarget.dataset.action || "");
-    if (action === "setFilter") {
-      const addon = String(actionTarget.dataset.addon || "all");
-      const { chips } = this.getFocusLists();
-      this.setAddonFilter(addon, "filter", Math.max(0, chips.indexOf(actionTarget)));
-      return true;
-    }
-    if (action === "playStream") {
-      this.playStream(actionTarget.dataset.streamId);
-      return true;
-    }
-    if (action === "openNativePlayer") {
-      void this.openStreamInNativePlayer(actionTarget.dataset.streamId);
-      return true;
-    }
+  onPointerActivate() {
     return false;
   },
 
@@ -2859,8 +2719,6 @@ export const StreamScreen = {
   },
 
   cleanup() {
-    this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = null;
     if (this._unmountPhone) {
       this._unmountPhone();
       this._unmountPhone = null;
