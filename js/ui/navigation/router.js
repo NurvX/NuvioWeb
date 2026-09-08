@@ -16,9 +16,9 @@ import { SupportersContributorsScreen } from "../screens/supporters/supportersCo
 import { ExperienceModeSelectionScreen } from "../screens/onboarding/experienceModeSelectionScreen.jsx";
 import { EssentialAddonSetupScreen } from "../screens/onboarding/essentialAddonSetupScreen.jsx";
 import { LicensesAttributionsScreen } from "../screens/settings/licensesAttributionsScreen.js";
-import { PluginScreen } from "../screens/plugin/pluginScreen.js";
+import { PluginScreen } from "../screens/plugin/pluginScreen.jsx";
 import { PluginsScreen } from "../screens/plugin/pluginsScreen.js";
-import { CatalogOrderScreen } from "../screens/plugin/catalogOrderScreen.js";
+import { CatalogOrderScreen } from "../screens/plugin/catalogOrderScreen.jsx";
 import { StreamScreen } from "../screens/stream/streamScreen.js";
 import { CastDetailScreen } from "../screens/cast/castDetailScreen.js";
 import { CatalogSeeAllScreen } from "../screens/catalog/catalogSeeAllScreen.jsx";
