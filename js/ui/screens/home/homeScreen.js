@@ -9745,9 +9745,10 @@ export const HomeScreen = {
   collectHeroCandidates(rows) {
     const flat = [];
     const selectedKeys = new Set(this.layoutPrefs?.heroCatalogKeys || []);
+    const catalogOnly = (rows || []).filter((row) => row?.rowKind !== "collection");
     const eligibleRows = selectedKeys.size
-      ? (rows || []).filter((row) => selectedKeys.has(String(row?.homeCatalogKey || "")))
-      : rows;
+      ? catalogOnly.filter((row) => selectedKeys.has(String(row?.homeCatalogKey || "")))
+      : catalogOnly;
     eligibleRows.forEach((row) => {
       (row?.result?.data?.items || []).slice(0, 4).forEach((item) => {
         const normalized = normalizeHomeRowItem(row, item);
