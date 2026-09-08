@@ -1571,10 +1571,7 @@ export const MetaDetailsScreen = {
   async mount(params = {}, navigationContext = {}) {
     this.container = document.getElementById("detail");
     ScreenUtils.show(this.container);
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.render(this.meta));
     this.stopTrailerPlayback({
       keepDom: false,
       restartAutoplay: false,
@@ -2949,10 +2946,11 @@ export const MetaDetailsScreen = {
     return merged;
   },
 
-  render(meta, focusRestore = undefined) {
-    if (Platform.isPhoneViewport()) {
-      return this.renderPhone(meta);
-    }
+  render(meta, _focusRestore = undefined) {
+    this.renderPhone(meta);
+  },
+
+  _tvRender(meta, focusRestore = undefined) {
     if (this._sectionsUpdateRaf) {
       const cancelRaf =
         typeof cancelAnimationFrame === "function" ? cancelAnimationFrame : clearTimeout;
@@ -9200,10 +9198,7 @@ export const MetaDetailsScreen = {
       });
       return true;
     }
-    if (Platform.isPhoneViewport()) {
-      return handlePhoneMetaDetailsPointerActivate(this, target);
-    }
-    return false;
+    return handlePhoneMetaDetailsPointerActivate(this, target);
   },
 
   async onKeyUp(event) {

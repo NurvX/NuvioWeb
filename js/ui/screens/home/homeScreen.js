@@ -7546,10 +7546,7 @@ export const HomeScreen = {
   async mount(params = {}, navigationContext = {}) {
     const mountStart = HOME_PERF_DEBUG ? homePerfNow() : 0;
     this.container = document.getElementById("home");
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.requestRender());
     const restoredRouteFocusState =
       navigationContext?.isBackNavigation && navigationContext?.restoredState?.layoutMode
         ? navigationContext.restoredState
@@ -8404,9 +8401,10 @@ export const HomeScreen = {
   },
 
   render() {
-    if (Platform.isPhoneViewport()) {
-      return this.renderPhone();
-    }
+    this.renderPhone();
+  },
+
+  _tvRender() {
     const renderStart = HOME_PERF_DEBUG ? homePerfNow() : 0;
     this.cancelScheduledRender();
     this.cancelModernCameraFollow({ stopAnimations: true });
@@ -8835,14 +8833,7 @@ export const HomeScreen = {
     mountHomeScreenPhone(this, this.container);
   },
 
-  // Delegates tap navigation for the phone home screen's poster-card markup (data-action/
-  // data-id via posterCard.js) through the shared onPointerActivate contract FocusEngine's
-  // global click dispatch already calls. Returns false (a no-op) outside phone mode so TV's
-  // own click handling — which never went through this contract — is unaffected.
   onPointerActivate(target) {
-    if (!Platform.isPhoneViewport()) {
-      return false;
-    }
     return handlePhoneHomePointerActivate(this, target);
   },
 

@@ -437,10 +437,7 @@ export const SearchScreen = {
   async mount(params = {}, navigationContext = {}) {
     this.container = document.getElementById("search");
     ScreenUtils.show(this.container);
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.requestRender());
     this.searchRouteEnterPending = true;
     this.activationGuardUntil = Date.now() + 220;
     this.layoutPrefs = LayoutPreferences.get();
@@ -855,9 +852,10 @@ export const SearchScreen = {
   },
 
   render() {
-    if (Platform.isPhoneViewport()) {
-      return this.renderPhone();
-    }
+    this.renderPhone();
+  },
+
+  _tvRender() {
     this.cancelScheduledRender();
     const queryText = this.query || "";
     this.container.innerHTML = `
@@ -936,14 +934,7 @@ export const SearchScreen = {
     mountSearchScreenPhone(this, this.container);
   },
 
-  // Delegates tap navigation for the phone search screen's markup (data-action via
-  // searchScreenPhone.js) through the shared onPointerActivate contract FocusEngine's global
-  // click dispatch already calls. Returns false (a no-op) outside phone mode so TV's own click
-  // handling — which never went through this contract — is unaffected.
   onPointerActivate(target) {
-    if (!Platform.isPhoneViewport()) {
-      return false;
-    }
     return handleSearchPhonePointerActivate(this, target);
   },
 

@@ -2114,12 +2114,7 @@ export const SettingsScreen = {
   async mount(_params = {}, navigationContext = {}) {
     this.container = document.getElementById("settings");
     ScreenUtils.show(this.container);
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => {
-      void this.render({ refreshModel: false });
-    });
     if (!this.handleWheelBound) {
       this.handleWheelBound = this.handleWheelEvent.bind(this);
       this.container.addEventListener("wheel", this.handleWheelBound, { passive: false });
@@ -6782,16 +6777,14 @@ export const SettingsScreen = {
     this.ensureExpandedState(section.id);
     this.persistUiState();
 
-    // Phone render path (ticket 05-01, mobile-parity epic). Placed here rather than at the
-    // very top of render() because this.model/this.visibleSections/this.actionMap (reset just
-    // above) are shared prep both TV and phone need — settingsScreenPhone.js calls
-    // this.renderSection(...) itself per visible section, reusing that same actionMap. Only
-    // the TV-shell-specific DOM work from here on (ensureShell()/nav rail/content slot/dialog
-    // slot) is skipped for phone.
-    if (Platform.isPhoneViewport()) {
-      return this.renderPhone();
-    }
+    return this.renderPhone();
+  },
 
+  _tvRender() {
+    const section =
+      getSettingsSectionById(this.activeSection) ||
+      this.visibleSections.find((item) => item.id === this.activeSection) ||
+      this.visibleSections[0];
     this.ensureShell();
 
     const shell = this.container.querySelector(".settings-shell");

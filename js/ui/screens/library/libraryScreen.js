@@ -231,10 +231,7 @@ export const LibraryScreen = {
   async mount() {
     this.container = document.getElementById("library");
     ScreenUtils.show(this.container);
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.requestRender());
     const controller = new LibraryController((state, change) =>
       this.handleControllerChange(state, change)
     );
@@ -1017,9 +1014,10 @@ export const LibraryScreen = {
   },
 
   render() {
-    if (Platform.isPhoneViewport()) {
-      return this.renderPhone();
-    }
+    this.renderPhone();
+  },
+
+  _tvRender() {
     this.cancelScheduledRender();
     this.layoutPrefs = LayoutPreferences.get();
     this.sidebarExpanded = false;
@@ -1092,14 +1090,7 @@ export const LibraryScreen = {
     mountLibraryScreenPhone(this, this.container);
   },
 
-  // Delegates tap navigation for the phone library screen's markup (data-action via
-  // libraryScreenPhone.js) through the shared onPointerActivate contract FocusEngine's global
-  // click dispatch already calls. Returns false (a no-op) outside phone mode so TV's own click
-  // handling — which never went through this contract — is unaffected.
   onPointerActivate(target) {
-    if (!Platform.isPhoneViewport()) {
-      return false;
-    }
     return handleLibraryPhonePointerActivate(this, target);
   },
 

@@ -43,7 +43,6 @@ import { selectAutoPlayStream } from "../../../core/streams/streamAutoPlaySelect
 import { metaRepository } from "../../../data/repository/metaRepository.js";
 import { I18n } from "../../../i18n/index.js";
 import { Environment } from "../../../platform/environment.js";
-import { Platform } from "../../../platform/index.js";
 import { Router } from "../../navigation/router.js";
 import { attachPlayerGestureLayer, PLAYER_GESTURE_HOLD_SPEED } from "./playerGestures.js";
 import {
@@ -2166,12 +2165,7 @@ export const PlayerScreen = {
     const mountToken = Number(this.playerMountToken || 0) + 1;
     this.playerMountToken = mountToken;
     this.playerRouteActive = true;
-    // Phone gesture layer (ticket 04-02, mobile-parity epic) — re-synced live when the
-    // viewport crosses the phone breakpoint (00-07), same pattern as every other phone-mode
-    // screen. All of it is additive and gated behind Platform.isPhoneViewport(); it never
-    // touches the existing keydown-based D-pad control logic below.
     this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => this.syncPhoneMode());
     this.webOsClockLocaleInfo = null;
     this.webOsClockSettingsSubscription?.cancel?.();
     this.webOsClockSettingsSubscription = null;
@@ -9612,7 +9606,7 @@ export const PlayerScreen = {
     }
     // Phone mode uses a shorter auto-hide delay (ticket 04-02) — TV's 4200ms is unchanged when
     // Platform.isPhoneViewport() is false.
-    const hideDelayMs = Platform.isPhoneViewport() ? 3500 : 4200;
+    const hideDelayMs = 3500;
     this.controlsHideTimer = setTimeout(() => {
       this.setControlsVisible(false);
     }, hideDelayMs);
@@ -19240,7 +19234,7 @@ export const PlayerScreen = {
   // methods' own trailing call. Cheap to call repeatedly: it only rebuilds the DOM once per
   // #playerUiRoot lifetime and otherwise just refreshes existing nodes.
   syncPhonePlayerChrome() {
-    if (this.isExternalFrameMode() || !Platform.isPhoneViewport()) {
+    if (this.isExternalFrameMode()) {
       this.teardownPhonePlayerChrome();
       return;
     }
@@ -19293,11 +19287,6 @@ export const PlayerScreen = {
   // resize across the phone breakpoint attaches/detaches the layer without a full re-mount.
   syncPhoneGestureLayer() {
     if (this.isExternalFrameMode()) {
-      this.teardownPhoneGestureLayer();
-      return;
-    }
-    const shouldAttach = Platform.isPhoneViewport();
-    if (!shouldAttach) {
       this.teardownPhoneGestureLayer();
       return;
     }
