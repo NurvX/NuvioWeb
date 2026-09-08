@@ -122,8 +122,9 @@ bottom tab bar and fullscreen player.
 - `hlsJsEngine.js` — HLS.js (primary path for mobile)
 - `dashJsEngine.js` — DASH playback
 
-`platformAvplayEngine.js` (Tizen/webOS AVPlay) is TV-only dead code to be removed.
-Subtitle rendering supports bitmap decode (`bitmapSubtitleDecoder.js`) alongside text cues.
+`platformAvplayEngine.js` (Tizen/webOS AVPlay) has been deleted. The player controller inlines
+a disabled stub. Subtitle rendering supports bitmap decode (`bitmapSubtitleDecoder.js`)
+alongside text cues.
 
 ### App startup (`js/app.js`)
 
@@ -183,14 +184,13 @@ to three adapters. Target: mobile platform layer with iOS/Android adapters via
 **Router** — still has webOS resume-route persistence and Tizen back-guard timing. Target:
 simple history-stack with Android back (`popstate`) and PWA resume handling.
 
-**Player** — `platformAvplayEngine.js` (47 lines) is TV-only, to be deleted. The three browser
-engines (native, HLS.js, DASH.js) stay.
+**Player** — `platformAvplayEngine.js` deleted; player controller stubs the AVPlay engine as
+disabled inline. The three browser engines (native, HLS.js, DASH.js) stay.
 
-**FocusEngine** — `focusEngine.js` (327 lines) is the D-pad spatial navigation engine, TV-only.
-Dead code — `gestureEngine.js` handles all phone interaction. Delete.
+**FocusEngine** — `focusEngine.js` deleted. `gestureEngine.js` handles all phone interaction.
 
-**Packaging scripts** — ~1,527 lines across `package-tizen.mjs`, `package-webos.mjs`,
-`ares-*.mjs`, `sync-*.mjs`. All dead, to be deleted along with their npm script entries.
+**Packaging scripts** — deleted: `package-tizen.mjs`, `package-webos.mjs`, `ares-*.mjs`,
+`sync-*.mjs`, and their npm script entries. `release-platform-artifacts.yml` workflow also deleted.
 
 **i18n** — `I18n.apply()` scans the DOM for `data-i18n` attributes. Needs adaptation for
 Preact JSX screens that manage their own DOM.

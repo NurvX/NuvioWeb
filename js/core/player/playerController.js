@@ -6,7 +6,6 @@ import { WatchProgressSyncService } from "../profile/watchProgressSyncService.js
 import { nativeVideoEngine } from "./engines/nativeVideoEngine.js";
 import { hlsJsEngine } from "./engines/hlsJsEngine.js";
 import { dashJsEngine } from "./engines/dashJsEngine.js";
-import { resolvePlatformAvplayEngine } from "./engines/platformAvplayEngine.js";
 import {
   applyWebOsAudioCodecOverrides,
   detectWebOsAudioCapabilities
@@ -336,7 +335,15 @@ export const PlayerController = {
   },
 
   getPlatformAvplayEngine() {
-    return resolvePlatformAvplayEngine(Platform.getName());
+    return {
+      name: "none",
+      isSupported() {
+        return false;
+      },
+      getApi() {
+        return null;
+      }
+    };
   },
 
   getPlatformAvplayEngineName() {
