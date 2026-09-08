@@ -429,14 +429,7 @@ export function getAddonBadgeLabel(name = "") {
 }
 
 async function ensureAddonLogoImageProxyReady() {
-  if (!Environment.isWebOS()) {
-    return false;
-  }
-  try {
-    return await ensureWebOsImageProxyReady();
-  } catch (_) {
-    return false;
-  }
+  return false;
 }
 
 export async function preloadStreamBadgeImages(settings = StreamBadgeSettingsStore.snapshot()) {

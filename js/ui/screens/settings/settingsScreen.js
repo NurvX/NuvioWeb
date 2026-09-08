@@ -2247,11 +2247,7 @@ export const SettingsScreen = {
       pluginsEnabled: PluginManager.pluginsEnabled,
       theme: ThemeStore.get(),
       player: PlayerSettingsStore.get(),
-      webOsAudioCompatibility: Platform.isWebOS()
-        ? WebOsAudioCompatibilityStore.get({
-            legacyForceAll: Boolean(PlayerSettingsStore.get().forceDtsTrueHdAudio)
-          })
-        : null,
+      webOsAudioCompatibility: null,
       torrent: TorrentSettingsStore.get(),
       layout: LayoutPreferences.get(),
       homeCatalog: HomeCatalogStore.get(),
