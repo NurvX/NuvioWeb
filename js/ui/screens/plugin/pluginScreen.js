@@ -6,26 +6,12 @@ import { addonRepository } from "../../../data/repository/addonRepository.js";
 import { Platform } from "../../../platform/index.js";
 import { QrCodeGenerator } from "../../../core/qr/qrCodeGenerator.js";
 import { ExperienceModeStore } from "../../../data/local/experienceModeStore.js";
-import { I18n } from "../../../i18n/index.js";
 import { h } from "preact";
 import { PluginScreenPhone } from "./pluginScreenPhone.jsx";
 import { mountPreact } from "../../phone/mountPreact.js";
 
-function t(key, fallback) {
-  return I18n.t(key, {}, { fallback });
-}
-
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }
 
 const PHONE_MANAGER_URL = "https://nuvio.tv/account?tab=addons";
@@ -166,11 +152,7 @@ export const PluginScreen = {
     if (!canvas) {
       return;
     }
-    QrCodeGenerator.generate(
-      canvas,
-      this.model.phoneManagerUrl,
-      Platform.isPhoneViewport() ? 160 : 440
-    );
+    QrCodeGenerator.generate(canvas, this.model.phoneManagerUrl, 160);
   },
 
   async openQrOverlay() {
@@ -185,24 +167,6 @@ export const PluginScreen = {
     this.qrOverlayOpen = false;
     await this.render({ refreshModel: false });
     return true;
-  },
-
-  bindContentEvents() {
-    this.container.querySelectorAll(".addons-focusable[data-action-id]").forEach((node) => {
-      node.addEventListener("keydown", (event) => {
-        const code = Number(event?.keyCode || 0);
-        if (code === 32) {
-          event.preventDefault();
-        }
-      });
-
-      node.addEventListener("click", async () => {
-        this.contentRow = Number(node.dataset.row || 0);
-        this.contentCol = Number(node.dataset.col || 0);
-        this.applyFocus();
-        await this.activateFocused();
-      });
-    });
   },
 
   async render({ refreshModel = true } = {}) {
@@ -231,149 +195,16 @@ export const PluginScreen = {
     });
 
     const enterClass = this.pluginRouteEnterPending ? " nuvio-route-slide-enter" : "";
-    const isPhone = Platform.isPhoneViewport();
-
-    if (isPhone) {
-      this.container.innerHTML = `
-        <div class="addons-shell addons-route-shell">
-          <div class="addons-route-content${enterClass}" data-phone-mount-root></div>
-        </div>
-      `;
-      const mountRoot = this.container.querySelector("[data-phone-mount-root]");
-      if (this._unmountPhone) this._unmountPhone();
-      this._unmountPhone = mountPreact(h(PluginScreenPhone, { screen: this }), mountRoot);
-      this.pluginRouteEnterPending = false;
-      this.normalizeFocus();
-      this.applyFocus();
-      this.renderQrCode();
-      return;
-    }
-
-    if (this._unmountPhone) {
-      this._unmountPhone();
-      this._unmountPhone = null;
-    }
 
     this.container.innerHTML = `
       <div class="addons-shell addons-route-shell">
-        <div class="addons-route-content${enterClass}">
-          <main class="home-main addons-main addons-main-centered">
-            <div class="addons-panel addons-panel-centered">
-              <section class="addons-hero-card">
-                <h1 class="addons-title addons-title-centered">${escapeHtml(t("addon_title", "Addons"))}</h1>
-                <p class="addons-lede">
-                  ${escapeHtml(
-                    this.model.isEssential
-                      ? t(
-                          "addon_manage_addons_only_from_phone_subtitle",
-                          "Scan a QR code to install or remove add-ons from your phone"
-                        )
-                      : t(
-                          "addon_manage_from_phone_subtitle",
-                          "Scan a QR code to manage addons, catalogs, and collections from your phone"
-                        )
-                  )}
-                </p>
-                <p class="addons-meta">${escapeHtml(`${this.model.addonCount} addon${this.model.addonCount === 1 ? "" : "s"} currently linked`)}</p>
-                <p class="addons-sync-status">${escapeHtml(this.buildSyncStatusText())}</p>
-                <div role="button"
-                     class="addons-large-row addons-large-row-centered addons-focusable"
-                     data-zone="content"
-                     data-row="0"
-                     data-col="0"
-                     data-action-id="manage_from_phone"
-                     tabindex="-1">
-                  <span class="addons-large-row-icon material-icons" aria-hidden="true">qr_code_2</span>
-                  <span class="addons-large-row-copy">
-                    <strong>${escapeHtml(t("addon_manage_from_phone_title", "Manage from phone"))}</strong>
-                    <small>${escapeHtml(
-                      this.model.isEssential
-                        ? t(
-                            "addon_manage_addons_only_from_phone_subtitle",
-                            "Scan a QR code to install or remove add-ons from your phone"
-                          )
-                        : t(
-                            "addon_manage_from_phone_subtitle",
-                            "Scan a QR code to manage addons, catalogs, and collections from your phone"
-                          )
-                    )}</small>
-                  </span>
-                  <span class="addons-large-row-tail-group">
-                    <span class="addons-large-row-tail material-icons" aria-hidden="true">phone_android</span>
-                  </span>
-                </div>
-                ${
-                  this.model.isEssential
-                    ? ""
-                    : `<div role="button"
-                     class="addons-large-row addons-large-row-centered addons-focusable"
-                     data-zone="content"
-                     data-row="1"
-                     data-col="0"
-                     data-action-id="reorder_home_catalogs"
-                     tabindex="-1">
-                  <span class="addons-large-row-icon material-icons" aria-hidden="true">tune</span>
-                  <span class="addons-large-row-copy">
-                    <strong>${escapeHtml(t("addon_reorder_title", "Reorder home catalogs"))}</strong>
-                    <small>${escapeHtml(t("addon_reorder_subtitle", "Controls catalog and collection row order on Home"))}</small>
-                  </span>
-                  <span class="addons-large-row-tail-group">
-                    <span class="addons-large-row-tail material-icons" aria-hidden="true">chevron_right</span>
-                  </span>
-                </div>`
-                }
-                <div role="button"
-                     class="addons-large-row addons-large-row-centered addons-focusable"
-                     data-zone="content"
-                     data-row="${this.model.isEssential ? 1 : 2}"
-                     data-col="0"
-                     data-action-id="refresh_addons"
-                     tabindex="-1"
-                     aria-disabled="${this.syncing ? "true" : "false"}">
-                  <span class="addons-large-row-icon material-icons" aria-hidden="true">${this.syncing ? "hourglass_top" : "sync"}</span>
-                  <span class="addons-large-row-copy">
-                    <strong>${escapeHtml(this.syncing ? t("addon_refresh_action", "Refreshing…") : t("addon_refresh_action", "Refresh Addons"))}</strong>
-                    <small>${escapeHtml(t("addon_refresh_default_subtitle", "Pull latest addon changes for current profile"))}</small>
-                  </span>
-                  <span class="addons-large-row-tail-group">
-                    <span class="addons-large-row-tail material-icons" aria-hidden="true">refresh</span>
-                  </span>
-                </div>
-              </section>
-            </div>
-          </main>
-        </div>
-        ${
-          this.qrOverlayOpen
-            ? `
-          <div class="addons-qr-overlay">
-            <div class="addons-qr-dialog">
-              <p class="addons-qr-instruction">${escapeHtml(
-                this.model.isEssential
-                  ? t(
-                      "addon_qr_addons_only_scan_instruction",
-                      "Scan with your phone to install or remove add-ons"
-                    )
-                  : t(
-                      "addon_qr_scan_instruction",
-                      "Scan with your phone to manage addons, catalogs, and collections"
-                    )
-              )}</p>
-              <canvas class="addons-qr-canvas" width="440" height="440" aria-label="QR code"></canvas>
-              <p class="addons-qr-url">${escapeHtml(this.model.phoneManagerUrl)}</p>
-              <div role="button" class="addons-qr-close addons-focusable focused" data-action-id="close_qr_overlay" tabindex="-1">
-                <span class="material-icons" aria-hidden="true">close</span>
-                <span>${escapeHtml(t("addon_qr_close", "Close"))}</span>
-              </div>
-            </div>
-          </div>
-        `
-            : ""
-        }
+        <div class="addons-route-content${enterClass}" data-phone-mount-root></div>
       </div>
     `;
+    const mountRoot = this.container.querySelector("[data-phone-mount-root]");
+    if (this._unmountPhone) this._unmountPhone();
+    this._unmountPhone = mountPreact(h(PluginScreenPhone, { screen: this }), mountRoot);
     this.pluginRouteEnterPending = false;
-    this.bindContentEvents();
     this.normalizeFocus();
     this.applyFocus();
     this.renderQrCode();
