@@ -571,6 +571,24 @@ function warnMissingKey(locale, key) {
   console.warn(`Missing translation for "${key}" in locale "${locale}"`);
 }
 
+export function t(key, params = {}, options = {}) {
+  const locale =
+    normalizeLocale(options?.locale ?? currentLocale) ||
+    resolvePreferredLocale(options?.locale ?? null);
+
+  if (typeof activeMessages[key] === "string") {
+    return interpolate(activeMessages[key], params);
+  }
+
+  const aliasedKey = KEY_ALIASES[key];
+  if (aliasedKey && typeof activeMessages[aliasedKey] === "string") {
+    return interpolate(activeMessages[aliasedKey], params);
+  }
+
+  warnMissingKey(locale, key);
+  return interpolate(options?.fallback ?? key, params);
+}
+
 export const I18n = {
   async init(preferred = null) {
     const locale = resolvePreferredLocale(preferred);
@@ -607,23 +625,7 @@ export const I18n = {
     return [...SUPPORTED_LOCALES];
   },
 
-  t(key, params = {}, options = {}) {
-    const locale =
-      normalizeLocale(options?.locale ?? currentLocale) ||
-      resolvePreferredLocale(options?.locale ?? null);
-
-    if (typeof activeMessages[key] === "string") {
-      return interpolate(activeMessages[key], params);
-    }
-
-    const aliasedKey = KEY_ALIASES[key];
-    if (aliasedKey && typeof activeMessages[aliasedKey] === "string") {
-      return interpolate(activeMessages[aliasedKey], params);
-    }
-
-    warnMissingKey(locale, key);
-    return interpolate(options?.fallback ?? key, params);
-  },
+  t,
 
   apply() {
     const locale = this.getLocale();
