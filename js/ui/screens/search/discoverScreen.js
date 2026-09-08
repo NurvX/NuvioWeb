@@ -55,7 +55,7 @@ function escapeHtml(value) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
 
@@ -307,7 +307,7 @@ export const DiscoverScreen = {
     return true;
   },
 
-  async mount(params = {}, navigationContext = {}) {
+  async mount(_params = {}, navigationContext = {}) {
     this.container = document.getElementById("discover");
     ScreenUtils.show(this.container);
     this.layoutPrefs = LayoutPreferences.get();

@@ -1267,7 +1267,7 @@ function formatTime(secondsValue) {
 function formatClock(date = new Date(), webOsLocaleInfo = null) {
   const locale = typeof I18n.getLocale === "function" ? I18n.getLocale() : undefined;
   const hour12 = resolveSystemHour12({
-    tizenApi: typeof tizen !== "undefined" ? tizen : null,
+    tizenApi: typeof tizen !== "undefined" ? tizen : null, // eslint-disable-line no-undef
     webOsLocaleInfo,
     intlApi: typeof Intl !== "undefined" ? Intl : null
   });

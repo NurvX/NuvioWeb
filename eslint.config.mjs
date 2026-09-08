@@ -1,14 +1,11 @@
 import js from "@eslint/js";
 import globals from "globals";
+import reactPlugin from "eslint-plugin-react";
 import eslintConfigPrettier from "eslint-config-prettier";
 
 const runtimeGlobals = {
   ...globals.browser,
-  ...globals.node,
-  PalmSystem: "readonly",
-  tizen: "readonly",
-  webOS: "readonly",
-  webOSSystem: "readonly"
+  ...globals.node
 };
 
 export default [
@@ -23,11 +20,18 @@ export default [
     ]
   },
   {
-    files: ["js/**/*.{js,mjs,cjs}", "scripts/**/*.{js,mjs,cjs}"],
+    files: ["js/**/*.{js,jsx,mjs,cjs}", "scripts/**/*.{js,mjs,cjs}"],
+    plugins: { react: reactPlugin },
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
-      globals: runtimeGlobals
+      globals: runtimeGlobals,
+      parserOptions: {
+        ecmaFeatures: { jsx: true }
+      }
+    },
+    settings: {
+      react: { pragma: "h", version: "18" }
     },
     rules: {
       ...js.configs.recommended.rules,
@@ -40,7 +44,9 @@ export default [
           ignoreRestSiblings: true,
           varsIgnorePattern: "^_"
         }
-      ]
+      ],
+      "react/jsx-uses-vars": "error",
+      "react/jsx-uses-react": "off"
     }
   },
   eslintConfigPrettier

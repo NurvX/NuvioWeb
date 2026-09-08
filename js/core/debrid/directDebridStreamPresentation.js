@@ -1,8 +1,8 @@
 import { DebridSettingsStore } from "../../data/local/debridSettingsStore.js";
-import { DEBRID_PROVIDER_IDS, DebridProviders } from "./debridProviders.js";
+import { DebridProviders } from "./debridProviders.js";
 import { DebridStreamTemplateEngine } from "./debridStreamTemplateEngine.js";
 
-const RESOLUTION_RANK = {
+const _RESOLUTION_RANK = {
   P2160: 700,
   P1440: 600,
   P1080: 500,
@@ -12,7 +12,7 @@ const RESOLUTION_RANK = {
   P360: 100,
   UNKNOWN: 0
 };
-const QUALITY_RANK = {
+const _QUALITY_RANK = {
   BLURAY_REMUX: 1200,
   BLURAY: 1100,
   WEB_DL: 1000,

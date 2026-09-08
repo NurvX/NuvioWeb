@@ -51,7 +51,7 @@ const store = createProfileScopedStore({
   normalize: normalizeStreamBadgeSettings
 });
 
-function clone(value) {
+function _clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 

@@ -4,7 +4,10 @@ import { metaRepository } from "../../../data/repository/metaRepository.js";
 import { watchProgressRepository } from "../../../data/repository/watchProgressRepository.js";
 import { savedLibraryRepository } from "../../../data/repository/savedLibraryRepository.js";
 import { watchedItemsRepository } from "../../../data/repository/watchedItemsRepository.js";
-import { libraryRepository } from "../../../data/repository/libraryRepository.js";
+import {
+  libraryRepository,
+  LibrarySourceMode
+} from "../../../data/repository/libraryRepository.js";
 import { detailWatchedEnrichmentService } from "../../../data/repository/detailWatchedEnrichmentService.js";
 import { watchedSeriesReconciliationService } from "../../../data/repository/watchedSeriesReconciliationService.js";
 import { TmdbService } from "../../../core/tmdb/tmdbService.js";

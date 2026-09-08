@@ -19,7 +19,7 @@ import {
   scrollSettingsContentItem
 } from "../settings/settingsScreen.js";
 
-function clamp(value, min, max) {
+function _clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 

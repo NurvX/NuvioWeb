@@ -245,7 +245,7 @@ async function openCatalogItemZoomMenu(screen, cardElement, item) {
 // Markup (JSX)
 // ---------------------------------------------------------------------------------------
 
-function Header({ descriptor, title, subtitle }) {
+function Header({ descriptor: _descriptor, title, subtitle }) {
   return (
     <header class="phone-catalog-seeall-header" data-phone-catalog-seeall-header>
       <button

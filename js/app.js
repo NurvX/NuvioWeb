@@ -1,4 +1,4 @@
-/* global __NUVIO_APP_VERSION__ */
+/* global __NUVIO_APP_VERSION__ */ // eslint-disable-line no-unused-vars
 
 import "./core/diagnostics/consoleDebugBuffer.js";
 import { detailWatchedEnrichmentService } from "./data/repository/detailWatchedEnrichmentService.js";

@@ -63,7 +63,7 @@ function CatalogOrderRow({ item, index, onAction }) {
 export function CatalogOrderScreenPhone({ screen }) {
   const items = screen.model?.items || [];
 
-  const handleAction = (row, col, action, key) => {
+  const handleAction = (row, col, _action, _key) => {
     screen.focusRow = row;
     screen.focusCol = col;
     screen.applyFocus();

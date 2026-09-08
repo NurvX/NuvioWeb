@@ -429,7 +429,7 @@ function normalizeHomeLayoutForWeb(value) {
   }
 }
 
-function normalizeTrailerTargetForAndroid(value) {
+function _normalizeTrailerTargetForAndroid(value) {
   return String(value || "")
     .trim()
     .toLowerCase() === "expanded_card"
@@ -437,7 +437,7 @@ function normalizeTrailerTargetForAndroid(value) {
     : "HERO_MEDIA";
 }
 
-function normalizeTrailerTargetForWeb(value) {
+function _normalizeTrailerTargetForWeb(value) {
   return String(value || "")
     .trim()
     .toUpperCase() === "EXPANDED_CARD"

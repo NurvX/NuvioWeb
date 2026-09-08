@@ -1,3 +1,4 @@
+/* global qrcode */
 // js/core/qr/qrCodeGenerator.js
 
 export const QrCodeGenerator = {

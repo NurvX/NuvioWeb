@@ -32,7 +32,7 @@ function buildEpisodeKey(season, episode) {
   return `${season}:${episode}`;
 }
 
-function parseWatchedAt(watchedAtValue) {
+function _parseWatchedAt(watchedAtValue) {
   if (!watchedAtValue) return null;
   if (typeof watchedAtValue === "number") return watchedAtValue;
   const parsed = Date.parse(watchedAtValue);
