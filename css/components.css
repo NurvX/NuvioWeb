@@ -11157,20 +11157,6 @@ html.legacy-webos .debug-console-log-frame {
   background: #000;
 }
 
-.tizen-avplay-object {
-  display: none;
-}
-
-.tizen-tv .tizen-avplay-object {
-  position: absolute;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  display: block;
-  background: transparent;
-  pointer-events: none;
-}
-
 .tizen-tv #videoPlayer,
 .tizen-tv .player-ui-root {
   right: auto;
