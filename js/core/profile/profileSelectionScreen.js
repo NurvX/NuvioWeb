@@ -9,7 +9,6 @@ import { I18n } from "../../i18n/index.js";
 import { NuvioDialog } from "../../ui/components/nuvioDialog.js";
 import { detailWatchedEnrichmentService } from "../../data/repository/detailWatchedEnrichmentService.js";
 import { resolveExperienceRoute } from "./experienceModeRouting.js";
-import { Platform } from "../../platform/index.js";
 import {
   renderProfileSelectionScreenPhone,
   mountProfileSelectionScreenPhone,
@@ -351,12 +350,6 @@ export const ProfileSelectionScreen = {
     }
 
     this.container.style.display = "block";
-    // Re-render live when the viewport crosses the phone breakpoint (00-07) so this screen
-    // flips between its TV and phone render paths without needing a full navigation.
-    this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = Platform.watchPhoneViewport(() => {
-      this.render();
-    });
     this.screenMode = String(params?.mode || "selection").toLowerCase();
     this.returnRoute = String(params?.returnRoute || "");
     this.isManagementMode = this.screenMode === "management";
@@ -478,10 +471,10 @@ export const ProfileSelectionScreen = {
     // that logic. Guarded at the very top since every state transition on this screen
     // (opening/closing the editor or PIN overlay, toggling management mode, etc.) re-invokes
     // this same render() — see that file's own header comment for the full design.
-    if (Platform.isPhoneViewport()) {
-      return this.renderPhone();
-    }
+    return this.renderPhone();
+  },
 
+  _tvRender() {
     const visibleProfiles = this.getVisibleProfiles();
     const canAddProfile = visibleProfiles.length < MAX_PROFILES;
     const totalItems = visibleProfiles.length + (canAddProfile ? 1 : 0);
@@ -1314,11 +1307,7 @@ export const ProfileSelectionScreen = {
       this._bgAnimRaf = null;
     }
 
-    if (
-      Platform.isTizen() ||
-      Platform.isWebOS() ||
-      globalThis.document?.body?.classList?.contains("performance-constrained")
-    ) {
+    if (globalThis.document?.body?.classList?.contains("performance-constrained")) {
       this._bgCurrentColor = targetColor;
       screen.style.background = this.buildBackgroundStyleFromColor(targetColor, themeColors);
       return;
@@ -2327,8 +2316,6 @@ export const ProfileSelectionScreen = {
   },
 
   cleanup() {
-    this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = null;
     cleanupProfileSelectionScreenPhone(this);
     this._destroyDialogs();
     this.cancelPendingProfileHold();

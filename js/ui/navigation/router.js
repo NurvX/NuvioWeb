@@ -266,10 +266,7 @@ export const Router = {
       await Screen.mount(this.currentParams, navigationContext);
     };
 
-    const useViewTransition =
-      Platform.isPhoneViewport() &&
-      typeof document.startViewTransition === "function" &&
-      this.current;
+    const useViewTransition = typeof document.startViewTransition === "function" && this.current;
     if (useViewTransition) {
       document.documentElement.dataset.navDirection = options?.isBackNavigation
         ? "back"

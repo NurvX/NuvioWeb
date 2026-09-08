@@ -1,7 +1,6 @@
 import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { Environment } from "../../../platform/environment.js";
-import { Platform } from "../../../platform/index.js";
 import { addonRepository } from "../../../data/repository/addonRepository.js";
 import { catalogRepository } from "../../../data/repository/catalogRepository.js";
 import { watchedItemsRepository } from "../../../data/repository/watchedItemsRepository.js";
@@ -1912,11 +1911,8 @@ export const FolderDetailScreen = {
   // explicitly deferred for (see the phone-touch-responsive spec's Out of
   // Scope section). Only the TABBED_GRID / row-track layouts, which use plain
   // native scroll, get touch activation here.
-  onPointerFocus(target) {
-    if (this.useHomeFollowLayout || Platform.isPhoneViewport()) {
-      return false;
-    }
-    return this.focusNode(target);
+  onPointerFocus(_target) {
+    return false;
   },
 
   onPointerActivate(target) {
