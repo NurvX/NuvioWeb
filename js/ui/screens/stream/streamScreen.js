@@ -46,7 +46,7 @@ import {
 } from "../../../core/media/addonLogoCache.js";
 import { Environment } from "../../../platform/environment.js";
 import { Platform } from "../../../platform/index.js";
-import { WebOsLunaService } from "../../../platform/webos/webosLunaService.js";
+
 import { I18n } from "../../../i18n/index.js";
 import {
   matchStreamBadges,
@@ -65,7 +65,7 @@ const STREAM_BADGE_LIMIT = 9;
 // focus move O(1) in layout reads on TV browsers, where measuring every card
 // forced a full list reflow on each keypress in long source lists.
 const TV_STREAM_BADGE_WINDOW_ROWS = 24;
-const WEBOS_NATIVE_PLAYER_APP_IDS = [
+const _WEBOS_NATIVE_PLAYER_APP_IDS = [
   "com.webos.app.mediadiscovery",
   "com.webos.app.photovideo",
   "com.webos.app.smartshare"
@@ -1903,33 +1903,7 @@ export const StreamScreen = {
   },
 
   async detectWebOsNativePlayerApp() {
-    if (!Environment.isWebOS() || !WebOsLunaService.isAvailable()) {
-      this.webOsNativePlayerAppId = "";
-      return "";
-    }
-    const requestToken = Number(this.nativePlayerRequestToken || 0) + 1;
-    this.nativePlayerRequestToken = requestToken;
-    for (const appId of WEBOS_NATIVE_PLAYER_APP_IDS) {
-      try {
-        const payload = await WebOsLunaService.request("luna://com.webos.applicationManager", {
-          method: "getAppLoadStatus",
-          parameters: { appId }
-        });
-        if (payload?.exist) {
-          if (this.nativePlayerRequestToken === requestToken) {
-            this.webOsNativePlayerAppId = appId;
-            this.requestRender({ delayMs: 0 });
-          }
-          return appId;
-        }
-      } catch (_) {
-        // Continue trying known native-player app ids.
-      }
-    }
-    if (this.nativePlayerRequestToken === requestToken) {
-      this.webOsNativePlayerAppId = "";
-      this.requestRender({ delayMs: 0 });
-    }
+    this.webOsNativePlayerAppId = "";
     return "";
   },
 
@@ -2144,65 +2118,7 @@ export const StreamScreen = {
     };
   },
 
-  async openStreamInNativePlayer(streamId) {
-    if (!Environment.isWebOS() || !this.webOsNativePlayerAppId || !WebOsLunaService.isAvailable()) {
-      return;
-    }
-    if (this.nativePlayerPendingStreamId) {
-      return;
-    }
-    const selected =
-      this.getFilteredStreams().find((stream) => stream.id === streamId) ||
-      this.streams.find((stream) => stream.id === streamId) ||
-      null;
-    if (!selected) {
-      return;
-    }
-
-    this.nativePlayerPendingStreamId = streamId;
-    this.requestRender({ delayMs: 0 });
-    try {
-      const result = await this.resolveStreamForNativePlayer(selected);
-      if (result?.status !== "success" || !result.stream) {
-        this.showStreamToast(
-          t(
-            "player_external_launch_unavailable",
-            {},
-            "This stream cannot be opened in Native Player"
-          )
-        );
-        return;
-      }
-
-      this.replaceStreamInList(streamId, result.stream);
-      const launchParameters = this.buildWebOsNativePlayerLaunchParameters(result.stream);
-      if (!launchParameters) {
-        this.requestRender({ delayMs: 0 });
-        this.showStreamToast(
-          t(
-            "player_external_launch_unavailable",
-            {},
-            "This stream cannot be opened in Native Player"
-          )
-        );
-        return;
-      }
-
-      await WebOsLunaService.request("luna://com.webos.applicationManager", {
-        method: "launch",
-        parameters: launchParameters
-      });
-      this.showStreamToast(
-        t("player_external_launching_media_player", {}, "Opening Native Player")
-      );
-    } catch (error) {
-      console.warn("Failed to open stream in native player", { streamId, error });
-      this.showStreamToast(t("player_external_launch_failed", {}, "Could not open Native Player"));
-    } finally {
-      this.nativePlayerPendingStreamId = "";
-      this.requestRender({ delayMs: 0 });
-    }
-  },
+  async openStreamInNativePlayer(_streamId) {},
 
   // Phone render path (ticket 04-01, mobile-parity epic) — all markup/interaction logic lives
   // in js/ui/screens/stream/streamScreenPhone.jsx; this just hands it the screen instance so it

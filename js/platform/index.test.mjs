@@ -52,19 +52,10 @@ test("isPhoneViewport reflects matchMedia on the browser platform", () => {
   }
 });
 
-test("isPhoneViewport is false off the browser platform even if matchMedia would match", () => {
-  const fakeList = createFakeMediaQueryList("(max-width: 600px)", true);
-  const originalMatchMedia = globalThis.matchMedia;
-  const originalIsBrowser = Platform.isBrowser;
-  globalThis.matchMedia = () => fakeList;
-  Platform.isBrowser = () => false;
-
-  try {
-    assert.equal(Platform.isPhoneViewport(), false);
-  } finally {
-    globalThis.matchMedia = originalMatchMedia;
-    Platform.isBrowser = originalIsBrowser;
-  }
+test("isBrowser always returns true on mobile-only platform", () => {
+  assert.equal(Platform.isBrowser(), true);
+  assert.equal(Platform.isWebOS(), false);
+  assert.equal(Platform.isTizen(), false);
 });
 
 test("watchPhoneViewport fires the callback on change and unsubscribes cleanly", () => {
@@ -93,21 +84,18 @@ test("watchPhoneViewport fires the callback on change and unsubscribes cleanly",
   }
 });
 
-test("watchPhoneViewport off the browser platform registers no listener and returns a no-op", () => {
+test("watchPhoneViewport always registers a listener on mobile-only platform", () => {
   const fakeList = createFakeMediaQueryList("(max-width: 600px)", false);
   const originalMatchMedia = globalThis.matchMedia;
-  const originalIsBrowser = Platform.isBrowser;
   globalThis.matchMedia = () => fakeList;
-  Platform.isBrowser = () => false;
 
   try {
-    const unsubscribe = Platform.watchPhoneViewport(() => {
-      throw new Error("callback should never fire off the browser platform");
-    });
+    const seen = [];
+    const unsubscribe = Platform.watchPhoneViewport((isPhone) => seen.push(isPhone));
+    assert.equal(fakeList.listenerCount(), 1);
+    unsubscribe();
     assert.equal(fakeList.listenerCount(), 0);
-    assert.doesNotThrow(() => unsubscribe());
   } finally {
     globalThis.matchMedia = originalMatchMedia;
-    Platform.isBrowser = originalIsBrowser;
   }
 });

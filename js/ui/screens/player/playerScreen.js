@@ -56,12 +56,6 @@ import { DirectDebridResolver } from "../../../core/debrid/directDebridResolver.
 import { TrackingScrobbleService } from "../../../data/repository/trackingScrobbleService.js";
 import { WebOsEngineFsResolver } from "../../../core/p2p/webosEngineFsResolver.js";
 import { TizenStreamingServerResolver } from "../../../core/p2p/tizenStreamingServerResolver.js";
-import { TizenEngineFsService } from "../../../platform/tizen/tizenEngineFsService.js";
-import {
-  requestWebOsCompanionService,
-  subscribeWebOsCompanionService
-} from "../../../platform/webos/webosCompanionService.js";
-import { WebOsLunaService } from "../../../platform/webos/webosLunaService.js";
 import { StreamPreferencesStore } from "../../../data/local/streamPreferencesStore.js";
 import { buildStreamResumeIdentity } from "../../../core/streams/streamResumeIdentity.js";
 import { TrackPreferencesStore } from "../../../data/local/trackPreferencesStore.js";
@@ -2181,34 +2175,6 @@ export const PlayerScreen = {
     this.webOsClockLocaleInfo = null;
     this.webOsClockSettingsSubscription?.cancel?.();
     this.webOsClockSettingsSubscription = null;
-    if (Environment.isWebOS() && WebOsLunaService.isAvailable()) {
-      try {
-        this.webOsClockSettingsSubscription = WebOsLunaService.subscribe(
-          "luna://com.webos.settingsservice",
-          {
-            method: "getSystemSettings",
-            parameters: { keys: ["localeInfo"] },
-            onSuccess: (result) => {
-              if (!this.playerRouteActive || this.playerMountToken !== mountToken) {
-                return;
-              }
-              const localeInfo = result?.settings?.localeInfo;
-              if (!localeInfo || typeof localeInfo !== "object") {
-                return;
-              }
-              this.webOsClockLocaleInfo = localeInfo;
-              if (this.lastUiTickState) {
-                this.lastUiTickState.clockMinuteKey = null;
-                this.lastUiTickState.endsAtMinuteBucket = null;
-              }
-              this.updateUiTick();
-            }
-          }
-        );
-      } catch (_) {
-        this.webOsClockSettingsSubscription = null;
-      }
-    }
     this.params = params;
     this.trackPreferenceContentId = this.getTrackPreferenceContentId();
     this.rememberedAudioTrackPreference = TrackPreferencesStore.getAudio(
@@ -3926,60 +3892,9 @@ export const PlayerScreen = {
     }
   },
 
-  startEngineFsKeepAlive(state = this.currentEngineFsStream) {
-    if (!state?.infoHash) {
-      return;
-    }
-    if (state.kind === "tizen-streaming-server") {
-      this.stopEngineFsKeepAlive();
-      logEngineFsDebug("EngineFS keepalive skipped for Tizen local service", {
-        infoHash: state.infoHash,
-        fileIdx: state.fileIdx
-      });
-      return;
-    }
-    const token = `${state.infoHash}:${state.fileIdx ?? -1}:${Date.now()}`;
-    this.stopEngineFsKeepAlive();
-    this.engineFsKeepAliveToken = token;
-    try {
-      this.engineFsKeepAliveHandle = subscribeWebOsCompanionService({
-        method: "enginefsKeepAlive",
-        parameters: {
-          token,
-          infoHash: state.infoHash,
-          fileIdx: state.fileIdx,
-          intervalMs: 8000
-        },
-        onSuccess: (payload) => {
-          if (payload?.settingsReachable === false) {
-            logEngineFsDebug("EngineFS keepalive reports runtime unavailable", {
-              token,
-              payload
-            });
-          }
-        },
-        onFailure: (error) => {
-          console.warn("EngineFS keepalive failed", {
-            token,
-            error
-          });
-        }
-      });
-      logEngineFsDebug("EngineFS keepalive started", {
-        token,
-        infoHash: state.infoHash,
-        fileIdx: state.fileIdx
-      });
-    } catch (error) {
-      console.warn("EngineFS keepalive could not start", {
-        token,
-        error
-      });
-    }
-  },
+  startEngineFsKeepAlive(_state) {},
 
   stopEngineFsKeepAlive() {
-    const token = String(this.engineFsKeepAliveToken || "").trim();
     if (this.engineFsKeepAliveHandle) {
       try {
         this.engineFsKeepAliveHandle.cancel?.();
@@ -3987,12 +3902,6 @@ export const PlayerScreen = {
         // Ignore local cancellation failures.
       }
       this.engineFsKeepAliveHandle = null;
-    }
-    if (token) {
-      requestWebOsCompanionService({
-        method: "enginefsKeepAliveStop",
-        parameters: { token }
-      }).catch(() => null);
     }
     this.engineFsKeepAliveToken = "";
   },
@@ -11122,11 +11031,6 @@ export const PlayerScreen = {
           statsUrl,
           error: String(error?.message || error || "")
         });
-        try {
-          await requestWebOsCompanionService({ method: "status", parameters: {} });
-        } catch (_) {
-          // Recovery is best-effort; retry logic will decide the next step.
-        }
       }
       return null;
     } finally {
@@ -12542,27 +12446,7 @@ export const PlayerScreen = {
   },
 
   async resolveTizenAvPlaySubtitleUrl(url) {
-    const original = String(url || "").trim();
-    if (!original || !Environment.isTizen()) {
-      return "";
-    }
-    if (!/^https?:\/\//i.test(original)) {
-      return original;
-    }
-    try {
-      const service = await TizenEngineFsService.ensureStarted();
-      const baseUrl = String(service?.baseUrl || "").replace(/\/+$/, "");
-      if (service?.status !== "success" || !baseUrl) {
-        return original;
-      }
-      return `${baseUrl}/subtitles.vtt?from=${encodeURIComponent(original)}`;
-    } catch (error) {
-      console.warn("Tizen subtitle proxy unavailable", {
-        subtitleUrl: original,
-        error: error?.message || String(error || "")
-      });
-      return original;
-    }
+    return String(url || "").trim();
   },
 
   parseSubtitleTimestamp(value = "") {

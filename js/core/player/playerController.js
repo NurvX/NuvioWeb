@@ -6,16 +6,10 @@ import { WatchProgressSyncService } from "../profile/watchProgressSyncService.js
 import { nativeVideoEngine } from "./engines/nativeVideoEngine.js";
 import { hlsJsEngine } from "./engines/hlsJsEngine.js";
 import { dashJsEngine } from "./engines/dashJsEngine.js";
-import {
-  applyWebOsAudioCodecOverrides,
-  detectWebOsAudioCapabilities
-} from "../../platform/webos/webosAudioCapabilities.js";
-import { WebOsLunaService } from "../../platform/webos/webosLunaService.js";
-import { WebOSPlayerExtensions } from "../../platform/webos/webosPlayerExtensions.js";
 import { loadStreamingLibs } from "../../runtime/loadStreamingLibs.js";
 
 const MIN_PROGRESS_SYNC_DURATION_MS = 1000;
-const WEBOS_AUDIO_TRACK_SELECTION_TIMEOUT_MS = 4000;
+
 const AVPLAY_BUFFER_FOR_PLAY_SECONDS = 5;
 const AVPLAY_BUFFER_FOR_RESUME_SECONDS = 4;
 const AVPLAY_BUFFERING_TIMEOUT_SECONDS = 10;
@@ -386,30 +380,10 @@ export const PlayerController = {
     return String(this.playbackEngine || "").startsWith("native");
   },
 
-  refreshWebOsDeviceInfo({ forceRefresh = false } = {}) {
-    if (!Platform.isWebOS()) {
-      return Promise.resolve({
-        unsupportedAudioCodecs: this.getWebOsUnsupportedAudioCodecs()
-      });
-    }
-    if (this.webosDeviceInfoPromise && !forceRefresh) {
-      return this.webosDeviceInfoPromise;
-    }
-
-    this.webosDeviceInfoPromise = detectWebOsAudioCapabilities({ forceRefresh })
-      .then((capabilities) => {
-        this.webosAudioCapabilities = capabilities;
-        this.webosUnsupportedAudioCodecs = new Set(capabilities.unsupportedAudioCodecs);
-        return {
-          ...capabilities,
-          unsupportedAudioCodecs: this.getWebOsUnsupportedAudioCodecs()
-        };
-      })
-      .catch(() => ({
-        unsupportedAudioCodecs: this.getWebOsUnsupportedAudioCodecs()
-      }));
-
-    return this.webosDeviceInfoPromise;
+  refreshWebOsDeviceInfo() {
+    return Promise.resolve({
+      unsupportedAudioCodecs: this.getWebOsUnsupportedAudioCodecs()
+    });
   },
 
   setWebOsAudioCodecOverrides({ forceDtsAudio = false, forceTrueHdAudio = false } = {}) {
@@ -426,10 +400,7 @@ export const PlayerController = {
   },
 
   getWebOsUnsupportedAudioCodecs() {
-    return applyWebOsAudioCodecOverrides(this.webosUnsupportedAudioCodecs, {
-      forceDtsAudio: this.forceDtsAudio,
-      forceTrueHdAudio: this.forceTrueHdAudio
-    });
+    return [];
   },
 
   getWebOsUnsupportedAudioPenalty(text = "") {
@@ -489,16 +460,7 @@ export const PlayerController = {
     );
   },
 
-  syncWebOsPlaybackKeepAwake() {
-    if (!Platform.isWebOS()) {
-      return;
-    }
-    if (this.shouldKeepWebOsPlaybackAwake()) {
-      WebOSPlayerExtensions.startPlaybackKeepAwake(() => this.shouldKeepWebOsPlaybackAwake());
-    } else {
-      WebOSPlayerExtensions.stopPlaybackKeepAwake();
-    }
-  },
+  syncWebOsPlaybackKeepAwake() {},
 
   emitVideoEvent(eventName, detail = null) {
     if (!this.video || !eventName) {
@@ -520,14 +482,8 @@ export const PlayerController = {
     }
   },
 
-  requestWebOsMediaCommand(method, parameters = {}) {
-    if (!Platform.isWebOS() || !WebOsLunaService.isAvailable()) {
-      return Promise.reject(new Error("webOS Luna media service unavailable"));
-    }
-    return WebOsLunaService.request("luna://com.webos.media", {
-      method,
-      parameters
-    });
+  requestWebOsMediaCommand() {
+    return Promise.reject(new Error("webOS Luna media service unavailable"));
   },
 
   resetNativeMediaState() {
@@ -1525,61 +1481,8 @@ export const PlayerController = {
 
     emitSelectionState("pending");
 
-    if (!WebOsLunaService.isAvailable()) {
-      commitSelection();
-      emitSelectionState("confirmed");
-      return true;
-    }
-
-    void (async () => {
-      try {
-        const mediaId = this.syncNativeMediaId() || (await this.waitForNativeMediaId());
-        if (requestToken !== this.webOsAudioSelectionRequestToken) {
-          return;
-        }
-        if (!mediaId) {
-          throw new Error("webOS media id unavailable");
-        }
-
-        let timeoutId = 0;
-        const timeoutPromise = new Promise((_, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(new Error("webOS audio track selection timed out"));
-          }, WEBOS_AUDIO_TRACK_SELECTION_TIMEOUT_MS);
-        });
-        let result;
-        try {
-          result = await Promise.race([
-            this.requestWebOsMediaCommand("selectTrack", {
-              type: "audio",
-              mediaId,
-              index: targetIndex
-            }),
-            timeoutPromise
-          ]);
-        } finally {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-        }
-        if (requestToken !== this.webOsAudioSelectionRequestToken) {
-          return;
-        }
-        if (result?.returnValue === false || result?.errorCode) {
-          throw new Error(result?.errorText || "webOS audio track selection failed");
-        }
-
-        commitSelection();
-        emitSelectionState("confirmed");
-      } catch (error) {
-        emitSelectionState("failed", {
-          error: String(
-            error?.errorText || error?.message || error || "webOS audio track selection failed"
-          )
-        });
-      }
-    })();
-
+    commitSelection();
+    emitSelectionState("confirmed");
     return true;
   },
 
