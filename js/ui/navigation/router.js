@@ -145,6 +145,16 @@ export const Router = {
       return;
     }
     this.popstateBound = true;
+    document.addEventListener("click", (event) => {
+      const target = event?.target?.closest?.(".focusable");
+      if (!target) {
+        return;
+      }
+      const screen = this.getCurrentScreen();
+      if (typeof screen?.onPointerActivate === "function") {
+        screen.onPointerActivate(target, event);
+      }
+    });
     window.addEventListener("popstate", async (event) => {
       if (this.ignoreNextPopstate) {
         this.ignoreNextPopstate = false;
