@@ -95,23 +95,10 @@ function isLowEndDevice() {
   return lowCpu || lowMem;
 }
 
-function getChromiumMajorVersion() {
-  const userAgent = String(globalThis.navigator?.userAgent || "");
-  const match = userAgent.match(/(?:chrome|chromium)\/(\d{2,3})/i);
-  const version = Number(match?.[1] || 0);
-  return Number.isFinite(version) ? version : 0;
-}
-
 function applyPerformanceMode() {
-  const constrained = Platform.isWebOS() || Platform.isTizen() || isLowEndDevice();
-  const webOsMajorVersion = Platform.isWebOS() ? Number(Platform.getWebOsMajorVersion() || 0) : 0;
-  const legacyWebOs = Platform.isWebOS() && (webOsMajorVersion === 0 || webOsMajorVersion <= 6);
-  const legacyWebOs38 = Platform.isWebOS() && webOsMajorVersion > 0 && webOsMajorVersion <= 3;
-  const legacyTizen = Platform.isTizen();
+  const constrained = isLowEndDevice();
   const rootClasses = document.documentElement.classList;
-  const modernWebOs = Platform.isWebOS() && getChromiumMajorVersion() >= 120;
-  const modernSidebarBlurCapable =
-    !rootClasses.contains("no-backdrop-filter") && ((!constrained && !legacyTizen) || modernWebOs);
+  const modernSidebarBlurCapable = !rootClasses.contains("no-backdrop-filter") && !constrained;
   document.documentElement.classList.toggle("performance-constrained", constrained);
   document.body.classList.toggle("performance-constrained", constrained);
   document.documentElement.classList.toggle(
@@ -119,12 +106,6 @@ function applyPerformanceMode() {
     modernSidebarBlurCapable
   );
   document.body.classList.toggle("modern-sidebar-blur-capable", modernSidebarBlurCapable);
-  document.documentElement.classList.toggle("legacy-webos", legacyWebOs);
-  document.body.classList.toggle("legacy-webos", legacyWebOs);
-  document.documentElement.classList.toggle("legacy-webos38", legacyWebOs38);
-  document.body.classList.toggle("legacy-webos38", legacyWebOs38);
-  document.documentElement.classList.toggle("legacy-tizen", legacyTizen);
-  document.body.classList.toggle("legacy-tizen", legacyTizen);
   ["no-flex-gap", "no-aspect-ratio", "no-css-math", "no-backdrop-filter"].forEach((className) => {
     document.body.classList.toggle(className, rootClasses.contains(className));
   });
@@ -167,7 +148,7 @@ async function shouldShowProfileSelection() {
   return { show: profiles.length > 1 || activeProfileHasPin, pinStates };
 }
 
-async function enterWithLastProfile({ restoreWebOsRoute = false } = {}) {
+async function enterWithLastProfile() {
   hasSelectedProfileThisSession = true;
   const profiles = await ProfileManager.getProfiles();
   const activeProfileId = ProfileManager.getActiveProfileId();
@@ -187,17 +168,8 @@ async function enterWithLastProfile({ restoreWebOsRoute = false } = {}) {
     });
   }
   const experienceRoute = activeProfile ? await resolveExperienceRoute(activeProfile.id) : "home";
-  const resumeRoute =
-    restoreWebOsRoute && typeof Router.consumeWebOsResumeRoute === "function"
-      ? Router.consumeWebOsResumeRoute()
-      : null;
   if (experienceRoute !== "home") {
     await Router.navigate(experienceRoute, {}, { replaceHistory: true, skipStackPush: true });
-  } else if (resumeRoute?.route) {
-    await Router.navigate(resumeRoute.route, resumeRoute.params || {}, {
-      replaceHistory: true,
-      skipStackPush: true
-    });
   } else {
     await Router.navigate("home");
   }
@@ -216,140 +188,7 @@ async function routeAfterAuthentication() {
     return;
   }
 
-  await enterWithLastProfile({ restoreWebOsRoute: true });
-}
-
-function setupWebOsAppLifecycle() {
-  if (!Platform.isWebOS()) {
-    return;
-  }
-
-  const appSystems = Array.from(
-    new Set([globalThis.webOSSystem || null, globalThis.PalmSystem || null].filter(Boolean))
-  );
-
-  function activateWebOsApp() {
-    const system = appSystems.find((entry) => typeof entry?.activate === "function") || null;
-    if (!system) {
-      return;
-    }
-    try {
-      system.activate();
-    } catch (error) {
-      console.warn("webOS activate failed", error);
-    }
-  }
-
-  function installNativeCallback(system, systemName, callbackName, { recoverOnCall = false } = {}) {
-    if (!system) {
-      return;
-    }
-    const previous =
-      typeof system[callbackName] === "function" ? system[callbackName].bind(system) : null;
-    try {
-      system[callbackName] = (...args) => {
-        if (previous) {
-          try {
-            previous(...args);
-          } catch (error) {
-            console.warn(`webOS callback ${systemName}.${callbackName} failed`, error);
-          }
-        }
-        if (recoverOnCall) {
-          void recover(`${systemName}.${callbackName}`);
-        }
-      };
-    } catch (error) {
-      console.warn(`webOS callback hook ${systemName}.${callbackName} failed`, error);
-    }
-  }
-
-  // webOS keeps the app resident when it is backgrounded. Re-opening can fire
-  // a launch event on the existing JS context instead of reloading the page.
-  let recovering = false;
-  const recover = async () => {
-    if (recovering || !appShellRendered) {
-      return;
-    }
-    void DeviceSessionRegistration.requestForegroundRegistration();
-    ProviderCredentialSyncService.requestForegroundPull();
-    const current = Router.getCurrent();
-    if (!current) {
-      return;
-    }
-    recovering = true;
-    try {
-      if (document.body) {
-        document.body.style.removeProperty("display");
-      }
-      const shouldReturnHome = !Router.isWebOsResumeRouteRestorable(current);
-      if (shouldReturnHome) {
-        await Router.navigate(
-          "home",
-          {},
-          {
-            replaceHistory: true,
-            skipStackPush: true
-          }
-        );
-      } else if (typeof Router.persistWebOsResumeRoute === "function") {
-        Router.persistWebOsResumeRoute(current, Router.currentParams || {});
-      }
-      // With handlesRelaunch=true, webOS expects the app to explicitly request
-      // foreground activation after processing the relaunch callback.
-      activateWebOsApp();
-    } catch (error) {
-      console.warn("webOS relaunch recovery failed", error);
-    } finally {
-      recovering = false;
-    }
-  };
-
-  document.addEventListener(
-    "webOSRelaunch",
-    () => {
-      void recover();
-    },
-    true
-  );
-
-  // webOS 4.x may fire webOSLaunch instead of webOSRelaunch when resuming.
-  document.addEventListener(
-    "webOSLaunch",
-    () => {
-      void recover();
-    },
-    true
-  );
-
-  // Some builds only expose visibilitychange when the WebView is resumed.
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
-      void recover();
-    }
-  });
-
-  // Older webOS WebKit builds may emit only the prefixed visibility signal.
-  document.addEventListener("webkitvisibilitychange", () => {
-    if (document.webkitHidden !== true) {
-      void recover();
-    }
-  });
-
-  installNativeCallback(globalThis.webOSSystem, "webOSSystem", "onshow", { recoverOnCall: true });
-  installNativeCallback(globalThis.webOSSystem, "webOSSystem", "onhide");
-  installNativeCallback(globalThis.webOSSystem, "webOSSystem", "onfocus", { recoverOnCall: true });
-  installNativeCallback(globalThis.webOSSystem, "webOSSystem", "onblur");
-  installNativeCallback(globalThis.webOSSystem, "webOSSystem", "onactivate", {
-    recoverOnCall: true
-  });
-  installNativeCallback(globalThis.webOSSystem, "webOSSystem", "ondeactivate");
-  installNativeCallback(globalThis.PalmSystem, "PalmSystem", "onshow", { recoverOnCall: true });
-  installNativeCallback(globalThis.PalmSystem, "PalmSystem", "onhide");
-  installNativeCallback(globalThis.PalmSystem, "PalmSystem", "onfocus", { recoverOnCall: true });
-  installNativeCallback(globalThis.PalmSystem, "PalmSystem", "onblur");
-  installNativeCallback(globalThis.PalmSystem, "PalmSystem", "onactivate", { recoverOnCall: true });
-  installNativeCallback(globalThis.PalmSystem, "PalmSystem", "ondeactivate");
+  await enterWithLastProfile();
 }
 
 function setupProviderCredentialForegroundLifecycle() {
@@ -401,7 +240,6 @@ async function bootstrapApp() {
   PlayerController.init();
 
   setupProviderCredentialForegroundLifecycle();
-  setupWebOsAppLifecycle();
 
   ThemeManager.apply();
   I18n.apply();
