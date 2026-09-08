@@ -247,12 +247,10 @@ button:focus-visible {
    (min-height, not a fixed height), so on a phone the app-wide
    html,body{overflow:hidden} rule can strand content below the fold.
    Scoped override, same pattern as the addon-management companion page. */
-@media (max-width: 600px) {
-  .auth-simple-shell,
-  .account-shell {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+.auth-simple-shell,
+.account-shell {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .auth-simple-hero {
