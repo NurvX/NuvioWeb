@@ -1,6 +1,5 @@
 import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
-import { Environment } from "../../../platform/environment.js";
 import { addonRepository } from "../../../data/repository/addonRepository.js";
 import { catalogRepository } from "../../../data/repository/catalogRepository.js";
 import { watchedItemsRepository } from "../../../data/repository/watchedItemsRepository.js";
@@ -10,31 +9,29 @@ import { TmdbService } from "../../../core/tmdb/tmdbService.js";
 import { TmdbSettingsStore } from "../../../data/local/tmdbSettingsStore.js";
 import { TmdbMetadataService } from "../../../core/tmdb/tmdbMetadataService.js";
 import { TMDB_API_KEY, TRAKT_API_URL, TRAKT_CLIENT_ID } from "../../../config.js";
-import {
-  HomeScreen,
-  buildModernHomeSizingStyle,
-  buildModernHeroPresentation,
-  createPosterCardMarkup,
-  createSeeAllCardMarkup,
-  escapeAttribute,
-  escapeHtml,
-  formatCatalogRowTitle,
-  normalizeCollectionFolderItem,
-  renderContinueWatchingSection
-} from "../home/homeScreen.js";
-import { renderModernHomeLayout } from "../home/modernHomeLayout.js";
-import {
-  buildWatchedTitleIdSet,
-  isTitleItemWatched,
-  renderTitleWatchedBadge
-} from "../../components/watchedTitleBadge.js";
+import { normalizeCollectionFolderItem } from "../home/homeScreen.js";
+import { buildWatchedTitleIdSet, isTitleItemWatched } from "../../components/watchedTitleBadge.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
+import { renderPosterCard, bindPosterCardEvents } from "../../components/posterCard.js";
 import {
-  renderFolderDetailScreenPhone,
-  mountFolderDetailScreenPhone,
-  cleanupFolderDetailScreenPhone,
-  handleFolderDetailPhonePointerActivate
-} from "./folderDetailScreenPhone.js";
+  renderPhoneShelf,
+  bindPhoneShelfEvents,
+  defaultPhoneShelfViewAllLabel
+} from "../../components/phoneShelf.js";
+import { renderSkeletonPosterCard, renderSkeletonShelf } from "../../components/phoneSkeleton.js";
+import { openPosterZoomOverlay } from "../../components/posterZoomOverlay.js";
+import { openBottomSheet, closeActiveBottomSheet } from "../../components/bottomSheet.js";
+import {
+  libraryRepository,
+  LibrarySourceMode
+} from "../../../data/repository/libraryRepository.js";
+import {
+  createPosterOptionsState,
+  getPosterOptions,
+  activatePosterOption,
+  getPosterListPickerOptions
+} from "../../components/posterOptionsMenu.js";
+import { I18n } from "../../../i18n/index.js";
 
 const TMDB_API_URL = "https://api.themoviedb.org/3";
 const TMDB_POSTER_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w342";
@@ -55,19 +52,6 @@ const STREAMING_NETWORK_PRESETS = new Map([
   ["paramount plus", { title: "Paramount+", tmdbId: 4330 }],
   ["starz", { title: "Starz", tmdbId: 318 }]
 ]);
-
-function isBackEvent(event) {
-  return Environment.isBackEvent(event);
-}
-
-function escapeFolderHtml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 function firstNonEmpty(...values) {
   for (const value of values) {
@@ -164,22 +148,6 @@ function normalizeItem(item = {}, fallbackType = "movie") {
   };
 }
 
-function buildHeroDisplay(item = null) {
-  const normalized = normalizeItem(item || null);
-  if (!normalized?.id) {
-    return null;
-  }
-  const typeLabel = normalized.type === "series" ? "Series" : "Movie";
-  const year = firstNonEmpty(normalized.releaseInfo);
-  return {
-    title: normalized.name || "Untitled",
-    description: firstNonEmpty(normalized.description) || " ",
-    logo: firstNonEmpty(normalized.logo),
-    backdrop: firstNonEmpty(normalized.background, normalized.poster),
-    meta: [typeLabel, year].filter(Boolean)
-  };
-}
-
 function buildFolderHeroSeed(folder = null) {
   if (!folder) {
     return null;
@@ -269,21 +237,6 @@ function buildFallbackStreamingSources(folder = {}) {
       filters: {}
     }
   ];
-}
-
-function groupNodesByOffsetTop(nodes = []) {
-  const grouped = [];
-  nodes.forEach((node) => {
-    const top = Math.round(node.offsetTop);
-    const bucket = grouped.find((entry) => Math.abs(entry.top - top) <= 6);
-    if (bucket) {
-      bucket.nodes.push(node);
-      return;
-    }
-    grouped.push({ top, nodes: [node] });
-  });
-  grouped.sort((left, right) => left.top - right.top);
-  return grouped.map((entry) => entry.nodes);
 }
 
 function roundRobinMerge(lists = []) {
@@ -740,6 +693,514 @@ async function fetchSourceItems(source = {}, page = 1) {
   return fetchAddonSourceItems(source, page);
 }
 
+const SCROLL_LOAD_THRESHOLD_PX = 640;
+const GRID_INITIAL_SKELETON_COUNT = 9;
+const ROW_SKELETON_COUNT = 6;
+
+function phoneT(key, params = {}, fallback = key) {
+  return I18n.t(key, params, { fallback });
+}
+
+function phoneEscapeHtml(value = "") {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function backIconMarkup() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6"/></svg>`;
+}
+
+function checkmarkIconMarkup() {
+  return `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>`;
+}
+
+function toPosterItem(screen, item) {
+  return {
+    id: String(item.id || ""),
+    posterUrl: item.poster || "",
+    title: item.name || "Untitled",
+    subtitle:
+      screen.layoutPrefs?.posterLabelsEnabled !== false ? String(item.releaseInfo || "") : "",
+    watched: isTitleItemWatched(item, screen.watchedTitleIds)
+  };
+}
+
+function detailNavParams(item, sourceMeta = {}) {
+  return {
+    itemId: item.id,
+    itemType: item.type || item.catalogType || sourceMeta.type || "movie",
+    fallbackTitle: item.name || "Untitled",
+    fallbackPoster: item.poster || "",
+    fallbackBackground: item.background || item.backdrop || item.poster || "",
+    addonBaseUrl: item.addonBaseUrl || sourceMeta.addonBaseUrl || "",
+    addonId: item.addonId || sourceMeta.addonId || "",
+    addonName: item.addonName || sourceMeta.addonName || "",
+    catalogType: item.catalogType || item.type || sourceMeta.type || "movie"
+  };
+}
+
+function navigateToItem(item, sourceMeta = {}) {
+  if (!item?.id) {
+    return false;
+  }
+  Router.navigate("detail", detailNavParams(item, sourceMeta));
+  return true;
+}
+
+function viewAllParamsForRow(row) {
+  return {
+    addonBaseUrl: row.addonBaseUrl || "",
+    addonId: row.addonId || "",
+    addonName: row.addonName || "",
+    catalogId: row.catalogId || "",
+    catalogName: row.catalogName || "",
+    type: row.type || "movie",
+    initialItems: Array.isArray(row.result?.data?.items) ? row.result.data.items : []
+  };
+}
+
+function buildItemsMap(screen) {
+  const map = new Map();
+  if (screen.viewMode === "TABBED_GRID") {
+    const tab = screen.getSelectedTab?.() || null;
+    const sourceMeta = tab?.source || {};
+    (tab?.items || []).forEach((item) => {
+      if (item?.id) {
+        map.set(String(item.id), { item, sourceMeta });
+      }
+    });
+  } else {
+    (screen.tabs || [])
+      .filter((tab) => !tab.isAllTab)
+      .forEach((tab) => {
+        const sourceMeta = tab.source || {};
+        (tab.items || []).forEach((item) => {
+          if (item?.id) {
+            map.set(String(item.id), { item, sourceMeta });
+          }
+        });
+      });
+  }
+  screen._phoneFolderItemsById = map;
+  return map;
+}
+
+function findEntryById(screen, id) {
+  return screen._phoneFolderItemsById?.get(String(id || "")) || null;
+}
+
+function openFolderListPickerSheet(screen, listPickerState) {
+  const options = getPosterListPickerOptions(listPickerState);
+  openBottomSheet({
+    items: options.map((option) => ({
+      title: option.label,
+      icon: option.selected ? checkmarkIconMarkup() : "",
+      onSelect: () => void handleFolderListPickerOption(screen, listPickerState, option.action)
+    }))
+  });
+}
+
+async function handleFolderListPickerOption(screen, listPickerState, action) {
+  const normalizedAction = String(action || "");
+  if (normalizedAction.startsWith("toggleLibraryList:")) {
+    const key = normalizedAction.slice("toggleLibraryList:".length);
+    const nextSelected = !listPickerState.membership?.[key];
+    listPickerState.membership =
+      listPickerState.sourceMode === LibrarySourceMode.SIMKL
+        ? Object.fromEntries(
+            listPickerState.tabs.map((tab) => [tab.key, nextSelected && tab.key === key])
+          )
+        : { ...(listPickerState.membership || {}), [key]: nextSelected };
+    listPickerState.destructiveRemovalRequired = false;
+    openFolderListPickerSheet(screen, listPickerState);
+    return;
+  }
+  if (
+    normalizedAction === "saveLibraryLists" ||
+    normalizedAction === "confirmDestructiveSimklRemoval"
+  ) {
+    try {
+      await libraryRepository.applyMembershipChanges(
+        listPickerState.item,
+        { desiredMembership: listPickerState.membership || {} },
+        { destructiveRemovalConfirmed: normalizedAction === "confirmDestructiveSimklRemoval" }
+      );
+      closeActiveBottomSheet();
+    } catch (error) {
+      console.warn("folderDetailScreen: failed to save list membership", error);
+      listPickerState.destructiveRemovalRequired =
+        error?.code === "SIMKL_DESTRUCTIVE_REMOVAL_REQUIRED";
+      openFolderListPickerSheet(screen, listPickerState);
+    }
+  }
+}
+
+async function handleFolderZoomAction(screen, item, sourceMeta, optionsState, action) {
+  if (action === "details") {
+    navigateToItem(item, sourceMeta);
+    return;
+  }
+  const result = await activatePosterOption(optionsState, action);
+  if (result?.type === "listPicker") {
+    openFolderListPickerSheet(screen, result.state);
+    return;
+  }
+  if (result?.type !== "updated") {
+    return;
+  }
+  if (action === "toggleWatched") {
+    const itemId = String(item.id || "").trim();
+    const watchedTitleIds = new Set(screen.watchedTitleIds || []);
+    if (result.state.isWatched) {
+      watchedTitleIds.add(itemId);
+    } else {
+      watchedTitleIds.delete(itemId);
+    }
+    screen.watchedTitleIds = watchedTitleIds;
+  }
+  screen.render();
+}
+
+async function openFolderItemZoomMenu(screen, cardElement, item, sourceMeta) {
+  const optionsState = await createPosterOptionsState({
+    id: item.id,
+    type: item.type || item.catalogType || sourceMeta.type || "movie",
+    title: item.name || "Untitled",
+    poster: item.poster || "",
+    background: item.background || item.backdrop || "",
+    addonBaseUrl: item.addonBaseUrl || sourceMeta.addonBaseUrl || ""
+  });
+  if (!optionsState) {
+    return;
+  }
+  const options = getPosterOptions(optionsState);
+  const actions = options.map((option) => ({
+    id: option.action,
+    label: option.label,
+    onSelect: () =>
+      void handleFolderZoomAction(screen, item, sourceMeta, optionsState, option.action)
+  }));
+  openPosterZoomOverlay({
+    posterElement: cardElement,
+    posterUrl: item.poster || "",
+    title: item.name || "Untitled",
+    subtitle: String(item.releaseInfo || ""),
+    aspect: "portrait",
+    actions
+  });
+}
+
+function onGridLongPress(screen) {
+  return (id, cardElement) => {
+    const entry = findEntryById(screen, id);
+    if (entry) {
+      void openFolderItemZoomMenu(screen, cardElement, entry.item, entry.sourceMeta);
+    }
+  };
+}
+
+function renderHero(coverImageUrl) {
+  return `
+    <div class="phone-folder-hero" data-phone-folder-hero>
+      <div class="phone-folder-hero-bg" data-phone-folder-hero-bg style="background-image:url('${phoneEscapeHtml(
+        coverImageUrl
+      ).replace(/'/g, "%27")}')"></div>
+      <div class="phone-folder-hero-scrim" aria-hidden="true"></div>
+    </div>
+  `;
+}
+
+function renderHeader(folder, collectionTitle) {
+  return `
+    <header class="phone-folder-header" data-phone-folder-header>
+      <button
+        type="button"
+        class="phone-folder-back focusable"
+        data-action="phoneFolderBack"
+        aria-label="${phoneEscapeHtml(phoneT("common.back", {}, "Back"))}"
+      >
+        ${backIconMarkup()}
+      </button>
+      <div class="phone-folder-header-text">
+        ${collectionTitle ? `<div class="phone-folder-eyebrow">${phoneEscapeHtml(collectionTitle)}</div>` : ""}
+        <h1 class="phone-folder-title">${phoneEscapeHtml(folder?.title || "Folder")}</h1>
+      </div>
+    </header>
+  `;
+}
+
+function renderTabRow(screen) {
+  const tabs = Array.isArray(screen.tabs) ? screen.tabs : [];
+  if (tabs.length <= 1) {
+    return "";
+  }
+  const chips = tabs
+    .map(
+      (tab, index) => `
+      <button type="button"
+              class="phone-folder-tab focusable${index === screen.selectedTabIndex ? " selected" : ""}"
+              data-action="selectFolderTab"
+              data-tab-index="${index}">${phoneEscapeHtml(tab.label || "Tab")}</button>
+    `
+    )
+    .join("");
+  return `<div class="phone-folder-tabs" data-phone-folder-tabs>${chips}</div>`;
+}
+
+function renderGridSkeleton() {
+  const cards = Array.from({ length: GRID_INITIAL_SKELETON_COUNT })
+    .map(() => renderSkeletonPosterCard({ aspect: "portrait" }))
+    .join("");
+  return `<div class="phone-folder-grid">${cards}</div>`;
+}
+
+function renderGridEmptyState(message) {
+  return `
+    <div class="phone-folder-empty-state">
+      <h3 class="phone-folder-empty-title">${phoneEscapeHtml(message)}</h3>
+    </div>
+  `;
+}
+
+function renderTabbedGridBody(screen) {
+  const tabRow = renderTabRow(screen);
+  const selectedTab = screen.getSelectedTab?.() || null;
+  const items = Array.isArray(selectedTab?.items) ? selectedTab.items : [];
+  let bodyMarkup;
+  if (!items.length && selectedTab?.loading) {
+    bodyMarkup = renderGridSkeleton();
+  } else if (!items.length) {
+    bodyMarkup = renderGridEmptyState(
+      selectedTab?.error || phoneT("catalog_see_all_empty_title", {}, "No items available")
+    );
+  } else {
+    bodyMarkup = `
+      <div class="phone-folder-grid" data-phone-folder-grid>
+        ${items.map((item) => renderPosterCard(toPosterItem(screen, item))).join("")}
+      </div>
+      ${
+        selectedTab?.loading
+          ? `
+        <div class="phone-folder-loading-footer">
+          ${renderLoadingIndicator()}
+          <span>${phoneEscapeHtml(phoneT("discover_loading", {}, "Loading..."))}</span>
+        </div>
+      `
+          : ""
+      }
+    `;
+  }
+  return `${tabRow}${bodyMarkup}`;
+}
+
+function buildRowTitle(row) {
+  const mediaTypeLabel = row.type === "series" ? "Series" : "Movie";
+  return row.catalogName !== mediaTypeLabel
+    ? `${row.catalogName} - ${mediaTypeLabel}`
+    : row.catalogName;
+}
+
+function renderRowTrackBody(screen) {
+  const rows = buildFolderSourceRows(screen.tabs || []);
+  if (!rows.length) {
+    return renderGridEmptyState(phoneT("catalog_see_all_empty_title", {}, "No items available"));
+  }
+  const shelvesMarkup = rows
+    .map((row) => {
+      const items = Array.isArray(row.result?.data?.items) ? row.result.data.items : [];
+      if (!items.length) {
+        return row.result?.status === "loading"
+          ? renderSkeletonShelf({ count: ROW_SKELETON_COUNT, aspect: "portrait" })
+          : "";
+      }
+      return renderPhoneShelf({
+        id: row.homeCatalogKey,
+        title: buildRowTitle(row),
+        items: items.map((item) => toPosterItem(screen, item)),
+        variant: "portrait",
+        viewAllLabel: defaultPhoneShelfViewAllLabel()
+      });
+    })
+    .join("");
+  return `<div class="phone-folder-rows" data-phone-folder-rows>${shelvesMarkup}</div>`;
+}
+
+function renderFolderDetailScreenPhone(screen) {
+  buildItemsMap(screen);
+  const folder = screen.folder || {};
+  const collectionTitle = screen.collection?.title || "";
+  const heroImage = String(folder.coverImageUrl || folder.heroBackdropUrl || "").trim();
+  const body =
+    screen.viewMode === "TABBED_GRID" ? renderTabbedGridBody(screen) : renderRowTrackBody(screen);
+  return `
+    <div class="phone-folder-root" data-phone-folder-root>
+      <div class="phone-folder-scroll" data-phone-folder-scroll>
+        <div class="phone-folder-content" data-phone-folder-content>
+          ${heroImage ? renderHero(heroImage) : ""}
+          ${body}
+        </div>
+      </div>
+      ${renderHeader(folder, collectionTitle)}
+    </div>
+  `;
+}
+
+function handleFolderDetailPhonePointerActivate(screen, target) {
+  const actionTarget = target?.closest?.("[data-action]");
+  const action = String(actionTarget?.dataset?.action || "");
+  if (!action) {
+    return false;
+  }
+  if (action === "phoneFolderBack") {
+    Router.back();
+    return true;
+  }
+  if (action === "selectFolderTab") {
+    const index = Math.max(0, Number(actionTarget.dataset.tabIndex || 0));
+    if (index !== screen.selectedTabIndex) {
+      screen.selectedTabIndex = index;
+      screen._phoneFolderScrollTop = 0;
+      screen.render();
+    }
+    return true;
+  }
+  if (action === "openDetail") {
+    const entry = findEntryById(screen, actionTarget.dataset.id);
+    if (!entry) {
+      return false;
+    }
+    return navigateToItem(entry.item, entry.sourceMeta);
+  }
+  return false;
+}
+
+function applyHeaderPadding(container) {
+  const header = container.querySelector("[data-phone-folder-header]");
+  const content = container.querySelector("[data-phone-folder-content]");
+  const hero = container.querySelector("[data-phone-folder-hero]");
+  if (!header || !content) {
+    return;
+  }
+  content.style.paddingTop = hero ? "0" : `${header.offsetHeight}px`;
+}
+
+function applyHeroParallax(container, scrollTop) {
+  const heroBg = container.querySelector("[data-phone-folder-hero-bg]");
+  if (heroBg) {
+    heroBg.style.transform = `translate3d(0, ${scrollTop * 0.4}px, 0)`;
+  }
+}
+
+async function loadMoreForSelectedTab(screen) {
+  const selectedTab = screen.getSelectedTab?.();
+  if (!selectedTab) {
+    return;
+  }
+  if (selectedTab.isAllTab) {
+    const offset = screen.tabs[0]?.isAllTab ? 1 : 0;
+    const sourceTabs = screen.tabs.filter((tab) => !tab.isAllTab);
+    await Promise.all(
+      sourceTabs.map((tab, index) => {
+        if (tab.hasMore && !tab.loading) {
+          return screen.loadTab(index + offset, { append: true });
+        }
+        return Promise.resolve();
+      })
+    );
+    return;
+  }
+  if (selectedTab.hasMore && !selectedTab.loading) {
+    await screen.loadTab(screen.selectedTabIndex, { append: true });
+  }
+}
+
+function bindTabbedGridScroll(screen, scroller) {
+  if (!scroller) {
+    return () => {};
+  }
+  const handleScroll = () => {
+    screen._phoneFolderScrollTop = scroller.scrollTop;
+    applyHeroParallax(scroller, scroller.scrollTop);
+    const remaining = scroller.scrollHeight - (scroller.scrollTop + scroller.clientHeight);
+    if (remaining <= SCROLL_LOAD_THRESHOLD_PX) {
+      void loadMoreForSelectedTab(screen);
+    }
+  };
+  scroller.addEventListener("scroll", handleScroll, { passive: true });
+  return () => scroller.removeEventListener("scroll", handleScroll);
+}
+
+function bindPlainScroll(scroller) {
+  if (!scroller) {
+    return () => {};
+  }
+  const handleScroll = () => {
+    applyHeroParallax(scroller, scroller.scrollTop);
+  };
+  scroller.addEventListener("scroll", handleScroll, { passive: true });
+  return () => scroller.removeEventListener("scroll", handleScroll);
+}
+
+function bindRowShelves(screen, container) {
+  const detachers = Array.from(container.querySelectorAll("[data-shelf-id]")).map((shelfEl) => {
+    const rowKey = String(shelfEl.dataset.shelfId || "");
+    return bindPhoneShelfEvents(shelfEl, {
+      onViewAll: () => {
+        const rows = buildFolderSourceRows(screen.tabs || []);
+        const row = rows.find((entry) => String(entry.homeCatalogKey || "") === rowKey);
+        if (row) {
+          Router.navigate("catalogSeeAll", viewAllParamsForRow(row));
+        }
+      },
+      onLongPress: onGridLongPress(screen)
+    });
+  });
+  return () => detachers.forEach((detach) => detach());
+}
+
+function mountFolderDetailScreenPhone(screen, container) {
+  cleanupFolderDetailScreenPhone(screen);
+
+  applyHeaderPadding(container);
+
+  const scroller = container.querySelector("[data-phone-folder-scroll]");
+  if (scroller && Number.isFinite(screen._phoneFolderScrollTop)) {
+    scroller.scrollTop = screen._phoneFolderScrollTop;
+  }
+  applyHeroParallax(container, scroller?.scrollTop || 0);
+
+  const detachScroll =
+    screen.viewMode === "TABBED_GRID"
+      ? bindTabbedGridScroll(screen, scroller)
+      : bindPlainScroll(scroller);
+
+  const detachGridLongPress =
+    screen.viewMode === "TABBED_GRID"
+      ? bindPosterCardEvents(container.querySelector("[data-phone-folder-grid]"), {
+          onLongPress: onGridLongPress(screen)
+        })
+      : () => {};
+
+  const detachRowShelves =
+    screen.viewMode === "TABBED_GRID" ? () => {} : bindRowShelves(screen, container);
+
+  const teardown = () => {
+    detachScroll();
+    detachGridLongPress();
+    detachRowShelves();
+  };
+  screen._phoneFolderTeardown = teardown;
+  return teardown;
+}
+
+function cleanupFolderDetailScreenPhone(screen) {
+  screen._phoneFolderTeardown?.();
+  screen._phoneFolderTeardown = null;
+}
+
 export const FolderDetailScreen = {
   getRouteStateKey(params = {}) {
     const collectionId = String(params?.collectionId || "").trim();
@@ -787,10 +1248,7 @@ export const FolderDetailScreen = {
             loading: false
           }))
         : [],
-      heroItem: this.heroItem ? { ...this.heroItem } : null,
-      followLayoutFocusState: this.useHomeFollowLayout
-        ? HomeScreen.captureCurrentContentFocusState.call(this)
-        : null
+      heroItem: this.heroItem ? { ...this.heroItem } : null
     };
   },
 
@@ -859,14 +1317,8 @@ export const FolderDetailScreen = {
     this.selectedTabIndex = 0;
     this.lastFocusedKey = "tab:0";
     this.savedScrollTop = 0;
-    this.restoredTrackScrollStates = {};
-    this.restoredFollowLayoutFocusState = null;
-    this.restoredFocusedItem = null;
-    this.navModel = { rows: [] };
     this.tabs = [];
     this.viewMode = String(this.collection?.viewMode || "TABBED_GRID").toUpperCase();
-    this.refreshUseHomeFollowLayout();
-    this.folderRouteEnterPending = true;
     this.heroItem = null;
 
     if (!this.collection || !this.folder) {
@@ -883,20 +1335,6 @@ export const FolderDetailScreen = {
         },
         this.collection
       ) || buildFolderHeroSeed(this.folder);
-    if (this.useHomeFollowLayout) {
-      this.layoutMode = "modern";
-      this.layoutPrefs = {
-        ...this.layoutPrefs,
-        homeLayout: "modern",
-        heroSectionEnabled: true
-      };
-      this.continueWatchingDisplay = [];
-      this.continueWatchingLoading = false;
-      this.heroCandidates = [this.heroItem].filter(Boolean);
-      this.heroIndex = 0;
-      this.rows = [];
-      HomeScreen.ensureDelegatedEventsBound.call(this);
-    }
 
     const [addons, watchedItems] = await Promise.all([
       addonRepository.getInstalledAddons().catch(() => []),
@@ -1013,434 +1451,10 @@ export const FolderDetailScreen = {
     return this.tabs[this.selectedTabIndex] || null;
   },
 
-  buildNavigationModel() {
-    if (this.useHomeFollowLayout) {
-      return HomeScreen.buildNavigationModel.call(this);
-    }
-    const rows = [];
-    if (this.viewMode === "TABBED_GRID") {
-      const tabNodes = Array.from(
-        this.container?.querySelectorAll(".folder-detail-tab.focusable") || []
-      );
-      if (tabNodes.length) {
-        rows.push(tabNodes);
-      }
-      const cardNodes = Array.from(
-        this.container?.querySelectorAll(".seeall-card.focusable") || []
-      );
-      groupNodesByOffsetTop(cardNodes).forEach((rowNodes) => {
-        if (rowNodes.length) {
-          rows.push(rowNodes);
-        }
-      });
-    } else {
-      const rowTracks = Array.from(this.container?.querySelectorAll(".folder-row-track") || []);
-      rowTracks.forEach((track) => {
-        const cards = Array.from(track.querySelectorAll(".seeall-card.focusable"));
-        if (cards.length) {
-          rows.push(cards);
-        }
-      });
-    }
-    rows.forEach((rowNodes, rowIndex) => {
-      rowNodes.forEach((node, colIndex) => {
-        node.dataset.navRow = String(rowIndex);
-        node.dataset.navCol = String(colIndex);
-      });
-    });
-    this.navModel = { rows };
-  },
-
-  focusNode(target) {
-    if (this.useHomeFollowLayout && arguments.length > 1) {
-      return HomeScreen.focusNode.call(this, ...arguments);
-    }
-    if (!target) {
-      return false;
-    }
-    this.container?.querySelectorAll(".focusable.focused").forEach((node) => {
-      if (node !== target) {
-        node.classList.remove("focused");
-      }
-    });
-    target.classList.add("focused");
-    target.focus();
-    if (String(target.dataset.action || "") === "openDetail") {
-      const item = normalizeItem({
-        id: target.dataset.itemId || "",
-        type: target.dataset.itemType || "movie",
-        name: target.dataset.itemTitle || "Untitled",
-        poster: target.querySelector(".seeall-card-poster-image")?.getAttribute("src") || "",
-        background:
-          target.dataset.backdropSrc ||
-          target.querySelector(".seeall-card-poster-image")?.getAttribute("src") ||
-          "",
-        logo: target.dataset.logoSrc || "",
-        releaseInfo: target.dataset.releaseInfo || "",
-        description: target.dataset.description || ""
-      });
-      if (item?.id) {
-        this.heroItem = item;
-        this.applyHeroToDom();
-      }
-    }
-    const shell = this.container?.querySelector(".seeall-shell");
-    const rowTrack = target.closest(".folder-row-track");
-    if (rowTrack instanceof HTMLElement) {
-      const left = target.offsetLeft;
-      const right = left + target.offsetWidth;
-      if (left < rowTrack.scrollLeft + 40) {
-        rowTrack.scrollLeft = Math.max(0, left - 40);
-      } else if (right > rowTrack.scrollLeft + rowTrack.clientWidth - 40) {
-        rowTrack.scrollLeft = right - rowTrack.clientWidth + 40;
-      }
-    }
-    if (shell && (target.closest(".seeall-grid") || target.closest(".folder-detail-rows"))) {
-      const top = target.offsetTop;
-      const bottom = top + target.offsetHeight;
-      if (top < shell.scrollTop + 100) {
-        shell.scrollTop = Math.max(0, top - 100);
-      } else if (bottom > shell.scrollTop + shell.clientHeight - 100) {
-        shell.scrollTop = bottom - shell.clientHeight + 100;
-      }
-      this.savedScrollTop = shell.scrollTop;
-    }
-    this.lastFocusedKey = String(target.dataset.focusKey || this.lastFocusedKey || "");
-    return true;
-  },
-
-  applyHeroToDom() {
-    if (this.useHomeFollowLayout) {
-      return HomeScreen.applyHeroToDom.call(this);
-    }
-    const hero = buildHeroDisplay(this.heroItem);
-    if (!hero) {
-      return;
-    }
-    const root = this.container;
-    const backdrop = root?.querySelector?.(".folder-follow-hero-backdrop");
-    const logo = root?.querySelector?.(".folder-follow-hero-logo");
-    const title = root?.querySelector?.(".folder-follow-hero-title");
-    const meta = root?.querySelector?.(".folder-follow-hero-meta");
-    const description = root?.querySelector?.(".folder-follow-hero-description");
-    if (backdrop) {
-      if (hero.backdrop) {
-        backdrop.setAttribute("src", hero.backdrop);
-      } else {
-        backdrop.removeAttribute("src");
-      }
-    }
-    if (logo) {
-      if (hero.logo) {
-        logo.setAttribute("src", hero.logo);
-        logo.removeAttribute("hidden");
-      } else {
-        logo.setAttribute("hidden", "hidden");
-      }
-    }
-    if (title) {
-      title.textContent = hero.title || "Untitled";
-      title.classList.toggle("is-hidden", Boolean(hero.logo));
-    }
-    if (meta) {
-      meta.textContent = hero.meta.join("  •  ");
-    }
-    if (description) {
-      description.textContent = hero.description || " ";
-    }
-  },
-
-  restoreFocus() {
-    if (this.useHomeFollowLayout) {
-      const current = this.container?.querySelector(".home-main .focusable.focused") || null;
-      if (current) {
-        return;
-      }
-      const identityTarget = this.findRestoredFocusedItem();
-      if (identityTarget) {
-        HomeScreen.setFocusedNode.call(this, identityTarget);
-        this.lastMainFocus = identityTarget;
-        HomeScreen.rememberMainRowFocus.call(this, identityTarget);
-        HomeScreen.ensureTrackHorizontalVisibility.call(this, identityTarget);
-        HomeScreen.scheduleModernHeroUpdate.call(this, identityTarget);
-        HomeScreen.scheduleFocusedPosterFlow.call(this, identityTarget);
-        this.restoredFocusedItem = null;
-        this.restoredFollowLayoutFocusState = null;
-        return;
-      }
-      if (
-        this.restoredFollowLayoutFocusState &&
-        HomeScreen.restoreFocusState.call(this, this.restoredFollowLayoutFocusState)
-      ) {
-        this.restoredFollowLayoutFocusState = null;
-        return;
-      }
-      ScreenUtils.setInitialFocus(this.container, HomeScreen.getInitialFocusSelector.call(this));
-      const target = this.container?.querySelector(".home-main .focusable.focused") || null;
-      if (target) {
-        this.lastMainFocus = target;
-        HomeScreen.scheduleModernHeroUpdate.call(this, target);
-        HomeScreen.scheduleFocusedPosterFlow.call(this, target);
-      }
-      return;
-    }
-    const target =
-      this.findRestoredFocusedItem() ||
-      (this.lastFocusedKey
-        ? this.container?.querySelector(`.focusable[data-focus-key="${this.lastFocusedKey}"]`)
-        : null) ||
-      this.container?.querySelector(".folder-detail-tab.focusable") ||
-      this.container?.querySelector(".seeall-card.focusable") ||
-      null;
-    if (!target) {
-      return;
-    }
-    const shell = this.container?.querySelector(".seeall-shell");
-    if (shell) {
-      shell.scrollTop = Number(this.savedScrollTop || 0);
-    }
-    Object.entries(this.restoredTrackScrollStates || {}).forEach(([rowKey, scrollLeft]) => {
-      const track = Array.from(
-        this.container?.querySelectorAll(".folder-row-track[data-row-key]") || []
-      ).find((node) => String(node.dataset.rowKey || "") === String(rowKey));
-      if (track) {
-        track.scrollLeft = Number(scrollLeft || 0);
-      }
-    });
-    this.focusNode(target);
-    this.restoredFocusedItem = null;
-    if (shell) {
-      shell.scrollTop = Number(this.savedScrollTop || 0);
-    }
-  },
-
-  findRestoredFocusedItem() {
-    const descriptor = this.restoredFocusedItem;
-    if (!descriptor?.itemId || !this.container) {
-      return null;
-    }
-    const candidates = Array.from(
-      this.container.querySelectorAll(".focusable[data-item-id]")
-    ).filter(
-      (node) =>
-        String(node.dataset.itemId || "") === descriptor.itemId &&
-        (!descriptor.itemType || String(node.dataset.itemType || "") === descriptor.itemType)
-    );
-    if (!candidates.length) {
-      return null;
-    }
-    if (descriptor.rowKey) {
-      const sameRow = candidates.find(
-        (node) =>
-          String(node.closest("[data-row-key]")?.dataset?.rowKey || "") === descriptor.rowKey
-      );
-      if (sameRow) {
-        return sameRow;
-      }
-    }
-    return candidates[0];
-  },
-
-  refreshUseHomeFollowLayout() {
-    this.useHomeFollowLayout = false;
-  },
-
   render() {
     this.renderPhone();
   },
 
-  _tvRender() {
-    const enterClass = this.folderRouteEnterPending ? " nuvio-route-slide-enter" : "";
-    const sourceRows =
-      this.viewMode === "TABBED_GRID"
-        ? this.sourceTabs || []
-        : this.tabs.filter((tab) => !tab.isAllTab);
-    const heroDisplay =
-      buildHeroDisplay(this.heroItem) || buildHeroDisplay(buildFolderHeroSeed(this.folder));
-    const selectedTab = this.getSelectedTab();
-    const items = selectedTab?.items || [];
-    const cards = items.length
-      ? items
-          .map(
-            (item, index) => `
-          <article class="seeall-card focusable"
-                   data-action="openDetail"
-                   data-item-id="${escapeHtml(item.id || "")}" 
-                   data-item-type="${escapeHtml(item.type || item.catalogType || "movie")}"
-                   data-item-title="${escapeHtml(item.name || "Untitled")}" 
-                   data-poster-src="${escapeHtml(item.poster || "")}"
-                   data-backdrop-src="${escapeHtml(item.background || item.poster || "")}"
-                   data-addon-base-url="${escapeHtml(item.addonBaseUrl || selectedTab?.source?.addonBaseUrl || "")}"
-                   data-addon-id="${escapeHtml(item.addonId || selectedTab?.source?.addonId || "")}"
-                   data-addon-name="${escapeHtml(item.addonName || selectedTab?.source?.addonName || "")}"
-                   data-catalog-type="${escapeHtml(item.catalogType || sourceType(selectedTab?.source || {}) || "")}"
-                   data-focus-key="item:${escapeHtml(item.id || index)}"
-                   data-item-index="${index}">
-            <div class="seeall-card-poster-wrap">
-              ${
-                item.poster
-                  ? `<img class="seeall-card-poster-image" src="${escapeHtml(item.poster)}" alt="${escapeHtml(item.name || "content")}" loading="lazy" decoding="async" />`
-                  : `<div class="seeall-card-poster placeholder"></div>`
-              }
-              ${isTitleItemWatched(item, this.watchedTitleIds) ? renderTitleWatchedBadge() : ""}
-            </div>
-            ${
-              this.layoutPrefs?.posterLabelsEnabled !== false
-                ? `
-              <div class="seeall-card-title">${escapeHtml(item.name || "Untitled")}</div>
-              <div class="seeall-card-year">${escapeHtml(item.releaseInfo || "")}</div>
-            `
-                : ""
-            }
-          </article>
-        `
-          )
-          .join("")
-      : `<div class="seeall-empty">${escapeFolderHtml(selectedTab?.error || "No items available.")}</div>`;
-
-    const rowsMarkup = sourceRows
-      .map((tab, index) => {
-        const mediaTypeLabel = sourceType(tab.source || {}) === "series" ? "Series" : "Movie";
-        const rowTitle =
-          tab.label !== mediaTypeLabel ? `${tab.label} - ${mediaTypeLabel}` : tab.label;
-        const rowCards = (tab.items || [])
-          .map(
-            (item, itemIndex) => `
-        <article class="seeall-card focusable"
-                 data-action="openDetail"
-                 data-item-id="${escapeHtml(item.id || "")}" 
-                 data-item-type="${escapeHtml(item.type || item.catalogType || "movie")}"
-                 data-item-title="${escapeHtml(item.name || "Untitled")}" 
-                 data-poster-src="${escapeHtml(item.poster || "")}"
-                 data-backdrop-src="${escapeHtml(item.background || item.poster || "")}" 
-                 data-logo-src="${escapeHtml(item.logo || "")}" 
-                 data-addon-base-url="${escapeHtml(item.addonBaseUrl || tab.source?.addonBaseUrl || "")}"
-                 data-addon-id="${escapeHtml(item.addonId || tab.source?.addonId || "")}"
-                 data-addon-name="${escapeHtml(item.addonName || tab.source?.addonName || "")}"
-                 data-catalog-type="${escapeHtml(item.catalogType || sourceType(tab.source || {}) || "")}"
-                 data-release-info="${escapeHtml(item.releaseInfo || "")}" 
-                 data-description="${escapeHtml(item.description || "")}" 
-                 data-focus-key="row:${index}:item:${escapeHtml(item.id || itemIndex)}"
-                 data-item-index="${itemIndex}">
-          <div class="seeall-card-poster-wrap">
-            ${
-              item.poster
-                ? `<img class="seeall-card-poster-image" src="${escapeHtml(item.poster)}" alt="${escapeHtml(item.name || "content")}" loading="lazy" decoding="async" />`
-                : `<div class="seeall-card-poster placeholder"></div>`
-            }
-            ${isTitleItemWatched(item, this.watchedTitleIds) ? renderTitleWatchedBadge() : ""}
-          </div>
-          ${
-            this.layoutPrefs?.posterLabelsEnabled !== false
-              ? `
-            <div class="seeall-card-title">${escapeHtml(item.name || "Untitled")}</div>
-            <div class="seeall-card-year">${escapeHtml(item.releaseInfo || "")}</div>
-          `
-              : ""
-          }
-        </article>
-      `
-          )
-          .join("");
-        const loading = tab.loading
-          ? `
-          <div class="seeall-loading folder-row-loading">
-            ${renderLoadingIndicator()}
-            <span>Loading...</span>
-          </div>
-        `
-          : "";
-        const error =
-          tab.error && !tab.loading
-            ? `<div class="seeall-empty">${escapeHtml(tab.error)}</div>`
-            : "";
-        return `
-        <section class="folder-detail-row">
-          <h2 class="folder-detail-row-title">${escapeHtml(rowTitle)}</h2>
-          <div class="folder-row-track" data-row-key="${escapeHtml(tab.key)}">
-            ${rowCards}
-          </div>
-          ${error}
-          ${loading}
-        </section>
-      `;
-      })
-      .join("");
-
-    this.container.innerHTML =
-      this.viewMode === "TABBED_GRID"
-        ? `
-          <div class="seeall-shell folder-detail-shell${enterClass}">
-          <header class="seeall-header folder-detail-header">
-            <div class="folder-detail-eyebrow">${escapeHtml(this.collection?.title || "Collection")}</div>
-            <h2 class="seeall-title">${escapeHtml(this.folder?.title || "Folder")}</h2>
-            ${
-              this.tabs.length > 1
-                ? `
-              <div class="folder-detail-tabs">
-                ${this.tabs
-                  .map(
-                    (tab, index) => `
-                  <button type="button"
-                          class="folder-detail-tab focusable${index === this.selectedTabIndex ? " is-selected" : ""}"
-                          data-action="selectTab"
-                          data-tab-index="${index}"
-                          data-focus-key="tab:${index}">${escapeHtml(tab.label || "Tab")}</button>
-                `
-                  )
-                  .join("")}
-              </div>
-            `
-                : ""
-            }
-          </header>
-          <section class="seeall-grid">
-            ${cards}
-          </section>
-          ${
-            selectedTab?.loading
-              ? `
-            <div class="seeall-loading">
-              ${renderLoadingIndicator()}
-              <span>Loading...</span>
-            </div>
-          `
-              : ""
-          }
-        </div>
-      `
-        : `
-        <div class="seeall-shell folder-detail-shell folder-detail-follow-layout">
-          <section class="folder-follow-hero">
-            <div class="folder-follow-hero-media">
-              <img class="folder-follow-hero-backdrop" src="${escapeHtml(heroDisplay?.backdrop || "")}" alt="" />
-            </div>
-            <div class="folder-follow-hero-copy">
-              <img class="folder-follow-hero-logo" src="${escapeHtml(heroDisplay?.logo || "")}" alt=""${heroDisplay?.logo ? "" : ' hidden="hidden"'} />
-              <h1 class="folder-follow-hero-title${heroDisplay?.logo ? " is-hidden" : ""}">${escapeHtml(heroDisplay?.title || this.folder?.title || "")}</h1>
-              <div class="folder-follow-hero-meta">${escapeHtml((heroDisplay?.meta || []).join("  •  "))}</div>
-              <p class="folder-follow-hero-description">${escapeHtml(heroDisplay?.description || " ")}</p>
-            </div>
-          </section>
-          <section class="folder-detail-rows">
-            ${rowsMarkup}
-          </section>
-        </div>
-      `;
-
-    ScreenUtils.indexFocusables(this.container);
-    this.buildNavigationModel();
-    this.restoreFocus();
-    this.applyHeroToDom();
-  },
-
-  // Phone render path (ticket 03-04, mobile-parity epic) — only reached for the TABBED_GRID /
-  // row-track view modes (see the `render()` guard above); all markup/interaction logic lives
-  // in js/ui/screens/collection/folderDetailScreenPhone.js, this just hands it the screen
-  // instance so it can read this.folder/this.collection/this.tabs/this.sourceTabs/
-  // this.selectedTabIndex/this.viewMode/this.watchedTitleIds/this.layoutPrefs (already
-  // populated by mount()'s/loadTab()'s existing data flow) and call this.loadTab(...) (the TV
-  // screen's own existing async method) directly for TABBED_GRID's infinite scroll.
   renderPhone() {
     if (!this.container) {
       return;
@@ -1449,488 +1463,11 @@ export const FolderDetailScreen = {
     mountFolderDetailScreenPhone(this, this.container);
   },
 
-  renderFollowLayout() {
-    HomeScreen.cancelModernCameraFollow.call(this, { stopAnimations: true });
-    HomeScreen.teardownModernTrackScrollPagination.call(this);
-    HomeScreen.cancelFocusedPosterFlow.call(this);
-    const enterClass = this.folderRouteEnterPending ? " nuvio-route-slide-enter" : "";
-    this.folderRouteEnterPending = false;
-    this.expandedPosterNode = null;
-    this.rows = buildFolderSourceRows(this.tabs || []);
-    const rowItems = this.rows.flatMap((row) => row?.result?.data?.items || []);
-    this.heroCandidates = [this.heroItem, ...rowItems].filter((item) => item?.id);
-    const heroItem = this.heroItem || this.heroCandidates[0] || null;
-    const payload = renderModernHomeLayout({
-      rows: this.rows,
-      heroItem,
-      heroCandidates: this.heroCandidates,
-      continueWatchingItems: [],
-      continueWatchingLoading: false,
-      continueWatchingLoadingCount: 0,
-      rowItemLimit: 50,
-      showHeroSection: Boolean(heroItem),
-      showPosterLabels: false,
-      preferLandscapePosters: false,
-      focusedRowKey: "",
-      focusedItemIndex: -1,
-      expandFocusedPoster: false,
-      buildModernHeroPresentation,
-      renderContinueWatchingSection,
-      createPosterCardMarkup,
-      createSeeAllCardMarkup,
-      formatCatalogRowTitle,
-      watchedTitleIds: this.watchedTitleIds,
-      escapeHtml,
-      escapeAttribute
-    });
-    this.catalogSeeAllMap = payload.catalogSeeAllMap;
-    const sizingStyle = buildModernHomeSizingStyle(this.layoutPrefs);
-    this.container.innerHTML = `
-      <div class="home-shell home-screen-shell home-layout-modern folder-detail-home-shell" style="${escapeAttribute(sizingStyle)}">
-        <main class="home-main home-screen-main">
-          <div class="home-route-content${enterClass}">
-            ${payload.markup}
-          </div>
-        </main>
-      </div>
-    `;
-    ScreenUtils.indexFocusables(this.container);
-    HomeScreen.buildNavigationModel.call(this);
-    HomeScreen.bindHomeViewportEvents.call(this);
-    HomeScreen.applyCachedModernPortraitPosterMetrics.call(
-      this,
-      this.container.querySelector(
-        ".home-screen-shell.home-layout-modern:not(.home-modern-landscape-posters)"
-      )
-    );
-    this.restoreFocus();
-    this.setupModernTrackScrollPagination();
-    HomeScreen.applyHeroToDom.call(this);
-    HomeScreen.ensureHomeTruncationObservers.call(this);
-    HomeScreen.scheduleHomeTruncationUpdate.call(this);
-  },
-
-  setupModernTrackScrollPagination() {
-    HomeScreen.teardownModernTrackScrollPagination.call(this);
-    if (!this.useHomeFollowLayout || !this.container) {
-      return;
-    }
-    const tracks = Array.from(this.container.querySelectorAll(".home-modern-row .home-track"));
-    this._trackScrollHandlers = this._trackScrollHandlers || new Map();
-    tracks.forEach((track) => {
-      const rowKey = String(track.dataset.trackRowKey || "");
-      if (!rowKey || this._trackScrollHandlers.has(track)) {
-        return;
-      }
-      const handler = () => {
-        if (this._trackPaginationInFlight?.has(rowKey)) {
-          return;
-        }
-        const cards = track.querySelectorAll(".home-content-card:not(.home-poster-card-loading)");
-        const firstCard = cards[0];
-        const cardWidth = firstCard ? firstCard.offsetWidth : 230;
-        const nearEndThreshold = (cardWidth + 24) * 4;
-        const distanceFromEnd = track.scrollWidth - (track.scrollLeft + track.clientWidth);
-        if (distanceFromEnd > nearEndThreshold) {
-          return;
-        }
-        void this.loadMoreFollowLayoutRow(rowKey, track);
-      };
-      this._trackScrollHandlers.set(track, handler);
-      track.addEventListener("scroll", handler, { passive: true });
-      handler();
-    });
-  },
-
-  async loadMoreFollowLayoutRow(rowKey, track) {
-    const rowIndex = (this.rows || []).findIndex(
-      (row) => String(row?.homeCatalogKey || "") === String(rowKey || "")
-    );
-    const rowData = rowIndex >= 0 ? this.rows[rowIndex] : null;
-    const tabIndex = Number(rowData?.folderTabIndex ?? -1);
-    const tab = this.tabs?.[tabIndex] || null;
-    if (!rowData || !tab || tab.isAllTab || tab.loading || !tab.hasMore) {
-      return;
-    }
-    this._trackPaginationInFlight = this._trackPaginationInFlight || new Set();
-    this._trackPaginationInFlight.add(rowKey);
-    this.tabs[tabIndex] = { ...tab, loading: true, error: "" };
-    try {
-      const nextPage = Math.max(1, Number(tab.page || 1) + 1);
-      const result = await fetchSourceItems(tab.source, nextPage);
-      const existing = Array.isArray(tab.items) ? tab.items : [];
-      const seen = new Set(existing.map((item) => `${item.type}:${item.id}`));
-      const incoming = (result.items || []).filter((item) => {
-        const key = `${item.type}:${item.id}`;
-        if (!item.id || seen.has(key)) {
-          return false;
-        }
-        seen.add(key);
-        return true;
-      });
-      const merged = [...existing, ...incoming];
-      const hasMore = Boolean(result.hasMore && incoming.length);
-      this.tabs[tabIndex] = {
-        ...this.tabs[tabIndex],
-        items: merged,
-        hasMore,
-        page: Number(result.page || nextPage),
-        loading: false,
-        error: ""
-      };
-      this.rebuildAllTab();
-      if (rowData?.result?.data) {
-        rowData.result.data.items = merged;
-        rowData.result.data.hasMore = hasMore;
-        rowData.result.data.currentPage = Number(result.page || nextPage);
-      }
-      if (incoming.length && track?.isConnected) {
-        const startIndex = existing.length;
-        const newMarkup = incoming
-          .map((item, index) =>
-            createPosterCardMarkup(
-              item,
-              rowIndex,
-              startIndex + index,
-              rowData.type || "movie",
-              rowData,
-              false,
-              "modern",
-              false,
-              false,
-              false,
-              this.watchedTitleIds
-            )
-          )
-          .join("");
-        const fragment = document.createRange().createContextualFragment(newMarkup);
-        track.appendChild(fragment);
-        ScreenUtils.indexFocusables(track);
-        HomeScreen.buildNavigationModel.call(this);
-        this.heroCandidates = [
-          this.heroItem,
-          ...(this.rows || []).flatMap((row) => row?.result?.data?.items || [])
-        ].filter((item) => item?.id);
-      }
-    } catch (error) {
-      this.tabs[tabIndex] = {
-        ...this.tabs[tabIndex],
-        loading: false,
-        error: String(error?.message || "Could not load source")
-      };
-      if (rowData?.result) {
-        rowData.result.status = "error";
-      }
-      console.warn("Folder track pagination failed", rowKey, error);
-    } finally {
-      this._trackPaginationInFlight?.delete(rowKey);
-    }
-  },
-
-  mergeHeroIntoFolderTabs(itemId, mergedHero) {
-    const mergeItems = (items = []) =>
-      (Array.isArray(items) ? items : []).map((item) => {
-        return String(item?.id || "") === String(itemId || "") ? { ...item, ...mergedHero } : item;
-      });
-    this.tabs = (this.tabs || []).map((tab) => ({
-      ...tab,
-      items: mergeItems(tab.items)
-    }));
-    this.sourceTabs = (this.sourceTabs || []).map((tab) => ({
-      ...tab,
-      items: mergeItems(tab.items)
-    }));
-  },
-
-  async enrichCurrentHeroAsync(hero, focusToken = Number(this.heroFocusToken || 0), options = {}) {
-    if (!this.useHomeFollowLayout) {
-      return;
-    }
-    if (
-      !hero ||
-      !hero.id ||
-      hero.heroSource === "continueWatching" ||
-      hero.heroSource === "collection" ||
-      hero.heroMetaEnriched
-    ) {
-      return;
-    }
-    if (!hasTmdbItemId(hero)) {
-      return HomeScreen.enrichCurrentHeroAsync.call(this, hero, focusToken, {
-        ...options,
-        routeName: "folderDetail"
-      });
-    }
-
-    const itemId = String(hero.id || "");
-    const itemType = String(hero.type || hero.apiType || "movie");
-    const deferCommit = Boolean(options?.deferCommit);
-    const token = (this.heroEnrichmentToken = Number(this.heroEnrichmentToken || 0) + 1);
-    const matchesHero = (candidate) => {
-      return (
-        String(candidate?.id || "") === itemId &&
-        String(candidate?.type || candidate?.apiType || "movie") === itemType
-      );
-    };
-    const canCommitHero = () => {
-      if (
-        Number(this.heroEnrichmentToken) !== token ||
-        Number(this.heroFocusToken || 0) !== Number(focusToken || 0)
-      ) {
-        return false;
-      }
-      if (!deferCommit) {
-        return matchesHero(this.heroItem);
-      }
-      return (
-        Router.getCurrent() === "folderDetail" &&
-        matchesHero(this.getNodeHeroSource(this.getCurrentFocusedNode()))
-      );
-    };
-    const commitHero = (resolvedHero, { merge = false } = {}) => {
-      if (!canCommitHero()) {
-        return false;
-      }
-      this.heroItem = resolvedHero;
-      if (merge) {
-        HomeScreen.mergeHeroIntoCatalogState.call(this, itemId, resolvedHero);
-        this.mergeHeroIntoFolderTabs(itemId, resolvedHero);
-      }
-      HomeScreen.applyHeroToDom.call(this);
-      return true;
-    };
-    try {
-      const settings = TmdbSettingsStore.get();
-      const tmdbId = await TmdbService.ensureTmdbId(firstNonEmpty(hero.tmdbId, hero.id), itemType);
-      if (!tmdbId) {
-        commitHero({
-          ...(deferCommit ? hero : this.heroItem),
-          heroMetaEnriched: true,
-          heroMetaEnriching: false
-        });
-        return;
-      }
-      const enriched = await TmdbMetadataService.fetchEnrichment({
-        tmdbId,
-        contentType: itemType,
-        language: settings.language
-      });
-      if (!canCommitHero()) {
-        return;
-      }
-      const sourceHero = deferCommit ? hero : this.heroItem;
-      const mergedHero = enriched
-        ? {
-            ...sourceHero,
-            ...buildEnrichedTmdbItem(sourceHero, enriched, settings),
-            heroMetaEnriched: true,
-            heroMetaEnriching: false
-          }
-        : { ...sourceHero, heroMetaEnriched: true, heroMetaEnriching: false };
-      commitHero(mergedHero, { merge: true });
-    } catch (_error) {
-      commitHero({
-        ...(deferCommit ? hero : this.heroItem),
-        heroMetaEnriched: true,
-        heroMetaEnriching: false
-      });
-    }
-  },
-
-  startPendingContinueWatchingHold(node) {
-    if (!this.useHomeFollowLayout) {
-      return HomeScreen.startPendingContinueWatchingHold.call(this, node);
-    }
-    if (!this.isHomeHoldTarget(node)) {
-      return false;
-    }
-    this.cancelPendingContinueWatchingEnter();
-    this.cancelPendingContinueWatchingHold();
-    const isPoster = this.isPosterHoldTarget(node);
-    const item = isPoster
-      ? this.getPosterItemFromNode(node)
-      : this.getContinueWatchingItemFromNode(node);
-    if (isPoster && !item?.id) {
-      return false;
-    }
-    if (!isPoster && !item?.contentId) {
-      return false;
-    }
-    this.pendingContinueWatchingHoldTarget = {
-      kind: isPoster ? "poster" : "continueWatching",
-      itemId: String(isPoster ? item.id : item.contentId || ""),
-      itemType: String(isPoster ? item.type : ""),
-      videoId: String(isPoster ? "" : item.videoId || ""),
-      holdTriggered: false
-    };
-    this.pendingContinueWatchingHoldTimer = setTimeout(() => {
-      this.pendingContinueWatchingHoldTimer = null;
-      const pending = this.pendingContinueWatchingHoldTarget;
-      if (!pending || Router.getCurrent() !== "folderDetail") {
-        return;
-      }
-      const current =
-        this.container?.querySelector(
-          ".home-continue-card.focusable.focused, .home-poster-card.focusable.focused"
-        ) || null;
-      if (!this.hasPendingContinueWatchingHold(current)) {
-        return;
-      }
-      pending.holdTriggered = true;
-      this.openHoldMenuForNode(current);
-    }, 650);
-    return true;
-  },
-
-  async onKeyDown(event) {
-    if (isBackEvent(event)) {
-      event?.preventDefault?.();
-      if (this.useHomeFollowLayout && (this.continueWatchingMenu || this.posterHoldMenu)) {
-        if (this.continueWatchingMenu) {
-          HomeScreen.closeContinueWatchingMenu.call(this);
-        } else {
-          HomeScreen.closePosterHoldMenu.call(this);
-        }
-        return;
-      }
-      this.prepareHomeReturnAnimation();
-      Router.back();
-      return;
-    }
-    if (this.useHomeFollowLayout) {
-      HomeScreen.onKeyDown.call(this, event);
-      return;
-    }
-    const current = this.container?.querySelector(".focusable.focused") || null;
-    if (!current) {
-      return;
-    }
-    const code = Number(event?.keyCode || 0);
-    if (code === 13) {
-      event?.preventDefault?.();
-      const action = String(current.dataset.action || "");
-      if (action === "selectTab") {
-        this.selectedTabIndex = Math.max(0, Number(current.dataset.tabIndex || 0));
-        this.lastFocusedKey = `tab:${this.selectedTabIndex}`;
-        this.savedScrollTop = 0;
-        this.render();
-        return;
-      }
-      if (action === "openDetail") {
-        this.lastFocusedKey = String(current.dataset.focusKey || this.lastFocusedKey || "");
-        Router.navigate("detail", {
-          itemId: current.dataset.itemId || "",
-          itemType: current.dataset.itemType || current.dataset.catalogType || "movie",
-          fallbackTitle: current.dataset.itemTitle || "Untitled",
-          fallbackPoster: current.dataset.posterSrc || "",
-          fallbackBackground: current.dataset.backdropSrc || "",
-          addonBaseUrl: current.dataset.addonBaseUrl || "",
-          addonId: current.dataset.addonId || "",
-          addonName: current.dataset.addonName || "",
-          catalogType: current.dataset.catalogType || current.dataset.itemType || "movie"
-        });
-      }
-      return;
-    }
-    const direction = code === 37 ? -1 : code === 39 ? 1 : 0;
-    if (direction !== 0 && current.matches(".folder-detail-tab.focusable")) {
-      event?.preventDefault?.();
-      const tabs = Array.from(
-        this.container?.querySelectorAll(".folder-detail-tab.focusable") || []
-      );
-      const currentIndex = tabs.indexOf(current);
-      this.focusNode(
-        tabs[Math.max(0, Math.min(tabs.length - 1, currentIndex + direction))] || current
-      );
-      return;
-    }
-    if (code === 38 || code === 40 || code === 37 || code === 39) {
-      event?.preventDefault?.();
-      const row = Number(current.dataset.navRow || 0);
-      const col = Number(current.dataset.navCol || 0);
-      if (code === 37 || code === 39) {
-        const rowNodes = this.navModel.rows[row] || [];
-        this.focusNode(
-          rowNodes[Math.max(0, Math.min(rowNodes.length - 1, col + (code === 39 ? 1 : -1)))] ||
-            current
-        );
-        return;
-      }
-      const nextRowNodes = this.navModel.rows[row + (code === 40 ? 1 : -1)] || null;
-      if (!nextRowNodes?.length) {
-        return;
-      }
-      this.focusNode(
-        nextRowNodes[Math.max(0, Math.min(nextRowNodes.length - 1, col))] || nextRowNodes[0]
-      );
-      if (
-        this.viewMode === "TABBED_GRID" &&
-        code === 40 &&
-        this.getSelectedTab()?.hasMore &&
-        current.closest(".seeall-grid")
-      ) {
-        const selectedTabIndex = this.selectedTabIndex;
-        if (this.tabs[selectedTabIndex]?.isAllTab) {
-          await Promise.all(
-            this.tabs.slice(1).map((tab, index) => {
-              if (tab.hasMore && !tab.loading) {
-                return this.loadTab(index + 1, { append: true });
-              }
-              return Promise.resolve();
-            })
-          );
-        } else if (this.tabs[selectedTabIndex]?.hasMore && !this.tabs[selectedTabIndex]?.loading) {
-          await this.loadTab(selectedTabIndex, { append: true });
-        }
-      } else if (this.viewMode !== "TABBED_GRID" && code === 40) {
-        const currentTrack = current.closest(".folder-row-track");
-        const currentRowIndex = Array.from(
-          this.container?.querySelectorAll(".folder-row-track") || []
-        ).indexOf(currentTrack);
-        const rowsForView = this.tabs.filter((tab) => !tab.isAllTab);
-        const currentRow = rowsForView[currentRowIndex] || null;
-        if (currentRow?.hasMore && !currentRow.loading) {
-          await this.loadTab(currentRowIndex, { append: true });
-        }
-      }
-    }
-  },
-
-  onKeyUp(event) {
-    if (this.useHomeFollowLayout) {
-      HomeScreen.onKeyUp.call(this, event);
-    }
-  },
-
-  prepareHomeReturnAnimation() {
-    HomeScreen.pendingCollectionRouteReturnAnimation = true;
-  },
-
-  // The home-follow layout mode delegates rendering/navigation to HomeScreen's
-  // swipeable-row transform-positioning system, which touch support is
-  // explicitly deferred for (see the phone-touch-responsive spec's Out of
-  // Scope section). Only the TABBED_GRID / row-track layouts, which use plain
-  // native scroll, get touch activation here.
-  onPointerFocus(_target) {
-    return false;
-  },
-
   onPointerActivate(target) {
     return handleFolderDetailPhonePointerActivate(this, target);
   },
 
   consumeBackRequest() {
-    if (this.useHomeFollowLayout) {
-      if (this.continueWatchingMenu) {
-        HomeScreen.closeContinueWatchingMenu.call(this);
-        return true;
-      }
-      if (this.posterHoldMenu) {
-        HomeScreen.closePosterHoldMenu.call(this);
-        return true;
-      }
-    }
-    this.prepareHomeReturnAnimation();
     return false;
   },
 
@@ -1939,5 +1476,3 @@ export const FolderDetailScreen = {
     ScreenUtils.hide(this.container);
   }
 };
-
-Object.setPrototypeOf(FolderDetailScreen, HomeScreen);
