@@ -11,6 +11,12 @@ import {
 import { getSidebarProfileState } from "../../components/sidebarNavigation.js";
 import { renderPhoneShelf, defaultPhoneShelfViewAllLabel } from "../../components/phoneShelf.js";
 import { renderPosterCard, bindPosterCardEvents } from "../../components/posterCard.js";
+import {
+  shouldWindow,
+  computeWindow,
+  renderWindowedGrid,
+  measureGrid
+} from "../../components/virtualPosterGrid.js";
 import { renderPhoneNavBar, bindPhoneNavBarEvents } from "../../components/phoneNavBar.js";
 import { renderSkeletonShelf } from "../../components/phoneSkeleton.js";
 import { openPosterZoomOverlay } from "../../components/posterZoomOverlay.js";
@@ -826,7 +832,8 @@ function refreshPhoneLibraryCloudBody(screen) {
 }
 
 function bindGridLongPress(screen, root) {
-  return bindPosterCardEvents(root, {
+  screen._phoneLibraryGridDetach?.();
+  screen._phoneLibraryGridDetach = bindPosterCardEvents(root, {
     onLongPress: (key, cardElement) => {
       const item = findSavedItem(screen, key);
       if (item) {
@@ -834,6 +841,44 @@ function bindGridLongPress(screen, root) {
       }
     }
   });
+  return screen._phoneLibraryGridDetach;
+}
+
+// Windowing for the saved vertical grid only (shelves and cloud rows keep
+// full render). Mirrors the catalog see-all wiring over the shared core.
+function applyLibraryGridWindow(screen, container) {
+  const grid = container.querySelector("[data-phone-library-grid]");
+  const scroller = container.querySelector("[data-phone-library-scroll]");
+  const state = screen.controller?.getState?.();
+  const items =
+    state?.viewMode === LIBRARY_VIEW_MODE.SAVED && screen.phoneLibraryLayoutMode === "vertical"
+      ? state.visibleItems || []
+      : [];
+  if (!grid || !scroller || !shouldWindow(items.length)) {
+    screen._phoneLibraryWindow = null;
+    return false;
+  }
+  const geometry = measureGrid(grid);
+  const window = computeWindow({
+    itemCount: items.length,
+    columns: geometry.columns,
+    rowHeight: geometry.rowHeight,
+    rowGap: geometry.rowGap,
+    scrollTop: scroller.scrollTop || 0,
+    viewportHeight: scroller.clientHeight || 600
+  });
+  const key = `${items.length}:${window.startIndex}:${window.endIndex}`;
+  if (screen._phoneLibraryWindow === key) {
+    return true;
+  }
+  screen._phoneLibraryWindow = key;
+  renderWindowedGrid(grid, {
+    items,
+    renderCard: (item) => renderPosterCard(savedPosterItem(screen, item)),
+    window
+  });
+  bindGridLongPress(screen, container.querySelector(".phone-library-content"));
+  return true;
 }
 
 function mountPhoneInteractivity(screen, container) {
@@ -842,9 +887,31 @@ function mountPhoneInteractivity(screen, container) {
   const state = screen.controller.getState();
   const isSaved = state.viewMode === LIBRARY_VIEW_MODE.SAVED;
 
-  const detachLongPress = isSaved
-    ? bindGridLongPress(screen, container.querySelector(".phone-library-content"))
-    : () => {};
+  if (isSaved) {
+    bindGridLongPress(screen, container.querySelector(".phone-library-content"));
+  } else {
+    screen._phoneLibraryGridDetach = null;
+  }
+
+  screen._phoneLibraryWindow = null;
+  const scroller = container.querySelector("[data-phone-library-scroll]");
+  applyLibraryGridWindow(screen, container);
+  const handleGridScroll = () => {
+    applyLibraryGridWindow(screen, container);
+  };
+  scroller?.addEventListener("scroll", handleGridScroll, { passive: true });
+
+  let geometryTimer = 0;
+  const remeasure = () => {
+    globalThis.clearTimeout?.(geometryTimer);
+    geometryTimer = globalThis.setTimeout?.(() => {
+      screen._phoneLibraryWindow = null;
+      applyLibraryGridWindow(screen, container);
+    }, 250);
+  };
+  const grid = container.querySelector("[data-phone-library-grid]");
+  grid?.addEventListener("load", remeasure, { capture: true, passive: true });
+  globalThis.addEventListener?.("resize", remeasure);
 
   const searchInput = container.querySelector("[data-phone-library-cloud-search-input]");
   const handleSearchInput = () => {
@@ -854,14 +921,19 @@ function mountPhoneInteractivity(screen, container) {
   };
   searchInput?.addEventListener("input", handleSearchInput);
 
-  const scroller = container.querySelector("[data-phone-library-scroll]");
   const detachNavBar = bindPhoneNavBarEvents(container, {
     currentRoute: "library",
     scrollRoot: scroller
   });
 
   const teardown = () => {
-    detachLongPress();
+    scroller?.removeEventListener("scroll", handleGridScroll);
+    grid?.removeEventListener("load", remeasure, { capture: true });
+    globalThis.removeEventListener?.("resize", remeasure);
+    globalThis.clearTimeout?.(geometryTimer);
+    screen._phoneLibraryGridDetach?.();
+    screen._phoneLibraryGridDetach = null;
+    screen._phoneLibraryWindow = null;
     searchInput?.removeEventListener("input", handleSearchInput);
     detachNavBar();
   };
