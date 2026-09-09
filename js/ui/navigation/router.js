@@ -25,6 +25,7 @@ import { CatalogSeeAllScreen } from "../screens/catalog/catalogSeeAllScreen.jsx"
 import { FolderDetailScreen } from "../screens/collection/folderDetailScreen.js";
 import { Platform } from "../../platform/index.js";
 import { RouteStateStore } from "./routeStateStore.js";
+import { playScreenTransition } from "./screenTransition.js";
 import { LiquidGlassController } from "../theme/liquidGlass.js";
 
 const ROUTER_PERF_DEBUG = Boolean(
@@ -285,21 +286,12 @@ export const Router = {
       await Screen.mount(this.currentParams, navigationContext);
     };
 
-    const useViewTransition = typeof document.startViewTransition === "function" && this.current;
-    if (useViewTransition) {
-      document.documentElement.dataset.navDirection = options?.isBackNavigation
-        ? "back"
-        : "forward";
-      try {
-        const transition = document.startViewTransition(() => performDomSwap());
-        await transition.finished;
-      } catch (_) {
-        // Transition may be skipped (e.g. rapid navigations) — DOM swap
-        // already ran inside the callback regardless.
-      }
-    } else {
-      await performDomSwap();
-    }
+    await playScreenTransition({
+      fromRoute: previousRoute,
+      toRoute: routeName,
+      direction: options?.isBackNavigation ? "back" : "forward",
+      mountFn: performDomSwap
+    });
 
     LiquidGlassController.refresh();
     logRouterPerf("navigate", {
@@ -408,15 +400,24 @@ export const Router = {
       return;
     }
 
-    this.captureCurrentRouteState();
-    this.routes[this.current].cleanup?.();
-    this.current = previousRoute;
-    this.currentParams = previousParams;
-    const navigationContext = this.resolveNavigationContext(previousRoute, previousParams, {
-      isBackNavigation: true
-    });
+    const fromRoute = this.current;
+    const mountPrevious = async () => {
+      this.captureCurrentRouteState();
+      this.routes[this.current].cleanup?.();
+      this.current = previousRoute;
+      this.currentParams = previousParams;
+      const navigationContext = this.resolveNavigationContext(previousRoute, previousParams, {
+        isBackNavigation: true
+      });
 
-    await this.routes[previousRoute].mount(previousParams, navigationContext);
+      await this.routes[previousRoute].mount(previousParams, navigationContext);
+    };
+    await playScreenTransition({
+      fromRoute,
+      toRoute: previousRoute,
+      direction: "back",
+      mountFn: mountPrevious
+    });
   },
 
   getCurrent() {
