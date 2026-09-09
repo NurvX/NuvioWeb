@@ -1,11 +1,7 @@
 import { Router } from "../../navigation/router.js";
 import { ScreenUtils } from "../../navigation/screen.js";
 import { I18n } from "../../../i18n/index.js";
-import {
-  LibraryController,
-  LIBRARY_PRIVACY_OPTIONS,
-  LIBRARY_VIEW_MODE
-} from "./libraryController.js";
+import { LibraryController, LIBRARY_VIEW_MODE } from "./libraryController.js";
 import {
   createPosterOptionsState,
   getPosterOptions,

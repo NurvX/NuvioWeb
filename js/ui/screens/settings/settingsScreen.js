@@ -6995,55 +6995,6 @@ export const SettingsScreen = {
     }
   },
 
-  async openSidebar() {
-    this.focusZone = "sidebar";
-    const sidebarNodes = getRootSidebarNodes(this.container);
-    const selectedSidebarNode = getRootSidebarSelectedNode(this.container);
-    this.sidebarFocusIndex = Math.max(0, sidebarNodes.indexOf(selectedSidebarNode));
-    this.applyFocus();
-  },
-
-  async closeSidebarToNav() {
-    this.syncNavFocusToActive();
-    this.focusZone = "nav";
-    this.applyFocus();
-  },
-
-  moveNavFocus(index) {
-    this.navIndex = clamp(index, 0, this.visibleSections.length - 1);
-    this.applyFocus();
-  },
-
-  async activateNavSelection() {
-    const section = this.visibleSections[this.navIndex];
-    if (!section) {
-      return;
-    }
-    if (section.id === "trakt") {
-      await Router.navigate("trakt");
-      return;
-    }
-    this.setActiveSection(section.id);
-    this.integrationView = "hub";
-    this.contentFocusKey = section.id === "appearance" ? this.getAppearanceThemeFocusKey() : null;
-    await this.render({ refreshModel: false });
-  },
-
-  syncNavFocusToActive() {
-    const activeIndex = this.visibleSections.findIndex((item) => item.id === this.activeSection);
-    if (activeIndex >= 0) {
-      this.navIndex = activeIndex;
-    }
-  },
-
-  updateFocusedContentKey() {
-    const focused = this.container.querySelector(".settings-content-focusable.focused");
-    if (focused) {
-      this.contentFocusKey = String(focused.dataset.focusKey || "");
-      this.rememberAppearanceThemeFocusKey(this.contentFocusKey);
-    }
-  },
-
   moveContent(direction) {
     const before = this.container.querySelector(".settings-content-focusable.focused");
     const beforeFocusKey = String(before?.dataset?.focusKey || "");
@@ -7517,54 +7468,19 @@ export const SettingsScreen = {
       void this.render({ refreshModel: false });
       return true;
     }
-    if (this.focusZone === "sidebar") {
-      Platform.exitApp();
-    } else {
-      void this.openSidebar();
-    }
-    return true;
+    return false;
   },
 
   cleanup() {
-    this.phoneViewportUnsubscribe?.();
-    this.phoneViewportUnsubscribe = null;
     cleanupSettingsScreenPhone(this);
     this.persistUiState();
     this.stopTraktPolling?.();
     this.stopDebridDeviceAuth();
-    if (this.container && this.handleWheelBound) {
-      this.container.removeEventListener("wheel", this.handleWheelBound);
-    }
-    if (this.container && this.handleClickBound) {
-      this.container.removeEventListener("click", this.handleClickBound);
-    }
-    const navSlot = this.container?.querySelector?.("[data-settings-nav]");
-    if (navSlot && this.handleRailScrollBound) {
-      navSlot.removeEventListener("scroll", this.handleRailScrollBound);
-    }
-    if (navSlot?.settingsScrollAnimationFrame) {
-      cancelAnimationFrame(navSlot.settingsScrollAnimationFrame);
-      navSlot.settingsScrollAnimationFrame = null;
-    }
-    this.handleWheelBound = null;
-    this.handleClickBound = null;
-    this.handleRailScrollBound = null;
-    this.railScrollNode = null;
     this.activeSection = null;
-    this.focusZone = "nav";
-    this.sidebarFocusIndex = 0;
-    this.navIndex = -1;
-    this.contentFocusKey = null;
-    this.appearanceThemeFocusKey = null;
     this.integrationView = "hub";
     this.expandedSections = {};
     this.optionDialog = null;
     this.textDialog = null;
-    this.dialogFocusIndex = 0;
-    this.sidebarExpanded = false;
-    this.pillIconOnly = false;
-    this.suppressNextContentFocusScroll = false;
-    this.renderedSectionId = null;
     ScreenUtils.hide(this.container);
   }
 };

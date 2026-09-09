@@ -87,18 +87,6 @@ function formatCatalogRowTitle(catalogName, addonName, type, showTypeSuffix = tr
   return endsWithType ? base : `${base} - ${typeLabel}`;
 }
 
-function isSearchableCatalogType(type) {
-  const normalized = String(type || "")
-    .trim()
-    .toLowerCase();
-  return (
-    normalized === "movie" ||
-    normalized === "series" ||
-    normalized === "tv" ||
-    normalized === "anime"
-  );
-}
-
 function isPerformanceConstrainedRuntime() {
   return Boolean(globalThis.document?.body?.classList?.contains("performance-constrained"));
 }
@@ -1027,8 +1015,7 @@ export const SearchScreen = {
   async searchRows(query, { token = this.loadToken, onFirstResults = null } = {}) {
     const addons = await addonRepository.getInstalledAddons();
     const searchableCatalogs = buildSearchTargets(addons);
-    const { buildSearchScheduleIndices, catalogSupportsExtra } =
-      await import("./searchCatalogTargets.js");
+    const { buildSearchScheduleIndices } = await import("./searchCatalogTargets.js");
     const scheduleIndices = buildSearchScheduleIndices(searchableCatalogs);
     const batchSize = getSearchCatalogBatchSize();
     const itemLimit = getSearchResultsPerRow();

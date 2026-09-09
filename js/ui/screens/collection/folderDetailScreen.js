@@ -5,7 +5,6 @@ import { catalogRepository } from "../../../data/repository/catalogRepository.js
 import { watchedItemsRepository } from "../../../data/repository/watchedItemsRepository.js";
 import { CollectionsStore } from "../../../data/local/collectionsStore.js";
 import { LayoutPreferences } from "../../../data/local/layoutPreferences.js";
-import { TmdbService } from "../../../core/tmdb/tmdbService.js";
 import { TmdbSettingsStore } from "../../../data/local/tmdbSettingsStore.js";
 import { TmdbMetadataService } from "../../../core/tmdb/tmdbMetadataService.js";
 import { TMDB_API_KEY, TRAKT_API_URL, TRAKT_CLIENT_ID } from "../../../config.js";
@@ -458,58 +457,6 @@ function mapTmdbListItem(item = {}, mediaType = "movie") {
       tmdbId: String(item.id)
     },
     type
-  );
-}
-
-function hasTmdbItemId(item = {}) {
-  const rawId = firstNonEmpty(item.tmdbId, item.id);
-  const normalized = rawId.replace(/^tmdb:/i, "").trim();
-  return /^\d+$/.test(normalized) || /^tt\d+$/i.test(normalized);
-}
-
-function buildEnrichedTmdbItem(baseItem = {}, enriched = {}, settings = {}) {
-  const useArtwork = settings.useArtwork !== false;
-  const useBasicInfo = settings.useBasicInfo !== false;
-  return normalizeItem(
-    {
-      ...baseItem,
-      name: useBasicInfo ? firstNonEmpty(enriched.localizedTitle, baseItem.name) : baseItem.name,
-      description: useBasicInfo
-        ? firstNonEmpty(enriched.description, baseItem.description)
-        : baseItem.description,
-      background: useArtwork
-        ? firstNonEmpty(enriched.backdrop, baseItem.background)
-        : baseItem.background,
-      backdrop: useArtwork
-        ? firstNonEmpty(enriched.backdrop, baseItem.backdrop)
-        : baseItem.backdrop,
-      landscapePoster: useArtwork
-        ? firstNonEmpty(enriched.backdrop, baseItem.landscapePoster)
-        : baseItem.landscapePoster,
-      poster: useArtwork ? firstNonEmpty(enriched.poster, baseItem.poster) : baseItem.poster,
-      logo: useArtwork ? enriched.logo : baseItem.logo,
-      genres:
-        useBasicInfo && Array.isArray(enriched.genres) && enriched.genres.length
-          ? enriched.genres
-          : baseItem.genres,
-      releaseInfo: useBasicInfo
-        ? firstNonEmpty(enriched.releaseInfo, baseItem.releaseInfo)
-        : baseItem.releaseInfo,
-      released: useBasicInfo
-        ? firstNonEmpty(enriched.released, baseItem.released)
-        : baseItem.released,
-      releaseDate: useBasicInfo
-        ? firstNonEmpty(enriched.released, baseItem.releaseDate)
-        : baseItem.releaseDate,
-      runtime: useBasicInfo ? firstNonEmpty(enriched.runtime, baseItem.runtime) : baseItem.runtime,
-      rating: useBasicInfo ? (enriched.rating ?? baseItem.rating) : baseItem.rating,
-      imdbRating: useBasicInfo ? (enriched.rating ?? baseItem.imdbRating) : baseItem.imdbRating,
-      language: useBasicInfo
-        ? firstNonEmpty(enriched.language, baseItem.language)
-        : baseItem.language,
-      country: useBasicInfo ? firstNonEmpty(enriched.country, baseItem.country) : baseItem.country
-    },
-    baseItem.type || baseItem.apiType || "movie"
   );
 }
 
