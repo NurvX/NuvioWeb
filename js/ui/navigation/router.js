@@ -25,7 +25,7 @@ import { CatalogSeeAllScreen } from "../screens/catalog/catalogSeeAllScreen.jsx"
 import { FolderDetailScreen } from "../screens/collection/folderDetailScreen.js";
 import { Platform } from "../../platform/index.js";
 import { RouteStateStore } from "./routeStateStore.js";
-import { playScreenTransition } from "./screenTransition.js";
+import { playScreenTransition, runScreenCleanup } from "./screenTransition.js";
 import { LiquidGlassController } from "../theme/liquidGlass.js";
 
 const ROUTER_PERF_DEBUG = Boolean(
@@ -263,7 +263,7 @@ export const Router = {
       const shouldSkipPush = skipStackPush || NON_BACKSTACK_ROUTES.has(previousRoute);
       if (this.current && this.current !== routeName) {
         this.captureCurrentRouteState();
-        this.routes[this.current].cleanup?.();
+        runScreenCleanup(this.routes[this.current], this.current);
         if (!shouldSkipPush) {
           this.stack.push({
             route: this.current,
@@ -272,7 +272,7 @@ export const Router = {
         }
       } else if (this.current === routeName) {
         this.captureCurrentRouteState();
-        this.routes[this.current].cleanup?.();
+        runScreenCleanup(this.routes[this.current], this.current);
       }
 
       this.current = routeName;
@@ -381,7 +381,7 @@ export const Router = {
 
     if (this.stack.length === 0) {
       if (this.current && this.current !== "home" && this.routes.home) {
-        this.routes[this.current].cleanup?.();
+        runScreenCleanup(this.routes[this.current], this.current);
         this.current = "home";
         this.currentParams = {};
         await this.routes.home.mount();
@@ -403,7 +403,7 @@ export const Router = {
     const fromRoute = this.current;
     const mountPrevious = async () => {
       this.captureCurrentRouteState();
-      this.routes[this.current].cleanup?.();
+      runScreenCleanup(this.routes[this.current], this.current);
       this.current = previousRoute;
       this.currentParams = previousParams;
       const navigationContext = this.resolveNavigationContext(previousRoute, previousParams, {

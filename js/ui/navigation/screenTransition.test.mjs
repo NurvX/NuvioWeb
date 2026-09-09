@@ -19,7 +19,8 @@ const {
   getTransitionDuration,
   shouldInstant,
   buildTransitionPlan,
-  playScreenTransition
+  playScreenTransition,
+  runScreenCleanup
 } = await import("./screenTransition.js");
 
 // --- Pure planning functions ---
@@ -139,4 +140,35 @@ test("playScreenTransition overlap: stale run settles without touching the new D
   await Promise.all([first, second]);
   assert.equal(document.querySelector(".phone-screen-snapshot"), null);
   assert.equal(document.documentElement.dataset.navDirection, "back");
+});
+
+test("runScreenCleanup: clean teardown runs and reports true", () => {
+  let calls = 0;
+  const ok = runScreenCleanup(
+    {
+      cleanup: () => {
+        calls += 1;
+      }
+    },
+    "a"
+  );
+  assert.equal(ok, true);
+  assert.equal(calls, 1);
+});
+
+test("runScreenCleanup: throwing teardown does not throw, reports false", () => {
+  const ok = runScreenCleanup(
+    {
+      cleanup: () => {
+        throw new TypeError("ghost method is not a function");
+      }
+    },
+    "detail"
+  );
+  assert.equal(ok, false);
+});
+
+test("runScreenCleanup: missing screen or cleanup is a clean no-op", () => {
+  assert.equal(runScreenCleanup(null, "a"), true);
+  assert.equal(runScreenCleanup({}, "a"), true);
 });

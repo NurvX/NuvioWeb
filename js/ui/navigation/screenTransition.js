@@ -64,6 +64,21 @@ export function buildTransitionPlan({
   };
 }
 
+// Runs an outgoing screen's cleanup without letting it strand the swap.
+// A leaving screen's teardown must never block arrival: failures warn and
+// the navigation continues. Returns true when cleanup ran clean.
+export function runScreenCleanup(screen, routeName = "") {
+  try {
+    screen?.cleanup?.();
+    return true;
+  } catch (error) {
+    try {
+      console.warn("Screen cleanup failed, continuing navigation", routeName, error);
+    } catch (_) {}
+    return false;
+  }
+}
+
 export function resolveRouteRoot(routeName) {
   if (!routeName || typeof document === "undefined") {
     return null;

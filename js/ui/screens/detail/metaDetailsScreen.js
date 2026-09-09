@@ -1542,7 +1542,7 @@ export const MetaDetailsScreen = {
         ? { ...this.episodeFocusIndexBySeason }
         : {},
       railFocusIndexByKey: this.railFocusIndexByKey ? { ...this.railFocusIndexByKey } : {},
-      pendingFocusRestore: this.captureDetailFocus(),
+      pendingFocusRestore: this.captureDetailFocus?.(),
       contentScrollTop: Number(content?.scrollTop || 0),
       trackScrollLeftByKey: captureHorizontalScrollMap(this.container),
       episodeProgressEntries: Array.from(this.episodeProgressMap?.entries?.() || []),
@@ -3299,7 +3299,7 @@ export const MetaDetailsScreen = {
   // TV dispatch site and js/ui/screens/detail/metaDetailsScreenPhone.js's own tap dispatch, so
   // neither has to duplicate this ~45-line data-layer sequence.
   async toggleWatchedFromDetail() {
-    const focusRestore = this.captureDetailFocus();
+    const focusRestore = this.captureDetailFocus?.();
     const isSeries = isSeriesDetailMeta(this.meta, this.episodes);
     if (isSeries) {
       if (this.isMarkedWatched) {
@@ -4045,14 +4045,14 @@ export const MetaDetailsScreen = {
     this.phoneViewportUnsubscribe = null;
     cleanupMetaDetailsScreenPhone(this);
     this.detailLoadToken = (this.detailLoadToken || 0) + 1;
-    this.cancelPendingEpisodeHold();
-    this.cancelPendingSeasonHold();
-    this.cancelPendingPosterHold();
-    this.cancelPendingHeroHold();
+    this.cancelPendingEpisodeHold?.();
+    this.cancelPendingSeasonHold?.();
+    this.cancelPendingPosterHold?.();
+    this.cancelPendingHeroHold?.();
     this.posterOptionsController?.destroy?.({ restoreFocus: false });
     this.posterOptionsController = null;
     this.posterOptionsFocusRestore = null;
-    this.destroyDetailHoldDialog();
+    this.destroyDetailHoldDialog?.();
     this.episodeHoldMenu = null;
     this.seasonHoldMenu = null;
     this.heroPlayMenu = null;
@@ -4061,7 +4061,7 @@ export const MetaDetailsScreen = {
       cancelAnimationFrame(this.episodeVirtualSyncRaf);
       this.episodeVirtualSyncRaf = null;
     }
-    this.stopEpisodeHoldRepeat();
+    this.stopEpisodeHoldRepeat?.();
     this.episodeThumbnailPrefetchCache = new Set();
     if (this.episodeThumbObserver) {
       try {
