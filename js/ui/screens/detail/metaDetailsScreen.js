@@ -1749,17 +1749,8 @@ export const MetaDetailsScreen = {
     this.isBackNavigation = Boolean(navigationContext?.isBackNavigation);
     this.pendingEpisodeSelection = null;
     this.pendingMovieSelection = null;
-    this.episodeHoldMenu = null;
-    this.seasonHoldMenu = null;
     this.heroPlayMenu = null;
     this.libraryListMenu = null;
-    this.detailHoldDialog = null;
-    this.posterOptionsController = null;
-    this.posterOptionsFocusRestore = null;
-    this.pendingPosterHoldTarget = null;
-    this.pendingPosterHoldTimer = null;
-    this.pendingHeroHoldTarget = null;
-    this.pendingHeroHoldTimer = null;
     this.streamChooserFocus = null;
     this.streamChooserLoadToken = 0;
     this.isLoadingDetail = true;
@@ -3424,8 +3415,6 @@ export const MetaDetailsScreen = {
       return false;
     }
     await this.setEpisodesWatchedState(episodes, watched);
-    this.episodeHoldMenu = null;
-    this.seasonHoldMenu = null;
     this.syncEpisodePlaybackDom(episodes);
     return true;
   },
@@ -3436,7 +3425,6 @@ export const MetaDetailsScreen = {
       return false;
     }
     await this.setEpisodesWatchedState(previousEpisodes, true);
-    this.episodeHoldMenu = null;
     this.syncEpisodePlaybackDom(previousEpisodes);
     return true;
   },
@@ -3513,63 +3501,8 @@ export const MetaDetailsScreen = {
       );
     }
     await this.refreshEpisodePlaybackState();
-    this.episodeHoldMenu = null;
     this.syncEpisodePlaybackDom([episode]);
     return true;
-  },
-
-  async activateEpisodeHoldMenuOption() {
-    const episode = this.getEpisodeHoldMenuEpisode();
-    const options = this.getEpisodeHoldMenuOptions();
-    const option =
-      options[
-        Math.max(0, Math.min(options.length - 1, Number(this.episodeHoldMenu?.optionIndex || 0)))
-      ];
-    if (!episode || !option) {
-      return false;
-    }
-    if (option.action === "play") {
-      this.closeEpisodeHoldMenu({ restoreFocus: false });
-      return this.startEpisodeFromHoldMenu(episode);
-    }
-    if (option.action === "playFromBeginning") {
-      this.closeEpisodeHoldMenu({ restoreFocus: false });
-      return this.startEpisodeFromHoldMenu(episode, { startOver: true });
-    }
-    if (option.action === "playManually") {
-      this.closeEpisodeHoldMenu({ restoreFocus: false });
-      return this.startEpisodeFromHoldMenu(episode, { manualSelection: true });
-    }
-    if (option.action === "toggleWatched") {
-      this.closeEpisodeHoldMenu({ restoreFocus: false });
-      return this.setEpisodeWatchedState(episode, !this.isEpisodeMarkedWatched(episode));
-    }
-    if (option.action === "markSeasonWatched" || option.action === "markSeasonUnwatched") {
-      this.closeEpisodeHoldMenu({ restoreFocus: false });
-      return this.setSeasonWatchedState(episode.season, option.action === "markSeasonWatched");
-    }
-    if (option.action === "markPreviousWatched") {
-      this.closeEpisodeHoldMenu({ restoreFocus: false });
-      return this.markPreviousEpisodesWatched(episode);
-    }
-    return false;
-  },
-
-  async activateSeasonHoldMenuOption() {
-    const season = this.getSeasonHoldMenuSeason();
-    const options = this.getSeasonHoldMenuOptions();
-    const option =
-      options[
-        Math.max(0, Math.min(options.length - 1, Number(this.seasonHoldMenu?.optionIndex || 0)))
-      ];
-    if (season == null || !option) {
-      return false;
-    }
-    if (option.action === "markSeasonWatched" || option.action === "markSeasonUnwatched") {
-      this.closeSeasonHoldMenu({ restoreFocus: false });
-      return this.setSeasonWatchedState(season, option.action === "markSeasonWatched");
-    }
-    return false;
   },
 
   async activateHeroOptionsMenu(actionOverride = "") {
@@ -3641,8 +3574,6 @@ export const MetaDetailsScreen = {
       !content ||
       Number(content.scrollTop || 0) > 160 ||
       !focused?.matches?.('.series-detail-actions [data-action="playDefault"]') ||
-      this.seasonHoldMenu ||
-      this.episodeHoldMenu ||
       this.heroPlayMenu ||
       this.libraryListMenu ||
       this.detailHoldDialog ||
@@ -3716,18 +3647,6 @@ export const MetaDetailsScreen = {
   },
 
   consumeBackRequest() {
-    if (this.seasonHoldMenu) {
-      this.closeSeasonHoldMenu();
-      return true;
-    }
-    if (this.episodeHoldMenu) {
-      this.closeEpisodeHoldMenu();
-      return true;
-    }
-    if (this.posterOptionsController?.dialog) {
-      this.closePosterOptionsMenu();
-      return true;
-    }
     if (this.heroPlayMenu || this.libraryListMenu) {
       this.closeHeroMenus();
       return true;
@@ -4053,8 +3972,6 @@ export const MetaDetailsScreen = {
     this.posterOptionsController = null;
     this.posterOptionsFocusRestore = null;
     this.destroyDetailHoldDialog?.();
-    this.episodeHoldMenu = null;
-    this.seasonHoldMenu = null;
     this.heroPlayMenu = null;
     this.libraryListMenu = null;
     if (this.episodeVirtualSyncRaf) {
