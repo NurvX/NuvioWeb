@@ -2058,6 +2058,12 @@
   gap: var(--phone-space-12) var(--phone-space-10);
 }
 
+/* Windowing spacer: reserves the height of off-screen rows. */
+.phone-grid-spacer {
+  grid-column: 1 / -1;
+  pointer-events: none;
+}
+
 .phone-catalog-seeall-grid .phone-poster {
   width: 100%;
 }

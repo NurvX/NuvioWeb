@@ -9,6 +9,12 @@ import { h } from "preact";
 import { mountPreact } from "../../phone/mountPreact.js";
 import { I18n } from "../../../i18n/index.js";
 import { renderPosterCard, bindPosterCardEvents } from "../../components/posterCard.js";
+import {
+  shouldWindow,
+  computeWindow,
+  renderWindowedGrid,
+  measureGrid
+} from "../../components/virtualPosterGrid.js";
 import { renderSkeletonPosterCard } from "../../components/phoneSkeleton.js";
 import { openPosterZoomOverlay } from "../../components/posterZoomOverlay.js";
 import { openBottomSheet, closeActiveBottomSheet } from "../../components/bottomSheet.js";
@@ -346,14 +352,62 @@ function applyHeaderPadding(container) {
 }
 
 function bindGridLongPress(screen, container) {
-  return bindPosterCardEvents(container.querySelector("[data-phone-catalog-seeall-grid]"), {
-    onLongPress: (id, cardElement) => {
-      const item = findItemById(screen, id);
-      if (item) {
-        void openCatalogItemZoomMenu(screen, cardElement, item);
+  screen._phoneCatalogSeeAllGridDetach?.();
+  screen._phoneCatalogSeeAllGridDetach = bindPosterCardEvents(
+    container.querySelector("[data-phone-catalog-seeall-grid]"),
+    {
+      onLongPress: (id, cardElement) => {
+        const item = findItemById(screen, id);
+        if (item) {
+          void openCatalogItemZoomMenu(screen, cardElement, item);
+        }
       }
     }
+  );
+  return screen._phoneCatalogSeeAllGridDetach;
+}
+
+// Windowing: when the list outgrows the threshold, only the visible row
+// window stays mounted. Scroll position, paging, and bindings are preserved
+// because spacers keep full-list scroll height and the window re-applies
+// from the last known scrollTop after every render.
+function gridWindowGeometry(container) {
+  const grid = container.querySelector("[data-phone-catalog-seeall-grid]");
+  const scroller = container.querySelector("[data-phone-catalog-seeall-scroll]");
+  if (!grid || !scroller) {
+    return null;
+  }
+  return { grid, scroller, ...measureGrid(grid) };
+}
+
+function applyGridWindow(screen, container, scrollTop) {
+  const items = Array.isArray(screen.items) ? screen.items : [];
+  const geometry = gridWindowGeometry(container);
+  if (!geometry || !shouldWindow(items.length)) {
+    screen._phoneCatalogSeeAllWindow = null;
+    return false;
+  }
+  screen._phoneCatalogSeeAllGridGeometry = geometry;
+  const window = computeWindow({
+    itemCount: items.length,
+    columns: geometry.columns,
+    rowHeight: geometry.rowHeight,
+    rowGap: geometry.rowGap,
+    scrollTop,
+    viewportHeight: geometry.scroller.clientHeight || 600
   });
+  const key = `${window.startIndex}:${window.endIndex}`;
+  if (screen._phoneCatalogSeeAllWindow === key) {
+    return true;
+  }
+  screen._phoneCatalogSeeAllWindow = key;
+  renderWindowedGrid(geometry.grid, {
+    items,
+    renderCard: (item) => renderPosterCard(toPosterItem(screen, item)),
+    window
+  });
+  bindGridLongPress(screen, container);
+  return true;
 }
 
 function mountPhoneInteractivity(screen, container) {
@@ -365,11 +419,17 @@ function mountPhoneInteractivity(screen, container) {
   if (scroller && Number.isFinite(screen._phoneCatalogSeeAllScrollTop)) {
     scroller.scrollTop = screen._phoneCatalogSeeAllScrollTop;
   }
+  screen._phoneCatalogSeeAllWindow = null;
+  const windowed = applyGridWindow(screen, container, scroller?.scrollTop || 0);
+  if (!windowed) {
+    bindGridLongPress(screen, container);
+  }
   const handleScroll = () => {
     if (!scroller) {
       return;
     }
     screen._phoneCatalogSeeAllScrollTop = scroller.scrollTop;
+    applyGridWindow(screen, container, scroller.scrollTop);
     if (screen.loading || !screen.hasMore) {
       return;
     }
@@ -380,11 +440,36 @@ function mountPhoneInteractivity(screen, container) {
   };
   scroller?.addEventListener("scroll", handleScroll, { passive: true });
 
-  const detachLongPress = bindGridLongPress(screen, container);
+  // Card heights settle as lazy images load (and on rotation): re-measure
+  // debounced and re-apply the window at the current scrollTop.
+  let geometryTimer = 0;
+  const remeasure = () => {
+    globalThis.clearTimeout?.(geometryTimer);
+    geometryTimer = globalThis.setTimeout?.(() => {
+      const next = gridWindowGeometry(container);
+      if (!next) {
+        return;
+      }
+      const prev = screen._phoneCatalogSeeAllGridGeometry || {};
+      screen._phoneCatalogSeeAllGridGeometry = next;
+      if (Math.abs((next.rowHeight || 0) - (prev.rowHeight || 0)) > 4) {
+        screen._phoneCatalogSeeAllWindow = null;
+        applyGridWindow(screen, container, scroller?.scrollTop || 0);
+      }
+    }, 250);
+  };
+  const grid = container.querySelector("[data-phone-catalog-seeall-grid]");
+  grid?.addEventListener("load", remeasure, { capture: true, passive: true });
+  globalThis.addEventListener?.("resize", remeasure);
 
   const teardown = () => {
     scroller?.removeEventListener("scroll", handleScroll);
-    detachLongPress();
+    grid?.removeEventListener("load", remeasure, { capture: true });
+    globalThis.removeEventListener?.("resize", remeasure);
+    globalThis.clearTimeout?.(geometryTimer);
+    screen._phoneCatalogSeeAllGridDetach?.();
+    screen._phoneCatalogSeeAllGridDetach = null;
+    screen._phoneCatalogSeeAllWindow = null;
   };
   screen._phoneCatalogSeeAllTeardown = teardown;
   return teardown;
