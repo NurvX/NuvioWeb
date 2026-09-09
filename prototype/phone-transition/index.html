@@ -1,0 +1,217 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway, not production. Answers wayfinder #30:
+  "What should the custom Preact transition feel like?"
+  Three variants of phone screen push/pop (+ sheet), switchable via ?variant=A|B|C
+  and the floating bar below. Open directly in a mobile-width browser window
+  (double-click works, no server needed).
+
+  Assumption stated: sub-shape B as a static file, because transitions are not a
+  page and cannot be hosted on an existing route. Durations/easings are the real
+  tokens from css/base.css; slide shapes reuse the existing keyframe geometry
+  (30% translateX + fade) from css/phone.css. The JS mirrors the proposed
+  mount-then-animate contract (incoming placed hidden -> reflow -> animate in;
+  outgoing kept one exit-duration, then hidden).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>PROTOTYPE #30 — phone transition feel (A/B/C)</title>
+<style>
+  :root {
+    --motion-fast: 150ms; --motion-normal: 220ms;
+    --motion-sheet-enter: 300ms; --motion-sheet-exit: 250ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-decelerate: cubic-bezier(0, 0, 0, 1);
+    --ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+    --bg: #0d0d0d; --card: #241a1a; --text: #f5f7f8; --muted: #969ca3; --accent: #e53935;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #000; color: var(--text);
+    font-family: system-ui, sans-serif; display: flex; flex-direction: column;
+    align-items: center; min-height: 100vh; }
+  h1 { font-size: 14px; font-weight: 600; color: var(--muted); margin: 12px 0 4px; }
+  /* Phone stage */
+  #stage { position: relative; width: min(390px, 100vw); height: min(700px, 72vh);
+    background: var(--bg); border-radius: 24px; overflow: hidden;
+    border: 1px solid #333; }
+  .screen { position: absolute; inset: 0; background: var(--bg); padding: 20px 16px 90px;
+    will-change: transform, opacity; }
+  .screen[hidden] { display: none; }
+  .hero { height: 180px; border-radius: 16px;
+    background: linear-gradient(135deg, #5c1010, var(--accent)); margin-bottom: 16px;
+    display: flex; align-items: flex-end; padding: 12px; font-weight: 700; }
+  .row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .poster { width: 72px; aspect-ratio: 2/3; border-radius: 8px; background: var(--card);
+    border: 1px solid #333; flex: none; }
+  .poster.wide { width: 120px; aspect-ratio: 16/9; }
+  .detail-poster { width: 130px; aspect-ratio: 2/3; border-radius: 12px;
+    background: linear-gradient(135deg, #10395c, #1e88e5); margin-bottom: 12px; }
+  .btn { display: inline-block; background: var(--accent); border-radius: 12px;
+    padding: 10px 18px; font-weight: 600; margin-top: 10px; }
+  .ghost { background: #222; }
+  .muted { color: var(--muted); font-size: 13px; }
+  /* Bottom sheet */
+  #sheet { position: absolute; left: 0; right: 0; bottom: 0; background: #1a1a1a;
+    border-radius: 24px 24px 0 0; padding: 12px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(105%); }
+  #sheet.open { transform: translateY(0); }
+  #sheet .grabber { width: 40px; height: 4px; border-radius: 999px; background: #444; margin: 0 auto 12px; }
+  #scrim { position: absolute; inset: 0; background: rgba(0,0,0,.56); opacity: 0;
+    pointer-events: none; }
+  /* ---- Variant A: native slide (both screens move, 30% + fade) ---- */
+  .vA .anim-in-from-right { animation: a-in-right var(--motion-normal) var(--ease-standard) both; }
+  .vA .anim-out-to-left { animation: a-out-left var(--motion-normal) var(--ease-accelerate) both; }
+  .vA .anim-in-from-left { animation: a-in-left var(--motion-normal) var(--ease-standard) both; }
+  .vA .anim-out-to-right { animation: a-out-right var(--motion-normal) var(--ease-accelerate) both; }
+  @keyframes a-in-right { from { transform: translateX(30%); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes a-out-left { from { transform: none; opacity: 1; } to { transform: translateX(-30%); opacity: 0; } }
+  @keyframes a-in-left { from { transform: translateX(-30%); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes a-out-right { from { transform: none; opacity: 1; } to { transform: translateX(30%); opacity: 0; } }
+  /* ---- Variant B: calm fade+scale (no lateral motion, back == forward) ---- */
+  .vB .anim-in-from-right, .vB .anim-in-from-left { animation: b-in var(--motion-normal) var(--ease-standard) both; }
+  .vB .anim-out-to-left, .vB .anim-out-to-right { animation: b-out var(--motion-normal) var(--ease-standard) both; }
+  @keyframes b-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes b-out { from { opacity: 1; } to { opacity: 0; } }
+  /* ---- Variant C: slide-over + scrim (incoming from 100%, outgoing dims) ---- */
+  .vC .screen.outgoing { z-index: 1; }
+  .vC .screen.incoming { z-index: 2; box-shadow: -16px 0 40px rgba(0,0,0,.5); }
+  .vC .anim-in-from-right, .vC .anim-in-from-left { animation: c-in var(--motion-normal) var(--ease-decelerate) both; }
+  .vC .anim-out-to-left, .vC .anim-out-to-right { animation: c-dim var(--motion-normal) var(--ease-standard) both; }
+  .vC .anim-back-out { animation: c-out var(--motion-normal) var(--ease-accelerate) both; }
+  .vC .anim-back-undim { animation: c-undim var(--motion-normal) var(--ease-standard) both; }
+  @keyframes c-in { from { transform: translateX(100%); } to { transform: none; } }
+  @keyframes c-dim { from { filter: brightness(1); } to { filter: brightness(.45); } }
+  @keyframes c-out { from { transform: none; } to { transform: translateX(100%); } }
+  @keyframes c-undim { from { filter: brightness(.45); } to { filter: brightness(1); } }
+  /* Sheets (all variants): enter 300 standard, exit 250 */
+  #sheet.anim-sheet-in { transition: transform var(--motion-sheet-enter) var(--ease-standard); }
+  #sheet.anim-sheet-out { transition: transform var(--motion-sheet-exit) var(--ease-standard); }
+  /* Reduced motion: instant cuts everywhere */
+  .reduced .screen, .reduced #sheet { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+  /* Floating switcher + readout */
+  #bar { position: sticky; bottom: 0; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+    padding: 12px; max-width: 560px; }
+  #bar button { background: #222; color: var(--text); border: 1px solid #444; border-radius: 999px;
+    padding: 8px 14px; font-size: 14px; }
+  #bar button.on { background: var(--accent); border-color: var(--accent); }
+  #readout { font-size: 12px; color: var(--muted); text-align: center; max-width: 560px; padding: 0 16px 24px; }
+  #readout b { color: var(--text); }
+</style>
+</head>
+<body>
+<h1>PROTOTYPE #30 — transition feel (throwaway)</h1>
+<div id="stage" class="vA">
+  <div id="scrim"></div>
+  <section id="home" class="screen">
+    <div class="hero">Hero pager</div>
+    <div class="muted">Continue watching</div>
+    <div class="row"><div class="poster"></div><div class="poster"></div><div class="poster"></div><div class="poster"></div></div>
+    <div class="muted">Trending</div>
+    <div class="row"><div class="poster wide"></div><div class="poster wide"></div></div>
+  </section>
+  <section id="detail" class="screen" hidden>
+    <div class="detail-poster"></div>
+    <div><b>Detail screen</b></div>
+    <div class="muted">Meta, streams, actions live here.</div>
+    <div><span class="btn">▶ Play</span> <span class="btn ghost">＋ Library</span></div>
+  </section>
+  <div id="sheet"><div class="grabber"></div><b>Bottom sheet</b><div class="muted">Long-press menu / filters live here.</div></div>
+</div>
+<div id="bar">
+  <button data-v="A">A · slide</button>
+  <button data-v="B">B · fade</button>
+  <button data-v="C">C · over</button>
+  <button id="push">Push →</button>
+  <button id="pop">← Back</button>
+  <button id="sheetBtn">Sheet</button>
+  <button id="rm">Reduced motion: off</button>
+</div>
+<p id="readout"></p>
+<script>
+  // Mirrors the proposed playScreenTransition contract: place incoming hidden,
+  // reflow, animate in; keep outgoing one exit-duration, then hide.
+  const stage = document.getElementById('stage');
+  const home = document.getElementById('home');
+  const detail = document.getElementById('detail');
+  const sheet = document.getElementById('sheet');
+  const readout = document.getElementById('readout');
+  const PARAMS = {
+    A: 'enter 220ms standard · exit 220ms accelerate · 30% slide + fade, both screens move',
+    B: 'enter 220ms standard · exit 220ms standard · fade + scale(.96→1), no lateral motion, back == forward',
+    C: 'enter 220ms decelerate · full-width slide-over, outgoing dims to 45%, exits back to 100%'
+  };
+  let variant = new URLSearchParams(location.search).get('variant') || 'A';
+  let current = 'home', lastAction = 'none yet';
+  const EXIT_MS = 220;
+  function setVariant(v) {
+    variant = v;
+    stage.classList.remove('vA', 'vB', 'vC');
+    stage.classList.add('v' + v);
+    document.querySelectorAll('#bar [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    render();
+  }
+  function swap(outEl, inEl, inClass, outClass) {
+    inEl.hidden = false;
+    inEl.classList.add('incoming'); outEl.classList.add('outgoing');
+    void inEl.offsetWidth; // reflow: hold-at-enter before animating
+    inEl.classList.add(inClass); outEl.classList.add(outClass);
+    setTimeout(() => {
+      outEl.hidden = true;
+      outEl.classList.remove('outgoing', outClass);
+      inEl.classList.remove('incoming', inClass);
+    }, EXIT_MS);
+  }
+  function push() {
+    if (current === 'detail') return;
+    current = 'detail'; lastAction = 'push (forward)';
+    if (variant === 'C') swap(home, detail, 'anim-in-from-right', 'anim-out-to-left');
+    else swap(home, detail, 'anim-in-from-right', 'anim-out-to-left');
+    render();
+  }
+  function pop() {
+    if (current === 'home') return;
+    current = 'home'; lastAction = 'pop (back)';
+    if (variant === 'C') { // slide-over back: top exits to 100%, under undims
+      detail.classList.add('incoming'); home.classList.add('outgoing');
+      detail.hidden = false; home.hidden = false;
+      void detail.offsetWidth;
+      detail.classList.add('anim-back-out'); home.classList.add('anim-back-undim');
+      setTimeout(() => {
+        detail.hidden = true;
+        detail.classList.remove('incoming', 'anim-back-out');
+        home.classList.remove('outgoing', 'anim-back-undim');
+      }, EXIT_MS);
+    } else if (variant === 'B') swap(detail, home, 'anim-in-from-left', 'anim-out-to-right');
+    else swap(detail, home, 'anim-in-from-left', 'anim-out-to-right');
+    render();
+  }
+  function toggleSheet() {
+    const open = sheet.classList.toggle('open');
+    sheet.classList.remove('anim-sheet-in', 'anim-sheet-out');
+    void sheet.offsetWidth;
+    sheet.classList.add(open ? 'anim-sheet-in' : 'anim-sheet-out');
+    lastAction = open ? 'sheet enter (300ms standard)' : 'sheet exit (250ms standard)';
+    render();
+  }
+  function render() {
+    readout.innerHTML = 'variant <b>' + variant + '</b> — ' + PARAMS[variant] +
+      '<br>showing <b>' + current + '</b> · last: <b>' + lastAction + '</b>' +
+      (document.body.classList.contains('reduced') ? ' · <b>reduced-motion ON (instant)</b>' : '');
+  }
+  document.querySelectorAll('#bar [data-v]').forEach(b => b.onclick = () => {
+    const u = new URL(location.href); u.searchParams.set('variant', b.dataset.v);
+    history.replaceState(null, '', u); setVariant(b.dataset.v);
+  });
+  document.getElementById('push').onclick = push;
+  document.getElementById('pop').onclick = pop;
+  document.getElementById('sheetBtn').onclick = toggleSheet;
+  document.getElementById('rm').onclick = (e) => {
+    const on = document.body.classList.toggle('reduced');
+    e.target.textContent = 'Reduced motion: ' + (on ? 'on' : 'off'); render();
+  };
+  setVariant('ABC'.includes(variant) ? variant : 'A');
+</script>
+</body>
+</html>
