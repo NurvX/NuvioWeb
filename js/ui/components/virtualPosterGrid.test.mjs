@@ -21,65 +21,65 @@ const GEOMETRY = { columns: 3, rowHeight: 200, rowGap: 12 };
 // --- computeWindow: pure row math ---
 
 test("computeWindow: short lists render whole with no spacers", () => {
-  const window = computeWindow({ itemCount: 9, ...GEOMETRY, scrollTop: 0, viewportHeight: 600 });
-  assert.equal(window.startIndex, 0);
-  assert.equal(window.endIndex, 9);
-  assert.equal(window.topSpacerPx, 0);
-  assert.equal(window.bottomSpacerPx, 0);
+  const range = computeWindow({ itemCount: 9, ...GEOMETRY, scrollTop: 0, viewportHeight: 600 });
+  assert.equal(range.startIndex, 0);
+  assert.equal(range.endIndex, 9);
+  assert.equal(range.topSpacerPx, 0);
+  assert.equal(range.bottomSpacerPx, 0);
 });
 
 test("computeWindow: top of a long list renders first rows plus overscan", () => {
-  const window = computeWindow({ itemCount: 500, ...GEOMETRY, scrollTop: 0, viewportHeight: 600 });
+  const range = computeWindow({ itemCount: 500, ...GEOMETRY, scrollTop: 0, viewportHeight: 600 });
   // 600px viewport ~= 3 rows visible + 2 overscan rows = 5 rows = 15 items
-  assert.equal(window.startIndex, 0);
-  assert.equal(window.endIndex, 15);
-  assert.equal(window.topSpacerPx, 0);
-  assert.ok(window.bottomSpacerPx > 0);
+  assert.equal(range.startIndex, 0);
+  assert.equal(range.endIndex, 15);
+  assert.equal(range.topSpacerPx, 0);
+  assert.ok(range.bottomSpacerPx > 0);
 });
 
 test("computeWindow: scrolled position maps scrollTop to start row with overscan", () => {
   // One row = 212px; scrollTop 1060 = row 5; minus 2 overscan rows = row 3 = index 9
-  const window = computeWindow({
+  const range = computeWindow({
     itemCount: 500,
     ...GEOMETRY,
     scrollTop: 1060,
     viewportHeight: 600
   });
-  assert.equal(window.startIndex, 9);
-  assert.equal(window.endIndex, 30);
-  assert.equal(window.topSpacerPx, 3 * 212);
+  assert.equal(range.startIndex, 9);
+  assert.equal(range.endIndex, 30);
+  assert.equal(range.topSpacerPx, 3 * 212);
 });
 
 test("computeWindow: end clamps to item count and shrinks bottom spacer", () => {
-  const window = computeWindow({
+  const range = computeWindow({
     itemCount: 20,
     ...GEOMETRY,
     scrollTop: 100000,
     viewportHeight: 600
   });
-  assert.equal(window.endIndex, 20);
-  assert.equal(window.bottomSpacerPx, 0);
-  assert.ok(window.topSpacerPx > 0);
+  assert.equal(range.endIndex, 20);
+  assert.equal(range.bottomSpacerPx, 0);
+  assert.ok(range.topSpacerPx > 0);
 });
 
 test("computeWindow: spacers account for every item exactly", () => {
   const rowStride = 212;
-  const window = computeWindow({
+  const range = computeWindow({
     itemCount: 500,
     ...GEOMETRY,
     scrollTop: 1060,
     viewportHeight: 600
   });
   const totalRows = Math.ceil(500 / 3);
-  const renderedRows = Math.ceil((window.endIndex - window.startIndex) / 3);
-  const spacerRows = window.topSpacerPx / rowStride + window.bottomSpacerPx / rowStride;
+  const renderedRows = Math.ceil((range.endIndex - range.startIndex) / 3);
+  const spacerRows = range.topSpacerPx / rowStride + range.bottomSpacerPx / rowStride;
   assert.equal(renderedRows + spacerRows, totalRows);
 });
 
 test("computeWindow: empty list renders nothing", () => {
-  const window = computeWindow({ itemCount: 0, ...GEOMETRY, scrollTop: 0, viewportHeight: 600 });
+  const range = computeWindow({ itemCount: 0, ...GEOMETRY, scrollTop: 0, viewportHeight: 600 });
   assert.deepEqual(
-    [window.startIndex, window.endIndex, window.topSpacerPx, window.bottomSpacerPx],
+    [range.startIndex, range.endIndex, range.topSpacerPx, range.bottomSpacerPx],
     [0, 0, 0, 0]
   );
 });
@@ -93,7 +93,7 @@ test("renderWindowedGrid: injects window cards between spacers, keeps card marku
   renderWindowedGrid(grid, {
     items,
     renderCard: (item) => `<div class="phone-poster-card" data-id="${item.id}"></div>`,
-    window: { startIndex: 9, endIndex: 24, topSpacerPx: 636, bottomSpacerPx: 16000 }
+    range: { startIndex: 9, endIndex: 24, topSpacerPx: 636, bottomSpacerPx: 16000 }
   });
   const cards = grid.querySelectorAll(".phone-poster-card");
   assert.equal(cards.length, 15);
@@ -110,7 +110,7 @@ test("renderWindowedGrid: no spacers when window covers everything", () => {
   renderWindowedGrid(grid, {
     items: [{ id: "a" }],
     renderCard: (item) => `<div class="phone-poster-card" data-id="${item.id}"></div>`,
-    window: { startIndex: 0, endIndex: 1, topSpacerPx: 0, bottomSpacerPx: 0 }
+    range: { startIndex: 0, endIndex: 1, topSpacerPx: 0, bottomSpacerPx: 0 }
   });
   assert.equal(grid.querySelectorAll(".phone-grid-spacer").length, 0);
   assert.equal(grid.querySelectorAll(".phone-poster-card").length, 1);

@@ -39,15 +39,15 @@ export function computeWindow({
   };
 }
 
-export function renderWindowedGrid(grid, { items = [], renderCard = null, window = null } = {}) {
+export function renderWindowedGrid(grid, { items = [], renderCard = null, range = null } = {}) {
   if (!grid || typeof renderCard !== "function") {
     return;
   }
   const list = Array.isArray(items) ? items : [];
-  const start = Math.max(0, Number(window?.startIndex) || 0);
-  const end = Math.min(list.length, Math.max(start, Number(window?.endIndex) || 0));
-  const top = Math.max(0, Number(window?.topSpacerPx) || 0);
-  const bottom = Math.max(0, Number(window?.bottomSpacerPx) || 0);
+  const start = Math.max(0, Number(range?.startIndex) || 0);
+  const end = Math.min(list.length, Math.max(start, Number(range?.endIndex) || 0));
+  const top = Math.max(0, Number(range?.topSpacerPx) || 0);
+  const bottom = Math.max(0, Number(range?.bottomSpacerPx) || 0);
   const spacer = (px) =>
     px > 0 ? `<div class="phone-grid-spacer" aria-hidden="true" style="height:${px}px"></div>` : "";
   const cards = list

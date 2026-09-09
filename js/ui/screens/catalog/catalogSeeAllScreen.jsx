@@ -388,7 +388,7 @@ function applyGridWindow(screen, container, scrollTop) {
     return false;
   }
   screen._phoneCatalogSeeAllGridGeometry = geometry;
-  const window = computeWindow({
+  const range = computeWindow({
     itemCount: items.length,
     columns: geometry.columns,
     rowHeight: geometry.rowHeight,
@@ -396,7 +396,7 @@ function applyGridWindow(screen, container, scrollTop) {
     scrollTop,
     viewportHeight: geometry.scroller.clientHeight || 600
   });
-  const key = `${window.startIndex}:${window.endIndex}`;
+  const key = `${range.startIndex}:${range.endIndex}`;
   if (screen._phoneCatalogSeeAllWindow === key) {
     return true;
   }

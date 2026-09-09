@@ -859,7 +859,7 @@ function applyLibraryGridWindow(screen, container) {
     return false;
   }
   const geometry = measureGrid(grid);
-  const window = computeWindow({
+  const range = computeWindow({
     itemCount: items.length,
     columns: geometry.columns,
     rowHeight: geometry.rowHeight,
@@ -867,7 +867,7 @@ function applyLibraryGridWindow(screen, container) {
     scrollTop: scroller.scrollTop || 0,
     viewportHeight: scroller.clientHeight || 600
   });
-  const key = `${items.length}:${window.startIndex}:${window.endIndex}`;
+  const key = `${items.length}:${range.startIndex}:${range.endIndex}`;
   if (screen._phoneLibraryWindow === key) {
     return true;
   }
