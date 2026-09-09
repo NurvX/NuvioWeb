@@ -35,7 +35,7 @@ import {
 import {
   buildModernRowKey,
   MODERN_HOME_CONSTANTS,
-  renderModernHomeLayout
+  renderModernHomeLayout as _renderModernHomeLayout
 } from "./modernHomeLayout.js";
 import {
   buildCatalogDisableKey,
@@ -44,12 +44,12 @@ import {
 } from "../../../core/addons/homeCatalogs.js";
 import {
   activateLegacySidebarAction,
-  bindRootSidebarEvents,
+  bindRootSidebarEvents as _bindRootSidebarEvents,
   getLegacySidebarNodes,
   getLegacySidebarSelectedNode,
   getSidebarProfileState,
   focusWithoutAutoScroll,
-  renderRootSidebar,
+  renderRootSidebar as _renderRootSidebar,
   setLegacySidebarExpanded
 } from "../../components/sidebarNavigation.js";
 import { NuvioDialog } from "../../components/nuvioDialog.js";
@@ -331,7 +331,7 @@ function uniqueById(items = []) {
   });
 }
 
-function renderHomeLoadingState() {
+function _renderHomeLoadingState() {
   return `
     <div class="home-loading-state" aria-label="Loading">
       ${renderLoadingIndicator({ className: "home-loading-spinner" })}
@@ -1941,7 +1941,7 @@ function buildHeroIndicators(items = [], activeItem) {
     .join("");
 }
 
-function renderHeroMarkup(layoutMode, heroItem, heroCandidates) {
+function _renderHeroMarkup(layoutMode, heroItem, heroCandidates) {
   const display = buildHeroDisplayModel(heroItem, layoutMode);
   const isInteractive = layoutMode !== "modern";
   return `
@@ -2193,7 +2193,7 @@ function continueWatchingStreamParams(item, options = {}) {
   };
 }
 
-function renderLegacyCatalogRowsMarkup(rows = [], options = {}) {
+function _renderLegacyCatalogRowsMarkup(rows = [], options = {}) {
   const {
     layoutMode = "classic",
     showPosterLabels = true,
@@ -8404,424 +8404,6 @@ export const HomeScreen = {
     this.renderPhone();
   },
 
-  _tvRender() {
-    const renderStart = HOME_PERF_DEBUG ? homePerfNow() : 0;
-    this.cancelScheduledRender();
-    this.cancelModernCameraFollow({ stopAnimations: true });
-    this.teardownModernTrackScrollPagination();
-    this.teardownContinueWatchingProgressiveRendering();
-    this.invalidateNavigationModel();
-    const backFocusState = this.isRestoringFocusFromBack
-      ? this.pendingBackFocusState || this.readStoredReturnFocusState() || null
-      : null;
-    const liveFocusState = this.captureCurrentFocusState();
-    const savedFocusState = this.savedFocusStates?.[this.layoutMode] || null;
-    const rawRetainedFocusState =
-      backFocusState ||
-      (!this.isRestoringFocusFromBack && liveFocusState?.focusKind === "sidebar"
-        ? null
-        : liveFocusState) ||
-      (!this.isRestoringFocusFromBack && savedFocusState?.focusKind === "sidebar"
-        ? null
-        : savedFocusState) ||
-      null;
-    const retainedFocusState = rawRetainedFocusState;
-    this.cancelFocusedPosterFlow();
-    this.expandedPosterNode = null;
-    const backFocusHero = backFocusState ? this.getHeroSourceFromFocusState(backFocusState) : null;
-    const shouldHoldHeroForContinueWatching =
-      this.layoutMode === "modern" &&
-      Boolean(this.continueWatchingLoading) &&
-      !this.continueWatchingDisplay?.length &&
-      !this.heroItem;
-    let heroItem = null;
-    if (!shouldHoldHeroForContinueWatching) {
-      const rawHeroItem =
-        backFocusHero ||
-        this.heroItem ||
-        this.heroCandidates?.[this.heroIndex] ||
-        this.pickHeroItem(this.rows);
-      heroItem = isCollectionFolderItem(rawHeroItem)
-        ? normalizeCollectionFolderItem(rawHeroItem)
-        : normalizeCatalogItem(rawHeroItem, "movie");
-      if (backFocusHero) {
-        this.heroItem = heroItem;
-      }
-    }
-    if (this.layoutMode === "modern" && shouldEnrichModernHero(heroItem)) {
-      heroItem = { ...heroItem, heroMetaEnriching: true };
-      this.heroItem = heroItem;
-    }
-    const showHeroSection = Boolean(this.layoutPrefs?.heroSectionEnabled) && Boolean(heroItem);
-    const layoutClass = `home-layout-${this.layoutMode}`;
-    const sizingStyle = [
-      this.layoutMode === "modern" ? buildModernHomeSizingStyle(this.layoutPrefs) : ""
-    ]
-      .filter(Boolean)
-      .join(";");
-    const showPosterLabels = this.layoutPrefs?.posterLabelsEnabled !== false;
-    const showCatalogAddonName = this.layoutPrefs?.catalogAddonNameEnabled !== false;
-    const pendingPosterFocusState = this.pendingPosterHoldFocus?.rowKey
-      ? {
-          rowKey: String(this.pendingPosterHoldFocus.rowKey),
-          itemIndex: Number(this.pendingPosterHoldFocus.index || 0)
-        }
-      : null;
-    const focusState =
-      pendingPosterFocusState ||
-      (!this.homeHoldFocusLocked && retainedFocusState && retainedFocusState.focusKind === "item"
-        ? retainedFocusState
-        : null);
-    const continueWatchingRows = partitionContinueWatchingRows(
-      this.continueWatchingDisplay || [],
-      this.layoutPrefs?.continueWatchingSortMode
-    );
-    this.continueWatchingRenderedItems = [
-      ...continueWatchingRows.main,
-      ...continueWatchingRows.upcoming
-    ];
-    const splitUpcomingEnabled =
-      String(this.layoutPrefs?.continueWatchingSortMode || "") === "split_upcoming";
-    const continueWatchingFocusIndex =
-      String(focusState?.rowKey || "") === "continue_watching"
-        ? Math.max(0, Number(focusState?.itemIndex || 0))
-        : String(focusState?.rowKey || "") === "upcoming_section"
-          ? continueWatchingRows.main.length + Math.max(0, Number(focusState?.itemIndex || 0))
-          : -1;
-    const continueWatchingRenderLimit = splitUpcomingEnabled
-      ? continueWatchingRows.main.length
-      : Math.min(
-          Number(this.continueWatchingDisplay?.length || 0),
-          Math.max(
-            this.getContinueWatchingRenderBatchSize(),
-            continueWatchingFocusIndex >= 0 ? continueWatchingFocusIndex + 1 : 0
-          )
-        );
-    const expandFocusedPoster =
-      this.layoutMode === "modern" &&
-      Number(this.layoutPrefs?.focusedPosterBackdropExpandDelaySeconds ?? 3) <= 0 &&
-      Boolean(focusState);
-    const rowItemLimit = this.getRowItemLimit();
-    const loadingRowItemCount = this.getLoadingRowItemCount();
-    const continueWatchingLoadingCount = Math.min(
-      Math.max(
-        Number(this.continueWatching?.length || 0),
-        Number(this.nextUpProgressCandidates?.length || 0)
-      ),
-      loadingRowItemCount
-    );
-    const effectiveContinueWatchingLoadingCount =
-      this.continueWatchingLoading && continueWatchingLoadingCount === 0
-        ? loadingRowItemCount
-        : continueWatchingLoadingCount;
-    this.teardownGridStickyHeader();
-
-    let mainContentMarkup = "";
-    let modernLayoutPayload = null;
-
-    if (this.isInitialHomeLoading) {
-      mainContentMarkup = renderHomeLoadingState();
-      this.catalogSeeAllMap = new Map();
-    } else if (this.layoutMode === "modern") {
-      modernLayoutPayload = renderModernHomeLayout({
-        rows: this.rows,
-        heroItem,
-        heroCandidates: this.heroCandidates,
-        continueWatchingItems: continueWatchingRows.main,
-        upcomingItems: continueWatchingRows.upcoming,
-        continueWatchingLoading: Boolean(this.continueWatchingLoading),
-        continueWatchingLoadingCount: effectiveContinueWatchingLoadingCount,
-        continueWatchingRenderLimit,
-        useEpisodeThumbnailsInCw: true,
-        blurContinueWatchingNextUp: false,
-        continueWatchingCardStyle: "card",
-        rowItemLimit,
-        showHeroSection,
-        showPosterLabels,
-        preferLandscapePosters: false,
-        focusedRowKey: focusState?.rowKey || "",
-        focusedItemIndex: Number.isFinite(focusState?.itemIndex) ? focusState.itemIndex : -1,
-        expandFocusedPoster,
-        buildModernHeroPresentation,
-        renderHeroBackdropImage,
-        renderContinueWatchingSection,
-        createPosterCardMarkup,
-        createSeeAllCardMarkup,
-        formatCatalogRowTitle,
-        shouldDeferRowImages: shouldDeferHomeRowImages,
-        watchedTitleIds: this.watchedTitleIds,
-        escapeHtml,
-        escapeAttribute
-      });
-      this.catalogSeeAllMap = modernLayoutPayload.catalogSeeAllMap;
-      mainContentMarkup = modernLayoutPayload.markup;
-    } else {
-      const continueHtml = renderContinueWatchingSection(continueWatchingRows.main, {
-        rowKey: "continue_watching",
-        loading: Boolean(this.continueWatchingLoading),
-        loadingCount: effectiveContinueWatchingLoadingCount,
-        itemLimit: continueWatchingRenderLimit,
-        useEpisodeThumbnails: true,
-        blurNextUp: false,
-        cardStyle: "card"
-      });
-      const upcomingHtml = renderContinueWatchingSection(continueWatchingRows.upcoming, {
-        rowKey: "upcoming_section",
-        titleKey: "upcoming_section_title",
-        title: "Upcoming",
-        startIndex: continueWatchingRows.main.length,
-        itemLimit: continueWatchingRows.upcoming.length,
-        useEpisodeThumbnails: true,
-        blurNextUp: false,
-        cardStyle: "card"
-      });
-      const legacyRowsPayload = renderLegacyCatalogRowsMarkup(this.rows, {
-        layoutMode: this.layoutMode,
-        showPosterLabels,
-        showCatalogAddonName,
-        focusedRowKey: focusState?.rowKey || "",
-        focusedItemIndex: Number.isFinite(focusState?.itemIndex) ? focusState.itemIndex : -1,
-        expandFocusedPoster: false,
-        rowItemLimit,
-        watchedTitleIds: this.watchedTitleIds
-      });
-      this.catalogSeeAllMap = legacyRowsPayload.catalogSeeAllMap;
-      mainContentMarkup = `
-        ${showHeroSection ? renderHeroMarkup(this.layoutMode, heroItem, this.heroCandidates) : ""}
-        ${continueHtml}
-        ${upcomingHtml}
-        ${this.layoutMode === "grid" ? '<div class="home-grid-sticky" id="homeGridSticky"></div>' : ""}
-        <section class="home-catalogs${this.layoutMode === "grid" ? " home-grid-catalogs" : ""}" id="homeCatalogRows">${legacyRowsPayload.markup}</section>
-      `;
-    }
-
-    const routeEnterClass = this.homeRouteEnterPending
-      ? this.pendingCollectionRouteReturnAnimation
-        ? " nuvio-route-slide-enter"
-        : " home-route-content-enter"
-      : "";
-    this.pendingCollectionRouteReturnAnimation = false;
-    // On Back, only keep the sidebar expanded if the restored focus actually
-    // belonged to the sidebar.
-    if (this.isRestoringFocusFromBack && retainedFocusState?.focusKind !== "sidebar") {
-      this.sidebarExpanded = false;
-    }
-    const sidebarFocusLocked = Boolean(
-      this.sidebarExpanded && retainedFocusState?.focusKind === "sidebar"
-    );
-
-    const nextMarkup = `
-      <div class="home-shell home-screen-shell ${layoutClass}"${sizingStyle ? ` style="${escapeAttribute(sizingStyle)}"` : ""}>
-        ${renderRootSidebar({
-          selectedRoute: "home",
-          profile: this.sidebarProfile
-        })}
-
-        <main class="home-main home-screen-main">
-          <div class="home-route-content${routeEnterClass}">
-            ${mainContentMarkup}
-          </div>
-        </main>
-      </div>
-      ${this.renderActiveHoldMenu()}
-    `;
-
-    // Returning to Home re-renders several times as cached rows, the background
-    // refresh and the catalog rows each land. When a pass produces markup the
-    // DOM already holds, writing it back costs a full parse, layout and paint of
-    // every card for no visible change - and it destroys the live nodes, which
-    // is what forces focus and scroll to be re-derived afterwards.
-    //
-    // Keep the last generated markup itself: exact equality is required because
-    // addon/catalog text is part of this string and fixed-width hashes can
-    // collide, which could otherwise preserve stale DOM.
-    const shellMounted = Boolean(this.container.querySelector(".home-shell"));
-    const markupUnchanged = shellMounted && this.renderedMarkup === nextMarkup;
-
-    if (!markupUnchanged) {
-      this.container.innerHTML = nextMarkup;
-      this.renderedMarkup = nextMarkup;
-    }
-
-    if (this.layoutMode === "modern") {
-      this.applyCachedModernPortraitPosterMetrics(
-        this.container.querySelector(
-          ".home-screen-shell.home-layout-modern:not(.home-modern-landscape-posters)"
-        )
-      );
-    }
-    bindRootSidebarEvents(this.container, {
-      currentRoute: "home",
-      onSelectedAction: () => this.closeSidebarToContent(),
-      onExpandSidebar: () => this.openSidebar()
-    });
-
-    this.buildNavigationModel();
-    this.bindHomeViewportEvents();
-    this.setupContinueWatchingProgressiveRendering();
-    if (this.layoutMode === "modern") {
-      this.setupModernTrackScrollPagination();
-    }
-    const canAttemptRestore = Boolean(retainedFocusState);
-    let restoredFocus = false;
-    if (sidebarFocusLocked) {
-      restoredFocus = this.restoreSidebarFocusState(
-        retainedFocusState?.focusKind === "sidebar" ? retainedFocusState : null
-      );
-    }
-    if (
-      !sidebarFocusLocked &&
-      !this.homeHoldFocusLocked &&
-      !backFocusState &&
-      this.pendingPosterHoldFocus
-    ) {
-      const pending = this.pendingPosterHoldFocus;
-      const target = this.resolvePosterHoldRestoreTarget(pending);
-      this.pendingPosterHoldFocus = null;
-      if (target) {
-        restoredFocus = true;
-        this.setFocusedNode(target);
-        this.lastMainFocus = target;
-        this.rememberMainRowFocus(target);
-        this.ensureTrackHorizontalVisibility(target);
-        this.ensureMainVerticalVisibility(target);
-      }
-    }
-    if (
-      !restoredFocus &&
-      !sidebarFocusLocked &&
-      !this.homeHoldFocusLocked &&
-      this.isRestoringFocusFromBack &&
-      backFocusState
-    ) {
-      restoredFocus = this.restoreFocusState(backFocusState);
-      if (restoredFocus) {
-        this.isRestoringFocusFromBack = false;
-      }
-    }
-    if (
-      !restoredFocus &&
-      !sidebarFocusLocked &&
-      !this.homeHoldFocusLocked &&
-      !backFocusState &&
-      Number.isFinite(this.pendingContinueWatchingFocusIndex)
-    ) {
-      const pendingRowKey = String(this.pendingContinueWatchingFocusRowKey || "continue_watching");
-      const cards = this.getNavigationRowNodes(pendingRowKey);
-      const target =
-        cards[
-          Math.max(
-            0,
-            Math.min(cards.length - 1, Number(this.pendingContinueWatchingFocusIndex || 0))
-          )
-        ] ||
-        cards[cards.length - 1] ||
-        null;
-      this.pendingContinueWatchingFocusIndex = null;
-      this.pendingContinueWatchingFocusRowKey = null;
-      if (target) {
-        restoredFocus = true;
-        this.setFocusedNode(target);
-        this.lastMainFocus = target;
-        this.rememberMainRowFocus(target);
-        this.ensureTrackHorizontalVisibility(target);
-        this.ensureMainVerticalVisibility(target);
-      } else {
-        ScreenUtils.setInitialFocus(this.container, this.getInitialFocusSelector());
-        const current = this.container.querySelector(".home-main .focusable.focused");
-        if (current && this.isMainNode(current)) {
-          this.lastMainFocus = current;
-          this.scheduleModernHeroUpdate(current);
-          this.scheduleFocusedPosterFlow(current);
-        }
-      }
-    } else if (
-      !sidebarFocusLocked &&
-      !backFocusState &&
-      !this.isRestoringFocusFromBack &&
-      this.forceInitialContinueWatchingFocus &&
-      this.layoutMode === "modern"
-    ) {
-      this.forceInitialContinueWatchingFocus = false;
-      restoredFocus = this.focusInitialContinueWatchingCard();
-      this.hasAppliedInitialContinueWatchingFocus = restoredFocus;
-    } else if (!sidebarFocusLocked && canAttemptRestore && !this.homeHoldFocusLocked) {
-      restoredFocus = this.restoreFocusState(retainedFocusState);
-      if (restoredFocus) {
-        this.isRestoringFocusFromBack = false;
-      }
-    }
-    if (
-      !restoredFocus &&
-      !sidebarFocusLocked &&
-      !this.homeHoldFocusLocked &&
-      !backFocusState &&
-      !this.isRestoringFocusFromBack &&
-      shouldHoldHeroForContinueWatching &&
-      this.layoutMode === "modern"
-    ) {
-      const currentFocusedNode = this.getCurrentFocusedNode();
-      if (currentFocusedNode?.isConnected) {
-        currentFocusedNode.classList.remove("focused");
-      }
-      this.setCurrentFocusedNode(null);
-      this.lastMainFocus = null;
-      this.hasAppliedInitialContinueWatchingFocus = this.focusInitialContinueWatchingCard();
-    } else if (
-      !restoredFocus &&
-      !sidebarFocusLocked &&
-      !this.homeHoldFocusLocked &&
-      !backFocusState
-    ) {
-      ScreenUtils.setInitialFocus(this.container, this.getInitialFocusSelector());
-      const current = this.container.querySelector(".home-main .focusable.focused");
-      if (current && this.isMainNode(current)) {
-        this.lastMainFocus = current;
-        this.scheduleModernHeroUpdate(current);
-        this.scheduleFocusedPosterFlow(current);
-      }
-      this.isRestoringFocusFromBack = false;
-    }
-    if (!this.container?.querySelector(".home-poster-card.focused")) {
-      this.clearFocusedPosterFlowState();
-    }
-    this.syncFocusedCollectionCardState();
-    this.setSidebarExpanded(false);
-    if (this.layoutMode === "grid") {
-      this.setupGridStickyHeader(showHeroSection);
-    }
-    this.startHeroRotation();
-    if (this.layoutMode === "modern" && heroItem) {
-      void this.enrichCurrentHeroAsync(heroItem);
-    }
-    this.homeRouteEnterPending = false;
-    this.renderedLayoutMode = this.layoutMode;
-    this.ensureHomeTruncationObservers();
-    this.scheduleHomeTruncationUpdate();
-    this.scheduleHomeLazyImageHydration(null, { refreshIndex: true });
-    this.scheduleReturnFocusRestore();
-    const mountedRows = Number(this.navModel?.rows?.length || 0);
-    const mountedCards = Number(
-      (this.navModel?.rows || []).reduce((total, rowNodes) => total + rowNodes.length, 0)
-    );
-    logHomePerf("render", {
-      ms: Number((homePerfNow() - renderStart).toFixed(2)),
-      domWrite: !markupUnchanged,
-      layoutMode: this.layoutMode,
-      rows: Number(this.rows?.length || 0),
-      mountedRows,
-      mountedCards,
-      continueWatching: Number(this.continueWatchingDisplay?.length || 0),
-      focusables: Number(mountedCards + (this.navModel?.sidebar?.length || 0))
-    });
-  },
-
-  // Phone render path (ticket 01-01, mobile-parity epic) — all markup/interaction logic lives
-  // in js/ui/screens/home/homeScreenPhone.jsx; this just hands it the screen instance so it can
-  // read this.rows/this.heroCandidates/this.continueWatchingDisplay/this.sidebarProfile
-  // (already populated by mount()'s existing data flow) and call this screen's own mutation
-  // methods (togglePosterLibrary/togglePosterWatched/openPosterListPicker/
-  // removeContinueWatchingItem/openContinueWatchingFromItem) directly.
   renderPhone() {
     if (!this.container) {
       return;
