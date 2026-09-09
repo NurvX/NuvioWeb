@@ -150,6 +150,15 @@ export const Router = {
       if (!target) {
         return;
       }
+      // A gestureEngine.js long-press that already fired sets this flag so the click that
+      // follows pointerup doesn't also activate the target — see attachLongPress. Restores
+      // the same guard FocusEngine.handlePointerClick used before it was deleted (720e00d).
+      if (target.dataset.suppressNextTap) {
+        delete target.dataset.suppressNextTap;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       const screen = this.getCurrentScreen();
       if (typeof screen?.onPointerActivate === "function") {
         screen.onPointerActivate(target, event);
