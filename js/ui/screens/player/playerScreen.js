@@ -2165,7 +2165,6 @@ export const PlayerScreen = {
     const mountToken = Number(this.playerMountToken || 0) + 1;
     this.playerMountToken = mountToken;
     this.playerRouteActive = true;
-    this.phoneViewportUnsubscribe?.();
     this.webOsClockLocaleInfo = null;
     this.webOsClockSettingsSubscription?.cancel?.();
     this.webOsClockSettingsSubscription = null;
@@ -19565,8 +19564,6 @@ export const PlayerScreen = {
     try {
       this.playerRouteActive = false;
       this.playerMountToken = Number(this.playerMountToken || 0) + 1;
-      this.phoneViewportUnsubscribe?.();
-      this.phoneViewportUnsubscribe = null;
       this.teardownPhoneGestureLayer();
       this.teardownPhonePlayerChrome();
       this.phoneLockActive = false;
