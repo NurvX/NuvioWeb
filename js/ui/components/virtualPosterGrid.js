@@ -39,22 +39,40 @@ export function computeWindow({
   };
 }
 
-export function renderWindowedGrid(grid, { items = [], renderCard = null, range = null } = {}) {
+export function renderWindowedGrid(
+  grid,
+  { items = [], renderCard = null, range = null, scroller = null } = {}
+) {
   if (!grid || typeof renderCard !== "function") {
     return;
   }
   const list = Array.isArray(items) ? items : [];
-  const start = Math.max(0, Number(range?.startIndex) || 0);
-  const end = Math.min(list.length, Math.max(start, Number(range?.endIndex) || 0));
-  const top = Math.max(0, Number(range?.topSpacerPx) || 0);
-  const bottom = Math.max(0, Number(range?.bottomSpacerPx) || 0);
+  // Fail open: a missing or malformed range renders everything. An unwound
+  // grid costs scroll performance; an empty grid loses the user's data.
+  const hasRange =
+    Number.isFinite(Number(range?.startIndex)) && Number.isFinite(Number(range?.endIndex));
+  const start = hasRange ? Math.max(0, Number(range.startIndex)) : 0;
+  const end = hasRange
+    ? Math.min(list.length, Math.max(start, Number(range.endIndex)))
+    : list.length;
+  const top = hasRange ? Math.max(0, Number(range.topSpacerPx) || 0) : 0;
+  const bottom = hasRange ? Math.max(0, Number(range.bottomSpacerPx) || 0) : 0;
   const spacer = (px) =>
     px > 0 ? `<div class="phone-grid-spacer" aria-hidden="true" style="height:${px}px"></div>` : "";
   const cards = list
     .slice(start, end)
     .map((item) => renderCard(item))
     .join("");
+  // Replacing innerHTML can collapse scroll height for a frame and clamp the
+  // scroller back to the top — pin and restore around the write so the window
+  // swap never moves the user's scroll position.
+  const savedTop = scroller ? Number(scroller.scrollTop) || 0 : 0;
   grid.innerHTML = `${spacer(top)}${cards}${spacer(bottom)}`;
+  if (scroller && savedTop > 0) {
+    try {
+      scroller.scrollTop = savedTop;
+    } catch (_) {}
+  }
 }
 
 // Measures live grid geometry: column count from the computed track list,

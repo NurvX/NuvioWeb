@@ -875,7 +875,8 @@ function applyLibraryGridWindow(screen, container) {
   renderWindowedGrid(grid, {
     items,
     renderCard: (item) => renderPosterCard(savedPosterItem(screen, item)),
-    window
+    range,
+    scroller
   });
   bindGridLongPress(screen, container.querySelector(".phone-library-content"));
   return true;

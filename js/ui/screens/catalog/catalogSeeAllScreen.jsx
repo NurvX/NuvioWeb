@@ -404,7 +404,8 @@ function applyGridWindow(screen, container, scrollTop) {
   renderWindowedGrid(geometry.grid, {
     items,
     renderCard: (item) => renderPosterCard(toPosterItem(screen, item)),
-    window
+    range,
+    scroller: geometry.scroller
   });
   bindGridLongPress(screen, container);
   return true;

@@ -120,3 +120,41 @@ test("thresholds: small grids stay fully rendered", () => {
   assert.ok(WINDOW_ITEM_THRESHOLD >= 30);
   assert.ok(DEFAULT_OVERSCAN_ROWS >= 1);
 });
+
+test("renderWindowedGrid: malformed range fails open to a full render", () => {
+  document.body.innerHTML = '<div id="grid"></div>';
+  const grid = document.getElementById("grid");
+  const items = Array.from({ length: 10 }, (_, i) => ({ id: `id-${i}` }));
+  const renderCard = (item) => `<div class="phone-poster-card" data-id="${item.id}"></div>`;
+  renderWindowedGrid(grid, { items, renderCard, range: globalThis.window });
+  assert.equal(grid.querySelectorAll(".phone-poster-card").length, 10);
+  assert.equal(grid.querySelectorAll(".phone-grid-spacer").length, 0);
+  renderWindowedGrid(grid, { items, renderCard });
+  assert.equal(grid.querySelectorAll(".phone-poster-card").length, 10);
+});
+
+test("renderWindowedGrid: preserves the scroller position across the swap", () => {
+  document.body.innerHTML = '<div id="scroller"><div id="grid"></div></div>';
+  const grid = document.getElementById("grid");
+  const scroller = document.getElementById("scroller");
+  let pinned = null;
+  Object.defineProperty(scroller, "scrollTop", {
+    configurable: true,
+    get() {
+      return pinned;
+    },
+    set(v) {
+      pinned = v;
+    }
+  });
+  pinned = 5000;
+  const items = Array.from({ length: 100 }, (_, i) => ({ id: `id-${i}` }));
+  renderWindowedGrid(grid, {
+    items,
+    renderCard: (item) => `<div class="phone-poster-card" data-id="${item.id}"></div>`,
+    range: { startIndex: 60, endIndex: 75, topSpacerPx: 4000, bottomSpacerPx: 2000 },
+    scroller
+  });
+  assert.equal(pinned, 5000);
+  assert.equal(grid.querySelectorAll(".phone-poster-card").length, 15);
+});
