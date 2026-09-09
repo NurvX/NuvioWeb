@@ -840,6 +840,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  scroll-padding-bottom: calc(var(--phone-space-72) + env(safe-area-inset-bottom, 0px));
 }
 
 .phone-detail-hero,
@@ -992,7 +993,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--phone-space-section-gap);
-  padding: var(--phone-space-20) 0 var(--phone-space-64);
+  /* Bottom clears the floating tab pill (pill + margin) plus the home indicator. */
+  padding: var(--phone-space-20) 0 calc(var(--phone-space-72) + env(safe-area-inset-bottom, 0px));
 }
 
 /* Play pill + expandable secondary-action row. */
