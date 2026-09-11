@@ -91,3 +91,27 @@ export function renderSkeletonShelf({ count = 4, aspect = "portrait" } = {}) {
     </section>
   `;
 }
+
+/**
+ * Returns markup for a filter-toolbar skeleton — a row of chip-shaped placeholders matching
+ * the search/discover filter chip rows (see `renderSkeletonBlock` for sizing semantics).
+ * Used by catalog/see-all and search while the real toolbar options are still resolving.
+ */
+export function renderSkeletonToolbar({ chipCount = 3 } = {}) {
+  const safeCount = Math.max(1, Number(chipCount) || 0);
+  const widths = ["84px", "120px", "64px", "96px"];
+  const chipsMarkup = Array.from({ length: safeCount })
+    .map((_, index) =>
+      renderSkeletonBlock({
+        width: widths[index % widths.length],
+        height: "36px",
+        radius: "var(--phone-radius-full)",
+        className: "phone-skeleton-chip"
+      })
+    )
+    .join("");
+
+  return `
+    <div class="phone-skeleton-toolbar" aria-hidden="true">${chipsMarkup}</div>
+  `;
+}

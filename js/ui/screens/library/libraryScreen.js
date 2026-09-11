@@ -19,6 +19,11 @@ import {
 } from "../../components/virtualPosterGrid.js";
 import { renderPhoneNavBar, bindPhoneNavBarEvents } from "../../components/phoneNavBar.js";
 import { renderSkeletonShelf } from "../../components/phoneSkeleton.js";
+import {
+  renderEmptyStateCard,
+  renderOfflineCard,
+  bindStateCardEvents
+} from "../../components/phoneStateCards.js";
 import { openPosterZoomOverlay } from "../../components/posterZoomOverlay.js";
 import { openBottomSheet, closeActiveBottomSheet } from "../../components/bottomSheet.js";
 import {
@@ -355,12 +360,15 @@ function renderSavedGrid(items, screen) {
 }
 
 function renderSavedEmptyState(screen) {
-  return `
-    <div class="phone-library-empty-state">
-      <h3 class="phone-library-empty-title">${escapeHtml(screen.controller.getEmptyStateTitle())}</h3>
-      <p class="phone-library-empty-message">${escapeHtml(screen.controller.getEmptyStateSubtitle())}</p>
-    </div>
-  `;
+  // Shared state card (#52): the library's controller-driven empty copy rides the shared
+  // card so every phone screen's empty path looks and behaves the same. The saved library's
+  // empties are terminal reasons (nothing to retry) — reason "empty" unless the controller
+  // is reporting an unauthenticated/unavailable source (still terminal, no action).
+  return renderEmptyStateCard({
+    reason: "empty",
+    title: screen.controller.getEmptyStateTitle(),
+    message: screen.controller.getEmptyStateSubtitle()
+  });
 }
 
 function renderSavedBody(screen) {
@@ -523,6 +531,22 @@ function renderCloudList(screen) {
   if (state.cloudLibrary.isRefreshing && !state.cloudLibrary.items.length) {
     return `<div class="phone-library-shelves">${renderSkeletonShelf({ count: 4 })}</div>`;
   }
+  // Cloud load failure with nothing to fall back on: shared retryable error card (#52) —
+  // the offline variant when the browser reports no network, otherwise a generic error.
+  if (state.cloudLibrary.loadFailed && !items.length && !state.cloudLibrary.items.length) {
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    return offline
+      ? renderOfflineCard({
+          condition: "no_internet",
+          actionLabel: t("action_retry", {}, "Retry")
+        })
+      : renderEmptyStateCard({
+          reason: "error",
+          title: t("cloud_library_load_failed", { provider: "" }, "Couldn't load cloud library"),
+          message: t("cloud_library_retry_message", {}, "Check your connection and try again."),
+          actionLabel: t("action_retry", {}, "Retry")
+        });
+  }
   let emptyTitle = "";
   let emptyMessage = "";
   if (!state.cloudLibrary.isEnabled) {
@@ -548,7 +572,9 @@ function renderCloudList(screen) {
     );
   }
   if (emptyTitle) {
-    return `<div class="phone-library-empty-state"><h3 class="phone-library-empty-title">${escapeHtml(emptyTitle)}</h3><p class="phone-library-empty-message">${escapeHtml(emptyMessage)}</p></div>`;
+    // Shared state card (#52) with the cloud reason families (disabled / not connected /
+    // genuinely empty) — all terminal, so no retry action.
+    return renderEmptyStateCard({ reason: "empty", title: emptyTitle, message: emptyMessage });
   }
   return `
     <div class="phone-library-cloud-list" data-phone-library-cloud-list>
@@ -925,6 +951,12 @@ function mountPhoneInteractivity(screen, container) {
   const detachNavBar = bindPhoneNavBarEvents(container, {
     currentRoute: "library",
     scrollRoot: scroller
+  });
+
+  // Cloud library failure card Retry (see #52) re-runs the controller's own refresh —
+  // a no-op when no state card is present.
+  bindStateCardEvents(container, {
+    onAction: () => void screen.controller.refreshCloudLibrary()
   });
 
   const teardown = () => {

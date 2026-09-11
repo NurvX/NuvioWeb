@@ -16,6 +16,11 @@ import {
   measureGrid
 } from "../../components/virtualPosterGrid.js";
 import { renderSkeletonPosterCard } from "../../components/phoneSkeleton.js";
+import {
+  renderEmptyStateCard,
+  renderOfflineCard,
+  bindStateCardEvents
+} from "../../components/phoneStateCards.js";
 import { openPosterZoomOverlay } from "../../components/posterZoomOverlay.js";
 import { openBottomSheet, closeActiveBottomSheet } from "../../components/bottomSheet.js";
 import { renderLoadingIndicator } from "../../components/loadingIndicator.js";
@@ -259,13 +264,46 @@ function SkeletonGrid() {
   return <div class="phone-catalog-seeall-grid" dangerouslySetInnerHTML={{ __html: cardsHtml }} />;
 }
 
+// Failure/empty states render through the shared phoneStateCards primitive (#52): the card's
+// data-state-reason is the behavior surface, and the Retry action re-runs this screen's own
+// loadNextPage.
+function ErrorState({ screen }) {
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  return (
+    <div
+      dangerouslySetInnerHTML={{
+        __html: offline
+          ? renderOfflineCard({
+              condition: "no_internet",
+              actionLabel: t("action_retry", {}, "Retry")
+            })
+          : renderEmptyStateCard({
+              reason: "error",
+              title: t("catalog_see_all_error_title", {}, "Couldn't load catalog"),
+              message: t(
+                "catalog_see_all_error_message",
+                {},
+                "Check your connection and try again."
+              ),
+              actionLabel: t("action_retry", {}, "Retry")
+            })
+      }}
+      ref={(node) => {
+        if (node) {
+          bindStateCardEvents(node, { onAction: () => void screen.loadNextPage() });
+        }
+      }}
+    />
+  );
+}
+
 function EmptyState() {
   return (
-    <div class="phone-catalog-seeall-empty-state">
-      <h3 class="phone-catalog-seeall-empty-title">
-        {t("catalog_see_all_empty_title", {}, "No items available")}
-      </h3>
-    </div>
+    <div
+      dangerouslySetInnerHTML={{
+        __html: renderEmptyStateCard({ reason: "empty" })
+      }}
+    />
   );
 }
 
@@ -273,6 +311,9 @@ function Body({ screen }) {
   const items = Array.isArray(screen.items) ? screen.items : [];
   if (!items.length && screen.loading) {
     return <SkeletonGrid />;
+  }
+  if (!items.length && screen.loadFailed) {
+    return <ErrorState screen={screen} />;
   }
   if (!items.length) {
     return <EmptyState />;
@@ -543,6 +584,7 @@ export const CatalogSeeAllScreen = {
     this.layoutPrefs = LayoutPreferences.get();
     this.loading = false;
     this.hasMore = true;
+    this.loadFailed = false;
     this.lastFocusedKey = this.items[0]?.id ? `item:${this.items[0].id}` : null;
     this.pendingRestoreFocus = false;
     this.preserveViewportOnNextRender = false;
@@ -600,10 +642,12 @@ export const CatalogSeeAllScreen = {
     if (result.status !== "success") {
       this.loading = false;
       this.hasMore = false;
+      this.loadFailed = !this.items.length;
       this.preserveViewportOnNextRender = false;
       this.render();
       return;
     }
+    this.loadFailed = false;
     const incoming = Array.isArray(result?.data?.items) ? result.data.items : [];
     let addedCount = 0;
     if (incoming.length) {

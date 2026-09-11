@@ -97,6 +97,7 @@ function makeInitialState() {
       isLoaded: false,
       isEnabled: true,
       isRefreshing: false,
+      loadFailed: false,
       providers: [],
       items: []
     },
@@ -937,7 +938,7 @@ export class LibraryController {
       const cloudLibrary = await cloudLibraryRepository.refresh();
       if (this.disposed) return false;
       this.cloudSettingsSignature = cloudLibrarySettingsSignature();
-      this.setState({ cloudLibrary });
+      this.setState({ cloudLibrary: { ...cloudLibrary, loadFailed: false } });
       return true;
     } catch (error) {
       if (this.disposed) return false;
@@ -946,7 +947,12 @@ export class LibraryController {
           t("cloud_library_load_failed", { provider: "" }, "Could not load cloud library")
       );
       this.setState({
-        cloudLibrary: { ...this.state.cloudLibrary, isLoaded: true, isRefreshing: false }
+        cloudLibrary: {
+          ...this.state.cloudLibrary,
+          isLoaded: true,
+          isRefreshing: false,
+          loadFailed: true
+        }
       });
       return false;
     }

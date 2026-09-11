@@ -258,6 +258,62 @@
   text-overflow: ellipsis;
 }
 
+/* Shared offline/empty state card (js/ui/components/phoneStateCards.js), ported from
+   NuvioMobile's NuvioNetworkOfflineCard / HomeEmptyStateCard: one surface card with a
+   reason-driven title/message and an optional retry action, used by every phone screen's
+   failure/empty path. Tests assert the data-state-reason attribute, not class names. */
+.phone-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--phone-space-8);
+  margin: var(--phone-space-24) var(--phone-space-screen-h);
+  padding: var(--phone-space-24) var(--phone-space-16);
+  background: var(--phone-accent-bg-elevated);
+  border: 1px solid var(--phone-border-default);
+  border-radius: var(--phone-radius-xl);
+  text-align: center;
+}
+
+.phone-state-title {
+  margin: 0;
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-title-md-size);
+  line-height: var(--phone-type-title-md-line);
+  font-weight: var(--phone-font-weight-semibold);
+  color: var(--phone-text-primary);
+}
+
+.phone-state-message {
+  margin: 0;
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-body-md-size);
+  line-height: var(--phone-type-body-md-line);
+  color: var(--phone-text-muted);
+}
+
+.phone-state-action {
+  margin-top: var(--phone-space-8);
+  padding: var(--phone-space-10) var(--phone-space-24);
+  border: none;
+  border-radius: var(--phone-radius-button);
+  background: var(--phone-accent-secondary);
+  color: #ffffff;
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-body-md-size);
+  font-weight: var(--phone-font-weight-semibold);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Filter-toolbar skeleton (renderSkeletonToolbar) — chip-shaped placeholders in a row. */
+.phone-skeleton-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--phone-space-8);
+  padding: var(--phone-space-8) var(--phone-space-screen-h);
+}
+
 /* Poster card (js/ui/components/posterCard.js), ported from NuvioMobile's poster-card
    visual system: rounded artwork, a top-sheen gradient, a watched checkmark badge, and a
    continue-watching progress bar, with a title/subtitle label pair below the artwork. */

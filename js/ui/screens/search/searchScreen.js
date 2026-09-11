@@ -12,6 +12,11 @@ import { renderPosterCard } from "../../components/posterCard.js";
 import { renderPhoneShelf } from "../../components/phoneShelf.js";
 import { renderPhoneNavBar, bindPhoneNavBarEvents } from "../../components/phoneNavBar.js";
 import { renderSkeletonShelf, renderSkeletonPosterCard } from "../../components/phoneSkeleton.js";
+import {
+  renderEmptyStateCard,
+  renderOfflineCard,
+  bindStateCardEvents
+} from "../../components/phoneStateCards.js";
 import { openBottomSheet } from "../../components/bottomSheet.js";
 import { SearchHistoryStore } from "../../../data/local/searchHistoryStore.js";
 
@@ -639,14 +644,8 @@ function toPosterItem(screen, item) {
   };
 }
 
-function renderEmptyStateCard({ title = "", message = "" } = {}) {
-  return `
-    <div class="phone-search-empty-state">
-      <h3 class="phone-search-empty-title">${escapeHtml(title)}</h3>
-      ${message ? `<p class="phone-search-empty-message">${escapeHtml(message)}</p>` : ""}
-    </div>
-  `;
-}
+// (removed: local renderEmptyStateCard — superseded by the shared phoneStateCards
+// primitive, see #52)
 
 function renderResultsShelves(screen) {
   const rows = Array.isArray(screen.phoneSearchRows) ? screen.phoneSearchRows : [];
@@ -661,25 +660,32 @@ function renderResultsShelves(screen) {
     .join("");
 }
 
+// Empty/failure cards render through the shared phoneStateCards primitive (see #52): the
+// reason drives built-in copy and the retry contract, with this screen's i18n strings as
+// explicit overrides; `data-state-reason` is the behavior surface (tests assert it, not
+// class names).
+
 function renderResultsBody(screen) {
   const status = screen.phoneSearchStatus;
   if (status === "loading") {
     return `<div class="phone-search-results-shelves">${renderSkeletonShelf({ count: 4 })}${renderSkeletonShelf({ count: 4 })}${renderSkeletonShelf({ count: 4 })}</div>`;
   }
   if (status === "offline") {
-    return renderEmptyStateCard({
-      title: t("phone_search_offline_title", {}, "You're offline"),
-      message: t("phone_search_offline_message", {}, "Check your connection and try again.")
+    return renderOfflineCard({
+      condition: "no_internet",
+      actionLabel: t("action_retry", {}, "Retry")
     });
   }
   if (status === "no_addons") {
     return renderEmptyStateCard({
+      reason: "no_addons",
       title: t("phone_search_no_addons_title", {}, "No addons installed"),
       message: t("phone_search_no_addons_message", {}, "Install an addon to start searching.")
     });
   }
   if (status === "no_catalogs") {
     return renderEmptyStateCard({
+      reason: "no_catalogs",
       title: t("phone_search_no_catalogs_title", {}, "Search isn't available"),
       message: t(
         "phone_search_no_catalogs_message",
@@ -690,12 +696,15 @@ function renderResultsBody(screen) {
   }
   if (status === "error") {
     return renderEmptyStateCard({
+      reason: "error",
       title: t("phone_search_error_title", {}, "Something went wrong"),
-      message: t("phone_search_error_message", {}, "Your search couldn't be completed. Try again.")
+      message: t("phone_search_error_message", {}, "Your search couldn't be completed. Try again."),
+      actionLabel: t("action_retry", {}, "Retry")
     });
   }
   if (status === "no_results") {
     return renderEmptyStateCard({
+      reason: "no_results",
       title: t("search_no_results_title", {}, "No Results"),
       message: t("search_no_results_subtitle", {}, "Try searching with different keywords")
     });
@@ -774,12 +783,14 @@ function renderDiscoverContent(screen, state) {
   }
   if (!state.hasAddons) {
     return renderEmptyStateCard({
+      reason: "no_addons",
       title: t("phone_search_no_addons_title", {}, "No addons installed"),
       message: t("phone_search_no_addons_message", {}, "Install an addon to start browsing.")
     });
   }
   if (!state.catalogOptions.length) {
     return renderEmptyStateCard({
+      reason: "no_catalogs",
       title: t("phone_search_no_catalogs_title", {}, "Nothing to browse"),
       message: t(
         "phone_search_no_browse_message",
@@ -793,14 +804,14 @@ function renderDiscoverContent(screen, state) {
   }
   if (state.itemsError && !state.items.length) {
     return renderEmptyStateCard({
+      reason: "error",
       title: t("phone_search_error_title", {}, "Something went wrong"),
-      message: t("phone_search_error_message", {}, "Try again in a moment.")
+      message: t("phone_search_error_message", {}, "Try again in a moment."),
+      actionLabel: t("action_retry", {}, "Retry")
     });
   }
   if (!state.items.length) {
-    return renderEmptyStateCard({
-      title: t("catalog_see_all_empty_title", {}, "No items available")
-    });
+    return renderEmptyStateCard({ reason: "empty" });
   }
   return `
     <div class="phone-search-discover-grid" data-phone-search-discover-grid>
@@ -890,6 +901,11 @@ function refreshPhoneSearchBody(screen) {
     return;
   }
   bodyNode.innerHTML = renderBody(screen);
+  // Retry actions on offline/error cards re-run this screen's own search (the same entry
+  // the input debounce uses), so the card never dead-ends.
+  bindStateCardEvents(bodyNode, {
+    onAction: () => void commitPhoneSearch(screen, screen.phoneSearchQuery)
+  });
 }
 
 function updateHeaderChrome(screen, container, scrollTop) {

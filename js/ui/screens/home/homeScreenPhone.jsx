@@ -8,6 +8,7 @@ import {
 } from "../../components/phoneShelf.js";
 import { renderPhoneNavBar, bindPhoneNavBarEvents } from "../../components/phoneNavBar.js";
 import { openPosterZoomOverlay } from "../../components/posterZoomOverlay.js";
+import { renderOfflineCard, bindStateCardEvents } from "../../components/phoneStateCards.js";
 import { formatCatalogRowTitle } from "./homeUtils.js";
 import { normalizeHomeRowItem } from "./homeScreen.js";
 import { savedLibraryRepository } from "../../../data/repository/savedLibraryRepository.js";
@@ -456,6 +457,14 @@ export function HomeScreenPhone({ screen }) {
     : [];
   const catalogRows = buildCatalogRows(screen);
 
+  // Shared offline card (#52): when the browser reports no network, home shows the offline
+  // card above the shelves instead of blanking on the hero — the same NuvioMobile
+  // NuvioNetworkOfflineCard behavior. Retry is bound in mountHomeScreenPhone.
+  const isNetworkOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const offlineMarkup = isNetworkOffline
+    ? renderOfflineCard({ condition: "no_internet", actionLabel: t("action_retry", {}, "Retry") })
+    : "";
+
   const continueWatchingMarkup = continueWatchingItems.length
     ? renderPhoneShelf({
         id: "continue_watching",
@@ -467,6 +476,7 @@ export function HomeScreenPhone({ screen }) {
 
   const scrollInnerHtml = `
     ${renderHeroPager(heroItems)}
+    ${offlineMarkup}
     <div class="phone-home-shelves">
       ${continueWatchingMarkup}
       ${renderCatalogShelves(catalogRows)}
@@ -531,6 +541,15 @@ export function mountHomeScreenPhone(screen, container) {
   const detachNavBar = bindPhoneNavBarEvents(container, {
     currentRoute: "home",
     scrollRoot: container.querySelector("[data-phone-home-scroll]")
+  });
+
+  // Offline-card Retry (see #52) — the only state-card action home can render; there is no
+  // single "reload rows" hook on the phone home screen, so retry re-initializes the app.
+  // Safe no-op when no state card is present.
+  bindStateCardEvents(container, {
+    onAction: () => {
+      window.location.reload();
+    }
   });
 
   const teardown = () => {
