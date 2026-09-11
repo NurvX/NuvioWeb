@@ -145,11 +145,12 @@
   justify-content: center;
   background: var(--phone-overlay-scrim);
   opacity: 0;
-  transition: opacity var(--phone-motion-sheet-enter) var(--phone-ease-standard);
+  transition: opacity var(--phone-motion-sheet-exit) var(--phone-ease-accelerate);
 }
 
 .phone-sheet-backdrop.open {
   opacity: 1;
+  transition: opacity var(--phone-motion-sheet-enter) var(--phone-ease-decelerate);
 }
 
 .phone-sheet {
@@ -160,11 +161,12 @@
   border-radius: var(--phone-radius-sheet) var(--phone-radius-sheet) 0 0;
   box-sizing: border-box;
   transform: translateY(100%);
-  transition: transform var(--phone-motion-sheet-enter) var(--phone-ease-standard);
+  transition: transform var(--phone-motion-sheet-exit) var(--phone-ease-accelerate);
 }
 
 .phone-sheet-backdrop.open .phone-sheet {
   transform: translateY(0);
+  transition: transform var(--phone-motion-sheet-enter) var(--phone-ease-decelerate);
 }
 
 .phone-sheet-drag-region {
@@ -477,7 +479,7 @@
     rgb(255 255 255 / 0.06) 80%,
     rgb(255 255 255 / 0) 100%
   );
-  animation: phone-skeleton-shimmer 1.6s linear infinite;
+  animation: phone-skeleton-shimmer 2.4s linear infinite;
 }
 
 @keyframes phone-skeleton-shimmer {
@@ -528,7 +530,7 @@
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity var(--phone-motion-normal) var(--phone-ease-standard);
+  transition: opacity var(--phone-motion-cinematic) var(--phone-ease-standard);
   pointer-events: none;
 }
 
@@ -590,7 +592,7 @@
   font-size: var(--phone-type-headline-size);
   line-height: var(--phone-type-headline-line);
   letter-spacing: var(--phone-type-headline-tracking);
-  font-weight: var(--phone-font-weight-bold);
+  font-weight: var(--phone-font-weight-semibold);
   color: var(--phone-text-primary);
 }
 
@@ -696,8 +698,8 @@
   transform: scale(0.9);
   opacity: 0;
   transition:
-    transform var(--phone-motion-normal) var(--phone-ease-emphasized),
-    opacity var(--phone-motion-normal) var(--phone-ease-emphasized);
+    transform var(--phone-motion-cinematic) var(--phone-ease-emphasized),
+    opacity var(--phone-motion-cinematic) var(--phone-ease-emphasized);
 }
 
 .phone-zoom-backdrop.open .phone-zoom-sheet {
@@ -822,6 +824,7 @@
   font-family: var(--phone-font-family);
   font-size: var(--phone-type-body-lg-size);
   line-height: var(--phone-type-body-lg-line);
+  font-weight: var(--phone-font-weight-regular);
   color: var(--phone-text-primary);
 }
 
@@ -1543,7 +1546,7 @@
   font-family: var(--phone-font-family);
   font-size: var(--phone-type-title-lg-size);
   line-height: var(--phone-type-title-lg-line);
-  font-weight: var(--phone-font-weight-bold);
+  font-weight: var(--phone-font-weight-semibold);
   color: var(--phone-text-primary);
 }
 
@@ -2025,7 +2028,7 @@
   font-family: var(--phone-font-family);
   font-size: var(--phone-type-title-md-size);
   line-height: var(--phone-type-title-md-line);
-  font-weight: var(--phone-font-weight-bold);
+  font-weight: var(--phone-font-weight-semibold);
   color: var(--phone-text-primary);
 }
 
@@ -3687,7 +3690,7 @@
   height: 26px;
   border-radius: var(--phone-radius-full);
   background: rgb(255 255 255 / 0.16);
-  transition: background 0.15s ease;
+  transition: background var(--phone-motion-normal) var(--phone-ease-standard);
 }
 
 .phone-settings-switch.is-on {
@@ -3703,7 +3706,7 @@
   border-radius: var(--phone-radius-full);
   background: #ffffff;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
-  transition: transform 0.15s ease;
+  transition: transform var(--phone-motion-normal) var(--phone-ease-standard);
 }
 
 .phone-settings-switch.is-on .phone-settings-switch-thumb {
@@ -3749,7 +3752,7 @@
 }
 
 .phone-catalog-order-icon-btn.is-disabled {
-  opacity: 0.35;
+  opacity: var(--phone-opacity-disabled);
   pointer-events: none;
 }
 

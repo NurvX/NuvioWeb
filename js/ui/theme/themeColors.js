@@ -96,6 +96,76 @@ const palettes = {
     "--border-color": "#333333",
     "--focus-color": "#ec407a",
     "--focus-bg": "#3d1a2d"
+  },
+  GOLD: {
+    "--bg-color": "#0f0e0b",
+    "--bg-elevated": "#1d1a14",
+    "--card-bg": "#262116",
+    "--secondary-color": "#e8a91c",
+    "--secondary-variant": "#9a6200",
+    "--on-secondary": "#111111",
+    "--text-color": "#ffffff",
+    "--text-secondary": "#b3b3b3",
+    "--text-tertiary": "#808080",
+    "--border-color": "#333333",
+    "--focus-color": "#ffd45c",
+    "--focus-bg": "#3d2d1a"
+  },
+  JADE: {
+    "--bg-color": "#0b0f0d",
+    "--bg-elevated": "#141d18",
+    "--card-bg": "#16251d",
+    "--secondary-color": "#22d37c",
+    "--secondary-variant": "#0bbf9a",
+    "--on-secondary": "#111111",
+    "--text-color": "#ffffff",
+    "--text-secondary": "#b3b3b3",
+    "--text-tertiary": "#808080",
+    "--border-color": "#333333",
+    "--focus-color": "#7bf08d",
+    "--focus-bg": "#153a2c"
+  },
+  ROSE_GOLD: {
+    "--bg-color": "#100c0f",
+    "--bg-elevated": "#1f161d",
+    "--card-bg": "#281a24",
+    "--secondary-color": "#ec70a9",
+    "--secondary-variant": "#b75aff",
+    "--on-secondary": "#111111",
+    "--text-color": "#ffffff",
+    "--text-secondary": "#b3b3b3",
+    "--text-tertiary": "#808080",
+    "--border-color": "#333333",
+    "--focus-color": "#ffb37a",
+    "--focus-bg": "#442037"
+  },
+  ARCTIC_BLUE: {
+    "--bg-color": "#0b0e14",
+    "--bg-elevated": "#141a24",
+    "--card-bg": "#161e2a",
+    "--secondary-color": "#3185f5",
+    "--secondary-variant": "#4d55e8",
+    "--on-secondary": "#ffffff",
+    "--text-color": "#ffffff",
+    "--text-secondary": "#b3b3b3",
+    "--text-tertiary": "#808080",
+    "--border-color": "#333333",
+    "--focus-color": "#4de3ff",
+    "--focus-bg": "#172844"
+  },
+  GRAPHITE: {
+    "--bg-color": "#0c0d0f",
+    "--bg-elevated": "#17191d",
+    "--card-bg": "#1a1e24",
+    "--secondary-color": "#aab2be",
+    "--secondary-variant": "#687381",
+    "--on-secondary": "#111111",
+    "--text-color": "#ffffff",
+    "--text-secondary": "#b3b3b3",
+    "--text-tertiary": "#808080",
+    "--border-color": "#333333",
+    "--focus-color": "#f3f5f7",
+    "--focus-bg": "#30343a"
   }
 };
 

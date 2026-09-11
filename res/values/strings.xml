@@ -2586,6 +2586,12 @@
     <string name="settings.appearance.themes.rose">Rose</string>
     <string name="settings.appearance.themes.violet">Violet</string>
     <string name="settings.appearance.themes.white">White</string>
+    <string name="settings.appearance.themes.gold">Gold</string>
+    <string name="settings.appearance.themes.jade">Jade</string>
+    <string name="settings.appearance.themes.rose_gold">Rose Gold</string>
+    <string name="settings.appearance.themes.arctic_blue">Arctic Blue</string>
+    <string name="settings.appearance.themes.graphite">Graphite</string>
+    <string name="settings.appearance.themes.custom">Custom</string>
     <string name="settings.dialogs.playerPreference">Player preference</string>
     <string name="settings.dialogs.preferredSubtitleLanguage">Preferred subtitle language</string>
     <string name="settings.dialogs.subtitleRenderMode">Subtitle render mode</string>

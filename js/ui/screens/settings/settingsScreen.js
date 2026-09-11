@@ -155,7 +155,43 @@ const THEME_OPTIONS = [
     color: "#fb8c00",
     onColor: "#ffffff"
   },
-  { id: "ROSE", labelKey: "settings.appearance.themes.rose", color: "#d81b60", onColor: "#ffffff" }
+  { id: "ROSE", labelKey: "settings.appearance.themes.rose", color: "#d81b60", onColor: "#ffffff" },
+  {
+    id: "GOLD",
+    labelKey: "settings.appearance.themes.gold",
+    color: "#e8a91c",
+    onColor: "#111111"
+  },
+  {
+    id: "JADE",
+    labelKey: "settings.appearance.themes.jade",
+    color: "#22d37c",
+    onColor: "#111111"
+  },
+  {
+    id: "ROSE_GOLD",
+    labelKey: "settings.appearance.themes.rose_gold",
+    color: "#ec70a9",
+    onColor: "#111111"
+  },
+  {
+    id: "ARCTIC_BLUE",
+    labelKey: "settings.appearance.themes.arctic_blue",
+    color: "#3185f5",
+    onColor: "#ffffff"
+  },
+  {
+    id: "GRAPHITE",
+    labelKey: "settings.appearance.themes.graphite",
+    color: "#aab2be",
+    onColor: "#111111"
+  },
+  {
+    id: "CUSTOM",
+    labelKey: "settings.appearance.themes.custom",
+    color: "#a1a1aa",
+    onColor: "#111111"
+  }
 ];
 
 const FONT_OPTIONS = [
