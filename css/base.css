@@ -74,11 +74,13 @@
   --phone-info: #42a5f5;
   --phone-overlay-scrim: rgba(0, 0, 0, 0.56);
 
-  /* Accent presets — NuvioMobile ships 7 selectable app themes, each defining its own
-     secondary/variant/background/elevated/card/focus-ring set. All 7 are ported as
-     tokens now so a future theme picker has real values to switch between; only Crimson
-     (the first-declared entry in NuvioMobile's AppTheme enum, and its apparent default)
-     is aliased as "active" below until a theme-selection feature exists to override it. */
+  /* Accent presets — NuvioMobile ships 12 themes plus Custom (generative),
+     each defining its own secondary/variant/background/elevated/card/
+     focus-ring/focus-background/on-secondary set. All presets are ported as
+     tokens now so the theme picker has real values to switch between; White
+     (NuvioMobile's default per Theme.kt: appTheme = AppTheme.WHITE) is
+     aliased as "active" below until a theme-selection feature overrides it.
+     Gold is the first-declared entry in NuvioMobile's AppTheme enum. */
   --phone-accent-crimson-secondary: #e53935;
   --phone-accent-crimson-secondary-rgb: 229 57 53;
   --phone-accent-crimson-variant: #c62828;
@@ -139,15 +141,94 @@
   --phone-accent-white-bg-card: #222222;
   --phone-accent-white-focus-ring: #ffffff;
 
-  /* Active accent alias — swap these to a different --phone-accent-<name>-* set (or wire
-     up to a settings-backed class) when a theme picker ships; nothing does yet. */
-  --phone-accent-secondary: var(--phone-accent-crimson-secondary);
-  --phone-accent-secondary-rgb: var(--phone-accent-crimson-secondary-rgb);
-  --phone-accent-variant: var(--phone-accent-crimson-variant);
-  --phone-accent-bg: var(--phone-accent-crimson-bg);
-  --phone-accent-bg-elevated: var(--phone-accent-crimson-bg-elevated);
-  --phone-accent-bg-card: var(--phone-accent-crimson-bg-card);
-  --phone-accent-focus-ring: var(--phone-accent-crimson-focus-ring);
+  /* Gold — first-declared entry in NuvioMobile's AppTheme enum. Values 1:1
+     from ThemeColors.kt Gold (secondary #E8A91C, variant #9A6200,
+     accentGradient 5-stop #8A5700/#E8A91C/#FFF1A8/#FFD45C/#9A6200,
+     onSecondary #111111, focusRing #FFD45C, focusBackground #3D2D1A). */
+  --phone-accent-gold-secondary: #e8a91c;
+  --phone-accent-gold-secondary-rgb: 232 169 28;
+  --phone-accent-gold-variant: #9a6200;
+  --phone-accent-gold-bg: #0f0e0b;
+  --phone-accent-gold-bg-elevated: #1d1a14;
+  --phone-accent-gold-bg-card: #262116;
+  --phone-accent-gold-focus-ring: #ffd45c;
+  --phone-accent-gold-on-secondary: #111111;
+  --phone-accent-gold-focus-bg: #3d2d1a;
+  --phone-accent-gold-gradient: linear-gradient(
+    135deg,
+    #8a5700,
+    #e8a91c,
+    #fff1a8,
+    #ffd45c,
+    #9a6200
+  );
+
+  /* Jade (ThemeColors.kt: secondary #22D37C, variant #0BBF9A, gradient
+     #7BF08D/#22D37C/#0BBF9A, onSecondary #111111, focusRing #7BF08D,
+     focusBackground #153A2C). */
+  --phone-accent-jade-secondary: #22d37c;
+  --phone-accent-jade-secondary-rgb: 34 211 124;
+  --phone-accent-jade-variant: #0bbf9a;
+  --phone-accent-jade-bg: #0b0f0d;
+  --phone-accent-jade-bg-elevated: #141d18;
+  --phone-accent-jade-bg-card: #16251d;
+  --phone-accent-jade-focus-ring: #7bf08d;
+  --phone-accent-jade-on-secondary: #111111;
+  --phone-accent-jade-focus-bg: #153a2c;
+  --phone-accent-jade-gradient: linear-gradient(135deg, #7bf08d, #22d37c, #0bbf9a);
+
+  /* RoseGold (ThemeColors.kt: secondary #EC70A9, variant #B75AFF, gradient
+     #B75AFF/#EC70A9/#FFB37A, onSecondary #111111, focusRing #FFB37A,
+     focusBackground #442037). */
+  --phone-accent-rosegold-secondary: #ec70a9;
+  --phone-accent-rosegold-secondary-rgb: 236 112 169;
+  --phone-accent-rosegold-variant: #b75aff;
+  --phone-accent-rosegold-bg: #100c0f;
+  --phone-accent-rosegold-bg-elevated: #1f161d;
+  --phone-accent-rosegold-bg-card: #281a24;
+  --phone-accent-rosegold-focus-ring: #ffb37a;
+  --phone-accent-rosegold-on-secondary: #111111;
+  --phone-accent-rosegold-focus-bg: #442037;
+  --phone-accent-rosegold-gradient: linear-gradient(135deg, #b75aff, #ec70a9, #ffb37a);
+
+  /* ArcticBlue (ThemeColors.kt: secondary #3185F5, variant #4D55E8, gradient
+     #4DE3FF/#3185F5/#4D55E8, onSecondary white, focusRing #4DE3FF,
+     focusBackground #172844). */
+  --phone-accent-arcticblue-secondary: #3185f5;
+  --phone-accent-arcticblue-secondary-rgb: 49 133 245;
+  --phone-accent-arcticblue-variant: #4d55e8;
+  --phone-accent-arcticblue-bg: #0b0e14;
+  --phone-accent-arcticblue-bg-elevated: #141a24;
+  --phone-accent-arcticblue-bg-card: #161e2a;
+  --phone-accent-arcticblue-focus-ring: #4de3ff;
+  --phone-accent-arcticblue-on-secondary: #ffffff;
+  --phone-accent-arcticblue-focus-bg: #172844;
+  --phone-accent-arcticblue-gradient: linear-gradient(135deg, #4de3ff, #3185f5, #4d55e8);
+
+  /* Graphite (ThemeColors.kt: secondary #AAB2BE, variant #687381, gradient
+     #F3F5F7/#AAB2BE/#687381, onSecondary #111111, focusRing #F3F5F7,
+     focusBackground #30343A). */
+  --phone-accent-graphite-secondary: #aab2be;
+  --phone-accent-graphite-secondary-rgb: 170 178 190;
+  --phone-accent-graphite-variant: #687381;
+  --phone-accent-graphite-bg: #0c0d0f;
+  --phone-accent-graphite-bg-elevated: #17191d;
+  --phone-accent-graphite-bg-card: #1a1e24;
+  --phone-accent-graphite-focus-ring: #f3f5f7;
+  --phone-accent-graphite-on-secondary: #111111;
+  --phone-accent-graphite-focus-bg: #30343a;
+  --phone-accent-graphite-gradient: linear-gradient(135deg, #f3f5f7, #aab2be, #687381);
+
+  /* Active accent alias — White is NuvioMobile's default (Theme.kt:
+     appTheme = AppTheme.WHITE). Swap these to a different
+     --phone-accent-<name>-* set when a theme picker ships. */
+  --phone-accent-secondary: var(--phone-accent-white-secondary);
+  --phone-accent-secondary-rgb: var(--phone-accent-white-secondary-rgb);
+  --phone-accent-variant: var(--phone-accent-white-variant);
+  --phone-accent-bg: var(--phone-accent-white-bg);
+  --phone-accent-bg-elevated: var(--phone-accent-white-bg-elevated);
+  --phone-accent-bg-card: var(--phone-accent-white-bg-card);
+  --phone-accent-focus-ring: var(--phone-accent-white-focus-ring);
 
   /* Typography. NuvioMobile uses JetBrains Sans (Bold/SemiBold/Regular only); this repo
      doesn't load that family yet (only DM Sans/Inter/Open Sans, per the @import block at
@@ -252,6 +333,27 @@
   --phone-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
   --phone-ease-decelerate: cubic-bezier(0, 0, 0, 1);
   --phone-ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+
+  /* Opacity tokens 1:1 from NuvioTokens.Opacity (Tokens.kt:85-100). */
+  --phone-opacity-invisible: 0;
+  --phone-opacity-disabled: 0.38;
+  --phone-opacity-secondary: 0.7;
+  --phone-opacity-muted: 0.6;
+  --phone-opacity-selected: 0.15;
+  --phone-opacity-hover: 0.08;
+  --phone-opacity-pressed: 0.12;
+  --phone-opacity-subtle: 0.06;
+  --phone-opacity-medium: 0.52;
+  --phone-opacity-strong: 0.75;
+  --phone-opacity-overlay-light: 0.35;
+  --phone-opacity-overlay-medium: 0.56;
+  --phone-opacity-overlay-heavy: 0.82;
+
+  /* Border + state tokens 1:1 from defaultNuvioThemeTokens (Tokens.kt:381-410). */
+  --phone-border-subtle: rgb(37 42 42 / 0.55);
+  --phone-border-strong: #3a4040;
+  --phone-text-disabled: rgb(150 156 163 / 0.38);
+  --phone-text-inverse: #111111;
 }
 
 html,
