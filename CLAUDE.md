@@ -47,6 +47,13 @@ npm run format:check           # prettier --check . (pre-commit hook via husky)
 npm run test                   # node --test "**/*.test.mjs"
 ```
 
+### Browser testing
+
+Always test in Chrome against the production URL **https://nuvioweb-web.vercel.app/** —
+the session there is already signed in, so no manual login is needed. Use the local
+`npm run serve` build only when the change under test isn't deployed yet (Vercel
+auto-deploys `main`, so merge first, then verify on the URL above).
+
 Runtime config (Supabase URL/keys, TMDB/Trakt/Simkl/Premiumize credentials, proxy URLs, etc.)
 is sourced from `local.properties` (gitignored; see `local.example.properties` for the schema)
 and baked into `dist/nuvio.env.js` at build time by `scripts/envProperties.mjs`. `js/config.js`

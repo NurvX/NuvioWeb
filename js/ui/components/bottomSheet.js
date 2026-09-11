@@ -1,8 +1,16 @@
 import { attachSwipe } from "../navigation/gestureEngine.js";
 
-// Phone-only slide-up action sheet, ported from NuvioMobile's NuvioModalBottomSheet /
-// NuvioBottomSheetActionRow (see .scratch/mobile-parity/spec.md). Not a TV/D-pad component —
-// `NuvioDialog` (nuvioDialog.js) remains the modal system for the TV UI.
+// Phone-only slide-up modal sheet host, ported from NuvioMobile's NuvioModalBottomSheet /
+// NuvioBottomSheetActionRow (BottomSheet.kt) and shared by every phone bottom sheet (see
+// parity ticket #51). Not a TV/D-pad component — `NuvioDialog` (nuvioDialog.js) remains the
+// modal system for the TV UI.
+//
+// Two entry points over one host:
+// - `openBottomSheet({ items, onDismiss })` — bare action rows (the original API, kept so
+//   existing callers are untouched).
+// - `openModalSheet({ title, subtitle, items, onDismiss })` — the same host with a sheet
+//   header, mirroring how NuvioMobile sheets compose NuvioModalBottomSheet with an
+//   EpisodeActionSheetHeader-style title/subtitle header (EpisodeWatchedActionSheet.kt).
 //
 // Screens integrate it the same way castDetailScreen.js/catalogSeeAllScreen.js already
 // integrate PosterOptionsDialogController: keep the returned controller, and check it in the
@@ -21,21 +29,27 @@ function escapeHtml(value = "") {
     .replace(/"/g, "&quot;");
 }
 
-/**
- * Opens a bottom sheet listing `items` ({icon, title, onSelect}) as full-width tappable
- * rows. Only one bottom sheet may be open at a time — opening a new one closes any existing
- * one first. Returns a controller exposing `destroy()`.
- */
-export function openBottomSheet({ items = [], onDismiss } = {}) {
-  closeActiveBottomSheet();
+function renderSheetHeader({ title, subtitle }) {
+  const hasTitle = Boolean(String(title || "").trim());
+  const hasSubtitle = Boolean(String(subtitle || "").trim());
+  if (!hasTitle && !hasSubtitle) {
+    return "";
+  }
+  return `
+      <div class="phone-sheet-header">
+        ${hasTitle ? `<div class="phone-sheet-title">${escapeHtml(title)}</div>` : ""}
+        ${hasSubtitle ? `<div class="phone-sheet-subtitle">${escapeHtml(subtitle)}</div>` : ""}
+      </div>
+  `;
+}
 
-  const backdrop = document.createElement("div");
-  backdrop.className = "phone-sheet-backdrop";
-  backdrop.innerHTML = `
+function renderSheetMarkup({ headerHtml, items = [] }) {
+  return `
     <div class="phone-sheet" role="dialog" aria-modal="true">
       <div class="phone-sheet-drag-region">
         <div class="phone-sheet-handle"></div>
       </div>
+      ${headerHtml}
       <div class="phone-sheet-actions">
         ${items
           .map(
@@ -50,6 +64,19 @@ export function openBottomSheet({ items = [], onDismiss } = {}) {
       </div>
     </div>
   `;
+}
+
+/**
+ * Shared host behind `openBottomSheet`/`openModalSheet`. Only one sheet may be open at a
+ * time — opening a new one closes any existing one first. Returns a controller exposing
+ * `destroy()`.
+ */
+function openSheet({ headerHtml = "", items = [], onDismiss } = {}) {
+  closeActiveBottomSheet();
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "phone-sheet-backdrop";
+  backdrop.innerHTML = renderSheetMarkup({ headerHtml, items });
   document.body.appendChild(backdrop);
 
   const sheet = backdrop.querySelector(".phone-sheet");
@@ -120,6 +147,28 @@ export function openBottomSheet({ items = [], onDismiss } = {}) {
   const controller = { destroy };
   activeController = controller;
   return controller;
+}
+
+/**
+ * Opens a bottom sheet listing `items` ({icon, title, onSelect}) as full-width tappable
+ * rows. Only one bottom sheet may be open at a time — opening a new one closes any existing
+ * one first. Returns a controller exposing `destroy()`.
+ */
+export function openBottomSheet({ items = [], onDismiss } = {}) {
+  return openSheet({ items, onDismiss });
+}
+
+/**
+ * Opens the same host with a sheet header (`title` + optional `subtitle`), the composition
+ * NuvioMobile's own sheets use (NuvioModalBottomSheet + EpisodeActionSheetHeader). Returns
+ * the same controller contract as `openBottomSheet`.
+ */
+export function openModalSheet({ title = "", subtitle = "", items = [], onDismiss } = {}) {
+  return openSheet({
+    headerHtml: renderSheetHeader({ title, subtitle }),
+    items,
+    onDismiss
+  });
 }
 
 /** Closes whatever bottom sheet is currently open, if any. Safe to call when none is open. */

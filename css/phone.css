@@ -225,6 +225,39 @@
   color: var(--phone-text-primary);
 }
 
+/* Sheet header (openModalSheet), ported from NuvioMobile's EpisodeActionSheetHeader: a
+   titleLarge-style title over a bodyMedium-style subtitle, separated from the action rows
+   by the rows' own top border. */
+.phone-sheet-header {
+  padding: 0 var(--phone-space-screen-h) var(--phone-space-14);
+  border-bottom: 1px solid var(--phone-border-default);
+}
+
+.phone-sheet-title {
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-title-md-size);
+  line-height: var(--phone-type-title-md-line);
+  font-weight: var(--phone-font-weight-semibold);
+  color: var(--phone-text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.phone-sheet-title + .phone-sheet-subtitle {
+  margin-top: var(--phone-space-4);
+}
+
+.phone-sheet-subtitle {
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-body-sm-size);
+  line-height: var(--phone-type-body-sm-line);
+  color: var(--phone-text-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* Poster card (js/ui/components/posterCard.js), ported from NuvioMobile's poster-card
    visual system: rounded artwork, a top-sheen gradient, a watched checkmark badge, and a
    continue-watching progress bar, with a title/subtitle label pair below the artwork. */
@@ -4404,22 +4437,37 @@
   cursor: pointer;
 }
 
-/* Shared PIN-action toast (create/edit/delete confirmation, PIN saved/removed) */
-.phone-profile-toast {
+/* Shared phone toast (js/ui/components/toast.js), ported from NuvioMobile's NuvioToastHost:
+   a top-anchored surface under the status bar that fades/slides down in, one at a time
+   (a new toast replaces whatever is showing). */
+.phone-toast {
   position: fixed;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-32));
-  transform: translateX(-50%);
-  background: rgb(26 26 26 / 0.94);
+  top: calc(env(safe-area-inset-top, 0px) + var(--phone-space-24));
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--phone-accent-bg-elevated);
   border: 1px solid var(--phone-border-default);
-  border-radius: var(--phone-radius-md);
-  padding: var(--phone-space-10) var(--phone-space-18);
+  border-radius: var(--phone-radius-xl);
+  padding: var(--phone-space-12) var(--phone-space-16);
   font-family: var(--phone-font-family);
-  font-size: var(--phone-type-body-sm-size);
+  font-size: var(--phone-type-body-md-size);
+  line-height: var(--phone-type-body-md-line);
   color: var(--phone-text-primary);
-  max-width: calc(100vw - var(--phone-space-40));
+  max-width: calc(100vw - 2 * var(--phone-space-screen-h));
   text-align: center;
-  z-index: 60;
+  z-index: 70;
+  opacity: 0;
+  transition:
+    opacity var(--phone-motion-fast) var(--phone-ease-accelerate),
+    transform var(--phone-motion-fast) var(--phone-ease-accelerate);
+}
+
+.phone-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  transition:
+    opacity var(--phone-motion-fast) var(--phone-ease-decelerate),
+    transform var(--phone-motion-fast) var(--phone-ease-decelerate);
 }
 
 /* Account / sign-in / QR sign-in / sync-code screens (ticket 05-03) — reuses the

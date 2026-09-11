@@ -189,3 +189,82 @@ test("integrates with a screen's consumeBackRequest() the same way PosterOptions
   const consumedWithNothingOpen = fakeScreen.consumeBackRequest();
   assert.equal(consumedWithNothingOpen, false, "back falls through once nothing is open");
 });
+
+// ---------------------------------------------------------------------------------------
+// openModalSheet — the same host with a title/subtitle header (#51)
+// ---------------------------------------------------------------------------------------
+
+const { openModalSheet } = await import("./bottomSheet.js");
+
+test("openModalSheet renders a title header above the action rows", () => {
+  openModalSheet({
+    title: "Reacher",
+    items: [{ title: "Edit", onSelect: () => {} }]
+  });
+
+  assert.ok(document.querySelector(".phone-sheet-header"), "header renders");
+  assert.equal(document.querySelector(".phone-sheet-title").textContent, "Reacher");
+  assert.equal(
+    document.querySelector(".phone-sheet-subtitle"),
+    null,
+    "no subtitle when none given"
+  );
+  assert.equal(document.querySelectorAll(".phone-sheet-action").length, 1);
+  closeActiveBottomSheet();
+});
+
+test("openModalSheet renders title + subtitle and escapes HTML in both", () => {
+  openModalSheet({
+    title: "<b>Alice</b>",
+    subtitle: "EP 1 • The Pilot",
+    items: [{ title: "Edit", onSelect: () => {} }]
+  });
+
+  // Escaped text content, not injected markup.
+  assert.equal(document.querySelector(".phone-sheet-title").textContent, "<b>Alice</b>");
+  assert.equal(document.querySelector(".phone-sheet-title").querySelector("b"), null);
+  assert.equal(document.querySelector(".phone-sheet-subtitle").textContent, "EP 1 • The Pilot");
+  closeActiveBottomSheet();
+});
+
+test("openModalSheet with no title and no subtitle renders no header, like openBottomSheet", () => {
+  openModalSheet({ items: [{ title: "X", onSelect: () => {} }] });
+
+  assert.equal(document.querySelector(".phone-sheet-header"), null);
+  assert.equal(document.querySelectorAll(".phone-sheet-action").length, 1);
+  closeActiveBottomSheet();
+});
+
+test("tapping a modal sheet action selects it and closes the sheet", () => {
+  let selected = null;
+  openModalSheet({
+    title: "Reacher",
+    items: [{ title: "Mark watched", onSelect: () => (selected = "watched") }]
+  });
+
+  document.querySelector(".phone-sheet-action").click();
+
+  assert.equal(selected, "watched");
+  assert.equal(document.querySelector(".phone-sheet"), null);
+});
+
+test("openModalSheet and openBottomSheet share the one-active-sheet guarantee", () => {
+  let firstDismissed = false;
+  openBottomSheet({ items: [], onDismiss: () => (firstDismissed = true) });
+
+  openModalSheet({ title: "Second", items: [] });
+
+  assert.equal(firstDismissed, true, "opening a modal sheet closes a bare bottom sheet");
+  assert.equal(document.querySelectorAll(".phone-sheet").length, 1);
+  assert.ok(document.querySelector(".phone-sheet-header"), "the surviving sheet is the modal one");
+
+  openBottomSheet({ items: [] });
+  assert.equal(document.querySelectorAll(".phone-sheet").length, 1);
+  assert.equal(
+    document.querySelector(".phone-sheet-header"),
+    null,
+    "the bare sheet closed the modal one"
+  );
+
+  closeActiveBottomSheet();
+});

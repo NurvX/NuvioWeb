@@ -1,6 +1,7 @@
 import { I18n } from "../../i18n/index.js";
 import { MAX_PROFILES } from "./profileManager.js";
-import { openBottomSheet, closeActiveBottomSheet } from "../../ui/components/bottomSheet.js";
+import { openModalSheet, closeActiveBottomSheet } from "../../ui/components/bottomSheet.js";
+import { showToast, dismissToast } from "../../ui/components/toast.js";
 import {
   getProfileInitial,
   resolveProfileAvatarUrl,
@@ -150,7 +151,6 @@ function renderGridScreen(screen) {
         </button>
       </div>
     </div>
-    ${renderToastPhone(screen)}
   `;
 }
 
@@ -159,7 +159,8 @@ function renderGridScreen(screen) {
 // ---------------------------------------------------------------------------------------
 
 function openPhoneDeleteConfirmSheet(screen, profile) {
-  openBottomSheet({
+  openModalSheet({
+    title: profile.name,
     items: [
       {
         title: t("profile_delete_btn", {}, "Delete Profile"),
@@ -210,7 +211,7 @@ function openPhoneProfileOptionsSheet(screen, profile) {
       onSelect: () => openPhoneDeleteConfirmSheet(screen, profile)
     });
   }
-  openBottomSheet({ items });
+  openModalSheet({ title: profile.name, items });
 }
 
 /** Mirrors `activateFocusedNode`'s own tail branch (profile-card tap) verbatim in decision
@@ -332,7 +333,6 @@ function renderEditorScreen(screen) {
         </div>
       </div>
     </div>
-    ${renderToastPhone(screen)}
   `;
 }
 
@@ -427,22 +427,6 @@ function renderPinScreen(screen) {
         </button>
       </div>
     </div>
-    ${renderToastPhone(screen)}
-  `;
-}
-
-// ---------------------------------------------------------------------------------------
-// Shared toast
-// ---------------------------------------------------------------------------------------
-
-function renderToastPhone(screen) {
-  if (!screen.pinActionMessage) {
-    return "";
-  }
-  return `
-    <div class="phone-profile-toast" role="status" aria-live="polite">
-      ${escapeHtml(screen.pinActionMessage)}
-    </div>
   `;
 }
 
@@ -530,6 +514,21 @@ export function mountProfileSelectionScreenPhone(screen, container) {
     };
   }
 
+  // Toast seam: TV's own `setPinActionMessage` re-renders the shared screen to reveal a
+  // render-based toast (components.css `.profile-pin-toast`); phone markup migrates onto the
+  // shared toast primitive (see #51) so confirmations surface the same way NuvioMobile's
+  // NuvioToastHost does, instead of via per-screen toast markup. The original is restored in
+  // teardown so the same singleton behaves unmodified back in TV mode.
+  const previousSetPinActionMessage = screen.setPinActionMessage;
+  screen.setPinActionMessage = (message) => {
+    const text = String(message || "");
+    if (!text) {
+      dismissToast();
+      return;
+    }
+    showToast(text);
+  };
+
   const teardown = () => {
     cardButtons.forEach((button) => {
       button.onclick = null;
@@ -549,6 +548,8 @@ export function mountProfileSelectionScreenPhone(screen, container) {
     if (pinCancelButton) {
       pinCancelButton.onclick = null;
     }
+    screen.setPinActionMessage = previousSetPinActionMessage;
+    dismissToast();
   };
 
   screen._phoneProfileTeardown = teardown;
@@ -586,4 +587,5 @@ export function cleanupProfileSelectionScreenPhone(screen) {
   screen._phoneProfileTeardown?.();
   screen._phoneProfileTeardown = null;
   closeActiveBottomSheet();
+  dismissToast();
 }
