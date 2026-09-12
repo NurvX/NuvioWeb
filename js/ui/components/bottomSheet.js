@@ -43,13 +43,14 @@ function renderSheetHeader({ title, subtitle }) {
   `;
 }
 
-function renderSheetMarkup({ headerHtml, items = [] }) {
+function renderSheetMarkup({ headerHtml = "", noticeHtml = "", items = [] }) {
   return `
     <div class="phone-sheet" role="dialog" aria-modal="true">
       <div class="phone-sheet-drag-region">
         <div class="phone-sheet-handle"></div>
       </div>
       ${headerHtml}
+      ${noticeHtml}
       <div class="phone-sheet-actions">
         ${items
           .map(
@@ -57,6 +58,7 @@ function renderSheetMarkup({ headerHtml, items = [] }) {
           <button type="button" class="phone-sheet-action" data-index="${index}">
             ${item.icon ? `<span class="phone-sheet-action-icon">${item.icon}</span>` : ""}
             <span class="phone-sheet-action-title">${escapeHtml(item.title || "")}</span>
+            ${item.trailing ? `<span class="phone-sheet-action-trailing">${item.trailing}</span>` : ""}
           </button>
         `
           )
@@ -69,14 +71,20 @@ function renderSheetMarkup({ headerHtml, items = [] }) {
 /**
  * Shared host behind `openBottomSheet`/`openModalSheet`. Only one sheet may be open at a
  * time — opening a new one closes any existing one first. Returns a controller exposing
- * `destroy()`.
+ * `destroy()` and the live sheet `root` element.
+ *
+ * Selection contract: `openSheet` closes the sheet first and invokes the row's `onSelect`
+ * afterwards (dismissFirst) — the same order NuvioMobile's sheets use
+ * (`dismissNuvioBottomSheet(...)` before the action callback) so the caller's callback
+ * never runs against a sheet that's still mounted. Rows that must stay open (in-place
+ * toggles, picker rows) set `dismissFirst: false` and manage the controller themselves.
  */
-function openSheet({ headerHtml = "", items = [], onDismiss } = {}) {
+function openSheet({ headerHtml = "", noticeHtml = "", items = [], onDismiss } = {}) {
   closeActiveBottomSheet();
 
   const backdrop = document.createElement("div");
   backdrop.className = "phone-sheet-backdrop";
-  backdrop.innerHTML = renderSheetMarkup({ headerHtml, items });
+  backdrop.innerHTML = renderSheetMarkup({ headerHtml, noticeHtml, items });
   document.body.appendChild(backdrop);
 
   const sheet = backdrop.querySelector(".phone-sheet");
@@ -108,6 +116,12 @@ function openSheet({ headerHtml = "", items = [], onDismiss } = {}) {
     button.onclick = () => {
       const index = Number(button.dataset.index || 0);
       const item = items[index] || null;
+      // `dismissFirst: false` rows (in-place toggles/picker rows) stay open and manage the
+      // sheet themselves — see the openSheet docblock's selection contract.
+      if (item?.dismissFirst === false) {
+        item.onSelect?.();
+        return;
+      }
       destroy();
       item?.onSelect?.();
     };
@@ -160,12 +174,23 @@ export function openBottomSheet({ items = [], onDismiss } = {}) {
 
 /**
  * Opens the same host with a sheet header (`title` + optional `subtitle`), the composition
- * NuvioMobile's own sheets use (NuvioModalBottomSheet + EpisodeActionSheetHeader). Returns
- * the same controller contract as `openBottomSheet`.
+ * NuvioMobile's own sheets use (NuvioModalBottomSheet + EpisodeActionSheetHeader). Pass a raw
+ * `headerHtml` to override the default text header with custom markup (e.g. the CW action
+ * sheet's poster-header), and a raw `noticeHtml` for a non-interactive notice line between the
+ * header and the action rows (e.g. the tracking picker's save-error). Returns the same
+ * controller contract as `openBottomSheet`.
  */
-export function openModalSheet({ title = "", subtitle = "", items = [], onDismiss } = {}) {
+export function openModalSheet({
+  title = "",
+  subtitle = "",
+  headerHtml = "",
+  noticeHtml = "",
+  items = [],
+  onDismiss
+} = {}) {
   return openSheet({
-    headerHtml: renderSheetHeader({ title, subtitle }),
+    headerHtml: headerHtml !== "" ? headerHtml : renderSheetHeader({ title, subtitle }),
+    noticeHtml,
     items,
     onDismiss
   });

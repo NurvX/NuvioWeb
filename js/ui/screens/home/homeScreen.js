@@ -125,7 +125,8 @@ import {
   HomeScreenPhone,
   mountHomeScreenPhone,
   cleanupHomeScreenPhone,
-  handlePhoneHomePointerActivate
+  handlePhoneHomePointerActivate,
+  mountPhonePosterListPicker
 } from "./homeScreenPhone.jsx";
 
 export { escapeAttribute, escapeHtml, formatCatalogRowTitle } from "./homeUtils.js";
@@ -4518,6 +4519,9 @@ export const HomeScreen = {
       ),
       error: ""
     };
+    if (Platform.isPhoneViewport()) {
+      return mountPhonePosterListPicker(this);
+    }
     return this.mountPosterListPickerDialog();
   },
 
@@ -4537,7 +4541,9 @@ export const HomeScreen = {
           : { ...(this.posterListPicker.membership || {}), [key]: nextSelected };
       this.posterListPicker.destructiveRemovalRequired = false;
       if (this.posterListPicker.sourceMode === LibrarySourceMode.SIMKL) {
-        this.mountPosterListPickerDialog();
+        this.remountPosterListPickerSurface();
+      } else if (Platform.isPhoneViewport()) {
+        this.remountPosterListPickerSurface();
       } else {
         this._homeHoldDialog?.setButtonSelected?.(
           normalizedAction,
@@ -4571,11 +4577,21 @@ export const HomeScreen = {
         this.posterListPicker.error = this.posterListPicker.destructiveRemovalRequired
           ? "Removing this status will also clear watched history or a rating on Simkl. Confirm only if that is intended."
           : t("detail_lists_save_failed", {}, "Could not save list changes.");
-        this.mountPosterListPickerDialog();
+        this.remountPosterListPickerSurface();
       }
       return true;
     }
     return false;
+  },
+
+  // Re-renders the active poster-list-picker surface — the phone tracking sheet on the phone
+  // path (#53), or the TV NuvioDialog everywhere else. Used after SIMKL toggles and after
+  // save errors so the error/confirm state actually shows.
+  remountPosterListPickerSurface() {
+    if (Platform.isPhoneViewport()) {
+      return mountPhonePosterListPicker(this);
+    }
+    return this.mountPosterListPickerDialog();
   },
 
   getPosterItemFromNode(node) {

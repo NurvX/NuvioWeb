@@ -43,8 +43,10 @@ import { selectAutoPlayStream } from "../../../core/streams/streamAutoPlaySelect
 import { metaRepository } from "../../../data/repository/metaRepository.js";
 import { I18n } from "../../../i18n/index.js";
 import { Environment } from "../../../platform/environment.js";
+import { Platform } from "../../../platform/index.js";
 import { Router } from "../../navigation/router.js";
 import { attachPlayerGestureLayer, PLAYER_GESTURE_HOLD_SPEED } from "./playerGestures.js";
+import { markPlayerEntered, markPlayerExitedNormally } from "../../components/phoneResumePrompt.js";
 import {
   renderPhonePlayerChrome,
   mountPhonePlayerChrome,
@@ -9458,6 +9460,10 @@ export const PlayerScreen = {
     }
     this.hasPresentedPlaybackFrame = true;
     this.warmBitmapSubtitleSharedResources();
+    // The floating phone resume prompt (#53) arms once a player session is really live —
+    // mirroring ResumePromptRepository.markPlayerEntered at mobile's player-launch. The
+    // compact snapshot is what phone home's resume prompt needs to rebuild the resume route.
+    this.armPhoneResumePrompt();
     if (!this.startupTrackPreferenceReady) {
       // Some P2P / engineFs startups expose tracks before the first real frame
       // is presented. Re-run the startup track pass once playback is actually live.
@@ -19223,6 +19229,45 @@ export const PlayerScreen = {
     this.syncPhonePlayerChrome();
   },
 
+  // Floating phone resume prompt (#53): arms the one-shot resume snapshot once a player
+  // session is actually presented (see markPlaybackPresentedAfterAdvance). Phone viewport
+  // only — the prompt is a phone-home surface; arming from a TV session would only write a
+  // snapshot phone home would then surface as "resume me" on the user's phone browser later.
+  armPhoneResumePrompt() {
+    if (!Platform.isPhoneViewport()) {
+      return;
+    }
+    const videoId = String(this.params?.videoId || this.params?.itemId || "").trim();
+    if (!videoId) {
+      return;
+    }
+    const currentSeconds = Number(this.getPlaybackCurrentSeconds?.() || 0);
+    const durationSeconds = Number(this.getPlaybackDurationSeconds?.() || 0);
+    const itemType = normalizeItemType(this.params?.itemType || "movie");
+    markPlayerEntered(videoId, {
+      contentId: this.params?.itemId || "",
+      videoId: this.params?.videoId || null,
+      type: itemType,
+      title: this.params?.playerTitle || this.params?.itemTitle || this.params?.itemId || "",
+      poster: this.params?.poster || this.params?.backdrop || null,
+      backdrop:
+        this.params?.backdrop || this.params?.playerBackdropUrl || this.params?.poster || null,
+      season: this.params?.season,
+      episode: this.params?.episode,
+      episodeTitle: this.params?.episodeTitle || this.params?.playerSubtitle || "",
+      positionMs: Math.round(currentSeconds * 1000),
+      durationMs: Math.round(durationSeconds * 1000),
+      progressFraction: durationSeconds > 0 ? Math.min(1, currentSeconds / durationSeconds) : 0
+    });
+  },
+
+  // Clears the resume arm when the player is torn down (any normal exit path — Back to
+  // stream, finished route, next-episode autoplay chain end, route cleanup). Mirrors mobile's
+  // ResumePromptRepository.markPlayerExitedNormally at PlayerRoute dispose.
+  clearPhoneResumePrompt() {
+    markPlayerExitedNormally();
+  },
+
   // Ticket 04-03's phone overlay chrome (playerScreenPhone.js) is appended as an additional
   // sibling layer inside #playerUiRoot rather than replacing any TV markup — see
   // playerScreenPhone.js's own header comment for why. This just owns the build/teardown/
@@ -19564,6 +19609,7 @@ export const PlayerScreen = {
     try {
       this.playerRouteActive = false;
       this.playerMountToken = Number(this.playerMountToken || 0) + 1;
+      this.clearPhoneResumePrompt();
       this.teardownPhoneGestureLayer();
       this.teardownPhonePlayerChrome();
       this.phoneLockActive = false;

@@ -268,3 +268,73 @@ test("openModalSheet and openBottomSheet share the one-active-sheet guarantee", 
 
   closeActiveBottomSheet();
 });
+
+// ---------------------------------------------------------------------------------------
+// dismissFirst: false — rows that stay open and manage the sheet themselves (#53 pickers)
+// ---------------------------------------------------------------------------------------
+
+test("dismissFirst:false rows stay open and manage the controller themselves", () => {
+  let toggled = 0;
+  let dismissCalled = false;
+  let closedByRow = false;
+  let controller = null;
+  controller = openBottomSheet({
+    items: [
+      {
+        title: "Toggle",
+        dismissFirst: false,
+        onSelect: () => {
+          toggled += 1;
+          if (toggled >= 2) {
+            closedByRow = true;
+            controller?.destroy();
+          }
+        }
+      }
+    ],
+    onDismiss: () => (dismissCalled = true)
+  });
+
+  document.querySelector(".phone-sheet-action").click();
+  assert.equal(toggled, 1);
+  assert.ok(document.querySelector(".phone-sheet"), "sheet stays open after the toggle row");
+  assert.equal(dismissCalled, false, "toggling is not a dismiss");
+
+  document.querySelector(".phone-sheet-action").click();
+  assert.equal(toggled, 2);
+  assert.equal(document.querySelector(".phone-sheet"), null, "row closed the sheet itself");
+  assert.equal(dismissCalled, true, "row-managed destroy still fires onDismiss");
+  assert.equal(closedByRow, true);
+});
+
+test("openModalSheet renders noticeHtml between the header and the rows", () => {
+  const controller = openModalSheet({
+    title: "Simkl",
+    noticeHtml: '<div class="phone-sheet-notice">Could not save list changes.</div>',
+    items: [{ title: "Save", onSelect: () => {} }]
+  });
+  const sheet = document.querySelector(".phone-sheet");
+  const header = sheet.querySelector(".phone-sheet-header");
+  const notice = sheet.querySelector(".phone-sheet-notice");
+  const actions = sheet.querySelector(".phone-sheet-actions");
+  assert.ok(notice, "notice renders");
+  assert.equal(notice.textContent, "Could not save list changes.");
+  // DOM order contract: header -> notice -> actions
+  assert.equal(header.nextElementSibling, notice);
+  assert.equal(notice.nextElementSibling, actions);
+  controller.destroy();
+});
+
+test("trailing content renders at the row end (dropdown checkmark)", () => {
+  const controller = openModalSheet({
+    title: "Genre",
+    items: [
+      { title: "Any", trailing: '<span class="check">✓</span>', onSelect: () => {} },
+      { title: "Comedy", onSelect: () => {} }
+    ]
+  });
+  const rows = Array.from(document.querySelectorAll(".phone-sheet-action"));
+  assert.ok(rows[0].querySelector(".phone-sheet-action-trailing .check"), "trailing on row 1");
+  assert.equal(rows[1].querySelector(".phone-sheet-action-trailing"), null, "no trailing on row 2");
+  controller.destroy();
+});

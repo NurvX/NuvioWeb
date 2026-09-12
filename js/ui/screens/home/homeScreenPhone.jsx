@@ -6,6 +6,17 @@ import {
   bindPhoneShelfEvents,
   defaultPhoneShelfViewAllLabel
 } from "../../components/phoneShelf.js";
+import {
+  openTrackingListPickerSheet,
+  normalizeTrackerOptions
+} from "../../components/phoneTrackingPicker.js";
+import { openCwActionSheet } from "../../components/phoneCwActionSheet.js";
+import {
+  consumeResumePrompt,
+  renderResumePromptFloating,
+  bindResumePrompt
+} from "../../components/phoneResumePrompt.js";
+import { closeActiveBottomSheet } from "../../components/bottomSheet.js";
 import { renderPhoneNavBar, bindPhoneNavBarEvents } from "../../components/phoneNavBar.js";
 import { openPosterZoomOverlay } from "../../components/posterZoomOverlay.js";
 import { renderOfflineCard, bindStateCardEvents } from "../../components/phoneStateCards.js";
@@ -474,7 +485,29 @@ export function HomeScreenPhone({ screen }) {
       })
     : "";
 
+  // Floating resume prompt (#53): the player "armed" a one-shot snapshot when playback was
+  // left running; the first phone-home render consumes it and keeps showing the prompt until
+  // the user taps Resume or Dismiss (see mountHomeScreenPhone's bindResumePrompt wiring).
+  if (screen._phoneResumePrompt === undefined) {
+    screen._phoneResumePrompt = consumeResumePrompt();
+  }
+  const phoneResumePrompt = screen._phoneResumePrompt;
+  const resumePromptItem = phoneResumePrompt?.item || {};
+  const resumePromptMarkup = phoneResumePrompt
+    ? renderResumePromptFloating({
+        title: resumePromptItem.title || resumePromptItem.name || "",
+        subtitle: [resumePromptItem.episodeCode, resumePromptItem.episodeTitle]
+          .filter(Boolean)
+          .join(" • "),
+        posterUrl:
+          resumePromptItem.thumbnail || resumePromptItem.backdrop || resumePromptItem.poster || "",
+        resumeLabel: t("resume_prompt_action", {}, "Resume"),
+        dismissLabel: t("action_dismiss", {}, "Dismiss")
+      })
+    : "";
+
   const scrollInnerHtml = `
+    <div class="phone-home-resume-prompt-host">${resumePromptMarkup}</div>
     ${renderHeroPager(heroItems)}
     ${offlineMarkup}
     <div class="phone-home-shelves">
@@ -517,10 +550,25 @@ export function mountHomeScreenPhone(screen, container) {
   const detachContinueWatchingShelf = bindPhoneShelfEvents(
     container.querySelector('[data-shelf-id="continue_watching"]'),
     {
-      onLongPress: (id, cardElement) => {
+      onLongPress: (id, _cardElement) => {
         const item = continueWatchingItems.find((entry) => String(entry.contentId) === String(id));
         if (item) {
-          openZoomForItem(screen, cardElement, item, { isContinueWatching: true });
+          // CW long-press opens the native-style action sheet (#53), not the generic zoom
+          // overlay — same as NuvioMobile's NuvioContinueWatchingActionSheet. Row branching
+          // (details/manual/start-from-beginning/remove, next-up hides start) is owned by
+          // buildCwSheetRows in phoneCwActionSheet.js and asserted by its behavior tests.
+          openCwActionSheet({
+            item,
+            posterUrl: item.thumbnail || item.backdrop || item.poster || item.landscapePoster || "",
+            showManualPlayOption: Boolean(screen.showContinueWatchingManualPlayOption),
+            labelFor: (key, fallback) => t(key, {}, fallback),
+            onOpenDetails: () => screen.openContinueWatchingDetails(item),
+            onPlayManually: () =>
+              screen.openContinueWatchingFromItem(item, { manualSelection: true }),
+            onStartFromBeginning: () =>
+              screen.openContinueWatchingFromItem(item, { startOver: true }),
+            onRemove: () => removeContinueWatchingWithAnimation(screen, item)
+          });
         }
       }
     }
@@ -552,7 +600,28 @@ export function mountHomeScreenPhone(screen, container) {
     }
   });
 
+  // Floating resume prompt (#53): wire the Resume/Dismiss taps on whatever prompt rendered.
+  // Resume navigates the same CW resume route a CW card tap would (openContinueWatchingFromItem),
+  // then clears the one-shot; Dismiss just clears it and re-renders clean.
+  const resumePromptHost = container.querySelector(".phone-home-resume-prompt-host");
+  bindResumePrompt(resumePromptHost || container, {
+    onResume: () => {
+      const prompt = screen._phoneResumePrompt;
+      screen._phoneResumePrompt = null;
+      if (prompt?.item) {
+        void screen.openContinueWatchingFromItem(prompt.item);
+      } else {
+        screen.requestRender?.();
+      }
+    },
+    onDismiss: () => {
+      screen._phoneResumePrompt = null;
+      screen.requestRender?.();
+    }
+  });
+
   const teardown = () => {
+    closeActiveBottomSheet();
     detachHeroPager();
     detachContinueWatchingShelf();
     detachCatalogShelves.forEach((detach) => detach());
@@ -561,6 +630,63 @@ export function mountHomeScreenPhone(screen, container) {
 
   screen._phoneHomeTeardown = teardown;
   return teardown;
+}
+
+/** Opens the phone tracking-list picker sheet for the poster-list-picker state `homeScreen.js`
+ * already built (`screen.posterListPicker`: membership + tabs + source mode), wiring Save back
+ * into the screen's existing `activatePosterListPickerOption("saveLibraryLists")` so the same
+ * SIMKL single-select / destructive-removal flow that TV's NuvioDialog uses applies here on
+ * the shared sheet scaffold. Toggle rows stay open in place (the picker's own contract); the
+ * Save row collects the final selection, syncs it to the screen state, and lets the screen's
+ * apply/save path take over (re-opening this sheet on save error, carrying the error notice).
+ */
+export function mountPhonePosterListPicker(screen) {
+  const state = screen.posterListPicker;
+  if (!state) {
+    return false;
+  }
+  const tabs = Array.isArray(state.tabs) ? state.tabs : [];
+  const membership = state.membership || {};
+  const singleSelect = state.sourceMode === LibrarySourceMode.SIMKL;
+  const options = normalizeTrackerOptions(tabs, membership, {
+    fallbackTitle: t("detail.library", {}, "Library")
+  });
+  const destructive = Boolean(state.destructiveRemovalRequired);
+  const noticeHtml = state.error
+    ? `<div class="phone-sheet-notice">${escapeHtml(state.error)}</div>`
+    : "";
+  const saveLabel = destructive
+    ? t("poster_list_picker_confirm_remove", {}, "Remove status and clear history")
+    : t("action_save", {}, "Save");
+
+  const controller = openTrackingListPickerSheet({
+    title: state.item?.title || t("detail.library", {}, "Library"),
+    subtitle: t(
+      "phone_tracking_picker_subtitle",
+      {},
+      "Choose which lists should include this title"
+    ),
+    noticeHtml,
+    saveLabel,
+    options,
+    singleSelect,
+    onSave: (keys) => {
+      const keySet = new Set(keys.map((key) => String(key)));
+      const nextMembership = Object.fromEntries(
+        tabs.map((tab) => [String(tab.key), keySet.has(String(tab.key))])
+      );
+      state.membership = nextMembership;
+      state.destructiveRemovalRequired = false;
+      void screen.activatePosterListPickerOption("saveLibraryLists");
+    },
+    onDismiss: () => {
+      if (screen.posterListPicker === state) {
+        screen.posterListPicker = null;
+      }
+    }
+  });
+  screen._phonePosterListPickerController = controller;
+  return true;
 }
 
 /** Handles a tap on any `.focusable[data-action]` target inside the phone home screen,

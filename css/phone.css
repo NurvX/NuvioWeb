@@ -225,6 +225,159 @@
   color: var(--phone-text-primary);
 }
 
+/* Trailing content for action rows (item.trailing in openBottomSheet/openModalSheet),
+   ported from NuvioBottomSheetActionRow's trailingContent (e.g. the dropdown sheet's
+   selected checkmark). Pushed to the row's end, keeps its own tap target. */
+.phone-sheet-action-trailing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: var(--phone-space-2);
+  color: var(--phone-accent-secondary);
+  flex-shrink: 0;
+}
+
+/* Continue-Watching action-sheet header (js/ui/components/phoneCwActionSheet.js), ported
+   from NuvioMobile's ContinueWatchingSheetHeader: a 64x92 artwork thumbnail beside a
+   title/subtitle column, on the shared .phone-sheet-header. */
+.phone-cw-sheet-header {
+  display: flex;
+  align-items: center;
+  gap: var(--phone-space-14);
+}
+
+.phone-cw-sheet-poster {
+  width: 64px;
+  height: 92px;
+  border-radius: var(--phone-radius-poster);
+  background: var(--phone-accent-bg-elevated);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.phone-cw-sheet-poster-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.phone-cw-sheet-poster-image-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-body-sm-size);
+  color: var(--phone-text-muted);
+}
+
+.phone-cw-sheet-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--phone-space-4);
+}
+
+/* Floating resume prompt (js/ui/components/phoneResumePrompt.js), ported from NuvioMobile's
+   floating resume prompt: a bottom-anchored card above the nav bar shown on home after a
+   player session, with a poster thumb, copy, and Resume/Dismiss actions. */
+.phone-resume-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--phone-space-72));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--phone-space-10);
+  max-width: calc(100vw - 2 * var(--phone-space-screen-h));
+  padding: var(--phone-space-10) var(--phone-space-14);
+  background: var(--phone-accent-bg-elevated);
+  border: 1px solid var(--phone-border-default);
+  border-radius: var(--phone-radius-xl);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
+  z-index: 55;
+}
+
+.phone-resume-prompt-poster {
+  width: 40px;
+  height: 56px;
+  border-radius: var(--phone-radius-poster);
+  background: var(--phone-accent-bg-elevated);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.phone-resume-prompt-poster-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.phone-resume-prompt-poster-image-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-body-sm-size);
+  color: var(--phone-text-muted);
+}
+
+.phone-resume-prompt-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.phone-resume-prompt-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-body-md-size);
+  line-height: var(--phone-type-body-md-line);
+  font-weight: var(--phone-font-weight-semibold);
+  color: var(--phone-text-primary);
+}
+
+.phone-resume-prompt-subtitle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-label-sm-size);
+  line-height: var(--phone-type-label-sm-line);
+  color: var(--phone-text-muted);
+}
+
+.phone-resume-prompt-action {
+  border: none;
+  border-radius: var(--phone-radius-button);
+  padding: var(--phone-space-8) var(--phone-space-14);
+  background: var(--phone-accent-secondary);
+  color: #ffffff;
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-body-sm-size);
+  font-weight: var(--phone-font-weight-semibold);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.phone-resume-prompt-dismiss {
+  border: none;
+  background: none;
+  color: var(--phone-text-muted);
+  font-size: var(--phone-type-body-lg-size);
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Sheet header (openModalSheet), ported from NuvioMobile's EpisodeActionSheetHeader: a
    titleLarge-style title over a bodyMedium-style subtitle, separated from the action rows
    by the rows' own top border. */
@@ -256,6 +409,17 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Non-interactive error/notice line between a sheet's header and rows (openModalSheet
+   noticeHtml — e.g. the tracking picker's save-error). Danger-tinted to match mobile's
+   TrackingListPickerDialog errorMessage. */
+.phone-sheet-notice {
+  margin: 0 var(--phone-space-screen-h) var(--phone-space-10);
+  font-family: var(--phone-font-family);
+  font-size: var(--phone-type-body-sm-size);
+  line-height: var(--phone-type-body-sm-line);
+  color: var(--phone-danger, #e5484d);
 }
 
 /* Shared offline/empty state card (js/ui/components/phoneStateCards.js), ported from

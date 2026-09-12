@@ -17,7 +17,7 @@ import {
   renderOfflineCard,
   bindStateCardEvents
 } from "../../components/phoneStateCards.js";
-import { openBottomSheet } from "../../components/bottomSheet.js";
+import { openModalSheet } from "../../components/bottomSheet.js";
 import { SearchHistoryStore } from "../../../data/local/searchHistoryStore.js";
 
 const SEARCH_RESULTS_PER_ROW_DEFAULT = 18;
@@ -567,10 +567,20 @@ function openDiscoverFilterSheet(screen, kind) {
   const options = getDiscoverFilterOptions(state, kind);
   if (!options.length) return;
   const currentValue = getDiscoverFilterValue(state, kind);
-  openBottomSheet({
+  const kindLabel =
+    kind === "type"
+      ? t("phone_search_filter_type", {}, "Type")
+      : kind === "catalog"
+        ? t("phone_search_filter_catalog", {}, "Catalog")
+        : t("phone_search_filter_genre", {}, "Genre");
+  // Dropdown-as-sheet on the shared scaffold (see #53): the chip's kind label becomes the
+  // sheet header and the selected option carries a trailing checkmark, mirroring
+  // NuvioMobile's NuvioDropdownChip/NuvioDropdownOptionsSheet.
+  openModalSheet({
+    title: kindLabel,
     items: options.map((option) => ({
       title: option.label,
-      icon: option.value === currentValue ? checkmarkIconMarkup() : "",
+      trailing: option.value === currentValue ? checkmarkIconMarkup() : "",
       onSelect: () => applyDiscoverFilterChange(screen, kind, option.value)
     }))
   });
