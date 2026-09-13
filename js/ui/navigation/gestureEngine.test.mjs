@@ -91,6 +91,73 @@ test("computeSnapIndex: clamps at the edges instead of wrapping", () => {
   assert.equal(next, 2, "dragging past the last item stays clamped, does not wrap");
 });
 
+test("computeSnapIndex: wrap mode wraps at the edges (native hero edge-wrap)", () => {
+  // Dragging right at the first item lands on the last.
+  const wrapRight = computeSnapIndex({
+    currentIndex: 0,
+    itemCount: 3,
+    dx: 150,
+    itemWidth: 300,
+    wrap: true
+  });
+  assert.equal(wrapRight, 2, "first -> last when dragging right at the start");
+
+  // Dragging left at the last item lands on the first.
+  const wrapLeft = computeSnapIndex({
+    currentIndex: 2,
+    itemCount: 3,
+    dx: -150,
+    itemWidth: 300,
+    wrap: true
+  });
+  assert.equal(wrapLeft, 0, "last -> first when dragging left at the end");
+
+  // A sub-threshold drag still stays put (no phantom wrap).
+  const stay = computeSnapIndex({
+    currentIndex: 0,
+    itemCount: 3,
+    dx: 10,
+    itemWidth: 300,
+    wrap: true
+  });
+  assert.equal(stay, 0, "small drag below the threshold does not wrap");
+});
+
+test("computeSnapIndex: wrap respects the native hero fraction/velocity thresholds", () => {
+  // 16% of the width (native HERO_SWIPE_THRESHOLD_FRACTION) is enough to advance.
+  const fraction = computeSnapIndex({
+    currentIndex: 0,
+    itemCount: 3,
+    dx: -50,
+    itemWidth: 300,
+    distanceThreshold: 0.16,
+    wrap: true
+  });
+  assert.equal(fraction, 1, "a 16% drag advances in wrap mode");
+  // ...but not quite enough below it.
+  const shortFraction = computeSnapIndex({
+    currentIndex: 0,
+    itemCount: 3,
+    dx: -40,
+    itemWidth: 300,
+    distanceThreshold: 0.16,
+    wrap: true
+  });
+  assert.equal(shortFraction, 0, "a drag just under 16% does not advance");
+
+  // A 300 px/s flick (0.3 px/ms) advances even over a tiny distance.
+  const flick = computeSnapIndex({
+    currentIndex: 1,
+    itemCount: 3,
+    dx: -10,
+    itemWidth: 300,
+    velocity: 0.31,
+    velocityThreshold: 0.3,
+    wrap: true
+  });
+  assert.equal(flick, 2, "native 300px/s velocity gate advances in wrap mode");
+});
+
 // --- DOM-facing seams ---
 
 function dispatchPointer(el, type, { x = 0, y = 0, pointerId = 1, button = 0 } = {}) {
@@ -347,4 +414,61 @@ test("attachPager: auto-advance wraps back to the first item after the last", as
     detach();
     el.remove();
   }
+});
+test("attachPager: wrap mode wraps at the edges (native hero edge-wrap)", () => {
+  const el = document.createElement("div");
+  document.body.appendChild(el);
+  const seen = [];
+  const detach = attachPager(el, {
+    itemWidth: 300,
+    getItemCount: () => 3,
+    wrap: true,
+    onIndexChange: (index) => seen.push(index)
+  });
+
+  // Drag right past the threshold while on the first item: wraps to the last.
+  dispatchPointer(el, "pointerdown", { x: 200, y: 0, pointerId: 9 });
+  dispatchPointer(el, "pointerup", { x: 320, y: 0, pointerId: 9 }); // dx = +120, past 0.3*300
+  assert.deepEqual(seen, [2], "first item dragged right wraps to the last");
+
+  // Drag left past the threshold while on the last item: wraps to the first.
+  dispatchPointer(el, "pointerdown", { x: 200, y: 0, pointerId: 9 });
+  dispatchPointer(el, "pointerup", { x: 20, y: 0, pointerId: 9 }); // dx = -180
+  assert.deepEqual(seen, [2, 0], "last item dragged left wraps to the first");
+
+  detach();
+  el.remove();
+});
+
+test("attachPager: onDragMove streams finger displacement and onDragEnd fires once on lift", () => {
+  const el = document.createElement("div");
+  document.body.appendChild(el);
+  const moves = [];
+  let dragStarts = 0;
+  let dragEnds = null;
+  const detach = attachPager(el, {
+    itemWidth: 300,
+    getItemCount: () => 2,
+    wrap: true,
+    onDragStart: () => {
+      dragStarts += 1;
+    },
+    onDragMove: ({ dx }) => moves.push(dx),
+    onDragEnd: ({ dx, cancelled }) => {
+      dragEnds = { dx, cancelled };
+    }
+  });
+
+  dispatchPointer(el, "pointerdown", { x: 200, y: 0, pointerId: 7 });
+  dispatchPointer(el, "pointermove", { x: 220, y: 0, pointerId: 7 });
+  dispatchPointer(el, "pointermove", { x: 250, y: 0, pointerId: 7 });
+  dispatchPointer(el, "pointerup", { x: 250, y: 0, pointerId: 7 });
+
+  assert.equal(dragStarts, 1);
+  assert.deepEqual(moves, [20, 50]);
+  assert.equal(dragEnds.dx, 50);
+  assert.equal(dragEnds.cancelled, false);
+
+  detach();
+  el.remove();
 });

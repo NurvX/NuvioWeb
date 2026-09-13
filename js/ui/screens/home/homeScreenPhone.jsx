@@ -20,6 +20,22 @@ import { closeActiveBottomSheet } from "../../components/bottomSheet.js";
 import { renderPhoneNavBar, bindPhoneNavBarEvents } from "../../components/phoneNavBar.js";
 import { openPosterZoomOverlay } from "../../components/posterZoomOverlay.js";
 import { renderOfflineCard, bindStateCardEvents } from "../../components/phoneStateCards.js";
+import {
+  computeHeroPageLayout,
+  computeHeroStretchScale,
+  computeHeroScrollParallaxTranslationY,
+  heroDragMaxFraction,
+  resolvePhoneHeroMaxHeight,
+  HERO_AUTO_ADVANCE_MS,
+  HERO_BACKGROUND_SCALE,
+  HERO_SWIPE_THRESHOLD_FRACTION,
+  HERO_SWIPE_VELOCITY_THRESHOLD
+} from "../../components/phoneHeroPager.js";
+import {
+  getPhoneHomeScrollForProfile,
+  savePhoneHomeScrollForProfile
+} from "../../../core/storage/phoneHomeScrollStore.js";
+import { ProfileManager } from "../../../core/profile/profileManager.js";
 import { formatCatalogRowTitle } from "./homeUtils.js";
 import { normalizeHomeRowItem } from "./homeScreen.js";
 import { savedLibraryRepository } from "../../../data/repository/savedLibraryRepository.js";
@@ -55,7 +71,6 @@ import {
 // binders and `css/phone.css` depend on is unchanged, and `mountHomeScreenPhone` can keep
 // wiring events with plain `querySelector` after Preact mounts.
 
-const HERO_AUTO_ADVANCE_MS = 8000;
 const CONTINUE_WATCHING_REMOVE_MS = 350;
 
 function t(key, params = {}, fallback = key) {
@@ -142,13 +157,15 @@ function renderHeroSlide(item, index) {
   const metaLine = buildHeroMetaLine(item);
   return `
     <div class="phone-hero-slide${index === 0 ? " active" : ""}" data-hero-slide="${index}">
-      ${
-        backdrop
-          ? `<img class="phone-hero-bg" src="${escapeHtml(backdrop)}" alt="" loading="${index === 0 ? "eager" : "lazy"}" />`
-          : `<div class="phone-hero-bg phone-hero-bg-empty" aria-hidden="true"></div>`
-      }
+      <div class="phone-hero-bg-wrap" data-hero-bg-wrap>
+        ${
+          backdrop
+            ? `<img class="phone-hero-bg" src="${escapeHtml(backdrop)}" alt="" loading="${index === 0 ? "eager" : "lazy"}" />`
+            : `<div class="phone-hero-bg phone-hero-bg-empty" aria-hidden="true"></div>`
+        }
+      </div>
       <div class="phone-hero-scrim" aria-hidden="true"></div>
-      <div class="phone-hero-content">
+      <div class="phone-hero-content" data-hero-content>
         ${
           item.logo
             ? `<img class="phone-hero-logo" src="${escapeHtml(item.logo)}" alt="${escapeHtml(heroTitle)}" />`
@@ -186,9 +203,15 @@ function renderHeroPager(heroItems) {
         </div>
       `
       : "";
+  // Slides live side-by-side on a horizontal track (#58): `bindHeroPager` translates the
+  // track, its background layer (slower, HERO_BACKGROUND_PARALLAX) and content layer
+  // (faster, HERO_CONTENT_PARALLAX) from `computeHeroPageLayout`, with the track wrapping
+  // around at the ends like NuvioMobile's hero pager.
   return `
     <section class="phone-hero" data-phone-hero>
-      ${slidesMarkup}
+      <div class="phone-hero-track" data-phone-hero-track>
+        ${slidesMarkup}
+      </div>
       ${dotsMarkup}
     </section>
   `;
@@ -207,17 +230,121 @@ function setActiveHeroIndex(container, index) {
   });
 }
 
-function bindHeroPager(screen, container, heroItems) {
+/** Applies the current pager state to the hero DOM: every slide's own translateX plus the
+ * parallax transforms of its background-wrap and content layers, all derived from the pure
+ * `computeHeroPageLayout` math (#58). `dragFraction` is the finger's live displacement as a
+ * fraction of the hero width (0 when settled). */
+function applyHeroLayout(hero, heroItems, activeIndex, dragFraction) {
+  const layout = computeHeroPageLayout({
+    itemCount: heroItems.length,
+    activeIndex,
+    dragFraction
+  });
+  hero.querySelectorAll("[data-hero-slide]").forEach((slide) => {
+    const entry = layout.slides.find((value) => value.index === Number(slide.dataset.heroSlide));
+    if (!entry) {
+      return;
+    }
+    slide.style.transform = `translateX(${entry.slideX}%)`;
+    slide
+      .querySelector("[data-hero-bg-wrap]")
+      ?.style.setProperty("transform", `translateX(${entry.bgX}%)`);
+    slide
+      .querySelector("[data-hero-content]")
+      ?.style.setProperty("transform", `translateX(${entry.contentX}%)`);
+  });
+}
+
+/** Applies the scroll-driven stretch/parallax to the active slide's background image — the
+ * web spin of NuvioMobile's `heroStretchZoom`/`heroBackgroundScrollTranslationY`, capped by
+ * `HERO_SCROLL_MAX_SCALE` (the CSS ceiling). The image carries the base 1.14 bleed scale on
+ * top of the stretch factor so the drag parallax on its wrap never reveals an edge. */
+function applyHeroScrollStretch(hero, scrollTopPx) {
+  const activeSlide = Array.from(hero.querySelectorAll("[data-hero-slide]")).find((slide) =>
+    slide.classList.contains("active")
+  );
+  const bg = activeSlide?.querySelector(".phone-hero-bg");
+  if (!bg) {
+    return;
+  }
+  const stretch = computeHeroStretchScale({ dyPx: scrollTopPx });
+  const translateY = computeHeroScrollParallaxTranslationY(scrollTopPx);
+  bg.style.transform = `translateY(${translateY}px) scale(${HERO_BACKGROUND_SCALE * stretch})`;
+}
+
+function bindHeroPager(screen, container, heroItems, { viewportReservePx = 0 } = {}) {
   const hero = container.querySelector("[data-phone-hero]");
-  if (!hero || heroItems.length < 2) {
+  if (!hero) {
     return () => {};
   }
 
+  // "Stretch within the CSS ceiling": the hero's height is resolved from the viewport and,
+  // on narrow phones, the viewport reserve protecting the Continue Watching shelf below
+  // (native `mobileHeroHeight`/`continueWatchingHeroViewportReserveHeight`), then capped by
+  // the web's own 62vh ceiling so the banner can never swallow the page.
+  const width = hero.offsetWidth || window.innerWidth || 1;
+  const viewportHeight = window.innerHeight || 0;
+  const computedMaxHeight = resolvePhoneHeroMaxHeight({
+    viewportHeightPx: viewportHeight,
+    belowSectionHeightHintPx: viewportReservePx,
+    widthPx: width
+  });
+  const cssCeiling = viewportHeight > 0 ? viewportHeight * 0.62 : Number.POSITIVE_INFINITY;
+  hero.style.maxHeight = `${Math.min(computedMaxHeight, cssCeiling)}px`;
+
+  const itemCount = heroItems.length;
+  if (itemCount < 2) {
+    return () => {};
+  }
+
+  let activeIndex = 0;
+  const scrollRoot = container.querySelector("[data-phone-home-scroll]");
+  const dragMaxFraction = heroDragMaxFraction();
+
+  const setDragging = (dragging) => {
+    if (dragging) {
+      hero.classList.add("dragging");
+    } else {
+      hero.classList.remove("dragging");
+    }
+  };
+
+  // Settle on `index` (wrapped) with the track animating back to a whole page. When
+  // `animate` is false (initial layout) the transition is suppressed by the `no-anim` class
+  // so the hero doesn't sweep in from the previous page on first paint.
+  const goToIndex = (index, { animate = true } = {}) => {
+    activeIndex = ((index % itemCount) + itemCount) % itemCount;
+    if (!animate) {
+      hero.classList.add("no-anim");
+    }
+    applyHeroLayout(hero, heroItems, activeIndex, 0);
+    setActiveHeroIndex(container, activeIndex);
+    if (!animate) {
+      requestAnimationFrame(() => hero.classList.remove("no-anim"));
+    }
+  };
+
+  goToIndex(0, { animate: false });
+
   const detachPager = attachPager(hero, {
-    itemWidth: hero.offsetWidth || window.innerWidth || 1,
+    itemWidth: width,
     autoAdvanceMs: HERO_AUTO_ADVANCE_MS,
     getItemCount: () => heroItems.length,
-    onIndexChange: (index) => setActiveHeroIndex(container, index)
+    wrap: true,
+    fractionThreshold: HERO_SWIPE_THRESHOLD_FRACTION,
+    velocityThreshold: HERO_SWIPE_VELOCITY_THRESHOLD,
+    onDragStart: () => setDragging(true),
+    onDragMove: ({ dx }) => {
+      const fraction = Math.max(-dragMaxFraction, Math.min(dragMaxFraction, dx / width));
+      applyHeroLayout(hero, heroItems, activeIndex, fraction);
+    },
+    onDragEnd: () => setDragging(false),
+    onIndexChange: (index) => {
+      activeIndex = ((index % itemCount) + itemCount) % itemCount;
+      applyHeroLayout(hero, heroItems, activeIndex, 0);
+      setActiveHeroIndex(container, activeIndex);
+      applyHeroScrollStretch(hero, Math.max(0, Number(scrollRoot?.scrollTop || 0)));
+    }
   });
 
   const dotButtons = Array.from(hero.querySelectorAll("[data-hero-dot]"));
@@ -225,7 +352,7 @@ function bindHeroPager(screen, container, heroItems) {
     dot.onclick = (event) => {
       event.preventDefault();
       event.stopPropagation();
-      setActiveHeroIndex(container, Number(dot.dataset.heroDot || 0));
+      goToIndex(Number(dot.dataset.heroDot || 0));
     };
   });
 
@@ -239,14 +366,57 @@ function bindHeroPager(screen, container, heroItems) {
     };
   });
 
+  const onScroll = () => {
+    applyHeroScrollStretch(hero, Math.max(0, Number(scrollRoot?.scrollTop || 0)));
+  };
+  scrollRoot?.addEventListener("scroll", onScroll, { passive: true });
+  applyHeroScrollStretch(hero, Math.max(0, Number(scrollRoot?.scrollTop || 0)));
+
   return () => {
     detachPager();
+    scrollRoot?.removeEventListener("scroll", onScroll);
     dotButtons.forEach((dot) => {
       dot.onclick = null;
     });
     ctaButtons.forEach((cta) => {
       cta.onclick = null;
     });
+    hero.classList.remove("dragging", "no-anim");
+  };
+}
+
+/** Per-profile scroll restore (#58 "scroll restores per profile"): restores this profile's
+ * saved phone-Home scroll offset right after mount and persists the offset (debounced) as
+ * the user scrolls, so switching profiles returns each profile to its own place. */
+function bindPhoneHomeScrollPersist(screen, container) {
+  const scrollEl = container.querySelector("[data-phone-home-scroll]");
+  if (!scrollEl) {
+    return () => {};
+  }
+  const profileId = ProfileManager.getActiveProfileId();
+  const saved = getPhoneHomeScrollForProfile(profileId);
+  if (saved != null) {
+    const maxScrollTop = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
+    scrollEl.scrollTop = Math.max(0, Math.min(saved, maxScrollTop));
+  }
+
+  let saveTimer = null;
+  const onScroll = () => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+    }
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      savePhoneHomeScrollForProfile(profileId, scrollEl.scrollTop);
+    }, 300);
+  };
+  scrollEl.addEventListener("scroll", onScroll, { passive: true });
+
+  return () => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+    }
+    scrollEl.removeEventListener("scroll", onScroll);
   };
 }
 
@@ -545,7 +715,15 @@ export function mountHomeScreenPhone(screen, container) {
     : [];
   const catalogRows = buildCatalogRows(screen);
 
-  const detachHeroPager = bindHeroPager(screen, container, heroItems);
+  // Viewport reserve (#58): under 600dp with a Continue Watching shelf to protect, the hero's
+  // height is capped so the shelf below stays visible (native
+  // `continueWatchingHeroViewportReserveHeight`). 220px clears the CW header + one card row
+  // on common phone heights.
+  const isNarrowViewport = (window.innerWidth || Number.POSITIVE_INFINITY) < 600;
+  const viewportReservePx = isNarrowViewport && continueWatchingItems.length ? 220 : 0;
+
+  const detachHeroPager = bindHeroPager(screen, container, heroItems, { viewportReservePx });
+  const detachScrollPersist = bindPhoneHomeScrollPersist(screen, container);
 
   const detachContinueWatchingShelf = bindPhoneShelfEvents(
     container.querySelector('[data-shelf-id="continue_watching"]'),
@@ -623,6 +801,7 @@ export function mountHomeScreenPhone(screen, container) {
   const teardown = () => {
     closeActiveBottomSheet();
     detachHeroPager();
+    detachScrollPersist();
     detachContinueWatchingShelf();
     detachCatalogShelves.forEach((detach) => detach());
     detachNavBar();

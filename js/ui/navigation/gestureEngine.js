@@ -280,12 +280,23 @@ function clampIndex(index, itemCount) {
   return Math.max(0, Math.min(itemCount - 1, index));
 }
 
+/** Positive modulo — the index the pager lands on when `index` wraps around a track of
+ * `itemCount` items (e.g. -1 of 3 becomes 2, so the last item is the "previous" of the
+ * first, and 3 of 3 becomes 0). */
+function wrapIndex(index, itemCount) {
+  if (!Number.isFinite(itemCount) || itemCount <= 0) {
+    return 0;
+  }
+  return ((index % itemCount) + itemCount) % itemCount;
+}
+
 /**
  * Given a completed drag on a paged track, decides which item index it should snap to.
  * Advances one item when the drag crossed `distanceThreshold` of `itemWidth`, or was fast
- * enough to cross `velocityThreshold` regardless of distance (a flick). Clamps at the ends —
- * dragging past the last/first item does not wrap; only `attachPager`'s auto-advance timer
- * wraps around.
+ * enough to cross `velocityThreshold` regardless of distance (a flick). When `wrap` is false
+ * (the default) it clamps at the ends; when true the track wraps around, so dragging past the
+ * last item lands on the first and dragging past the first lands on the last — matching
+ * NuvioMobile's `resolveHeroTargetPage` edge-wrap (see HomeHeroSection.kt).
  */
 export function computeSnapIndex({
   currentIndex = 0,
@@ -294,18 +305,22 @@ export function computeSnapIndex({
   itemWidth = 0,
   velocity = 0,
   distanceThreshold = DEFAULT_PAGER_DISTANCE_THRESHOLD,
-  velocityThreshold = DEFAULT_PAGER_VELOCITY_THRESHOLD
+  velocityThreshold = DEFAULT_PAGER_VELOCITY_THRESHOLD,
+  wrap = false
 } = {}) {
   if (!itemWidth || itemCount <= 0) {
-    return clampIndex(currentIndex, itemCount);
+    return wrap ? wrapIndex(currentIndex, itemCount) : clampIndex(currentIndex, itemCount);
   }
   const ratio = Math.abs(dx) / itemWidth;
   const shouldAdvance = ratio > distanceThreshold || Math.abs(velocity) > velocityThreshold;
   if (!shouldAdvance) {
-    return clampIndex(currentIndex, itemCount);
+    return wrap ? wrapIndex(currentIndex, itemCount) : clampIndex(currentIndex, itemCount);
   }
   const delta = dx < 0 ? 1 : -1;
-  return clampIndex(currentIndex + delta, itemCount);
+  if (!wrap) {
+    return clampIndex(currentIndex + delta, itemCount);
+  }
+  return wrapIndex(currentIndex + delta, itemCount);
 }
 
 /**
@@ -314,10 +329,29 @@ export function computeSnapIndex({
  * lifetime (e.g. more hero candidates loading in). `onIndexChange(nextIndex)` fires whenever
  * the current page changes, from either a drag or an auto-advance tick. Returns a teardown
  * function.
+ *
+ * Live-drag callers (the hero's parallax track) pass `onDragStart`, `onDragMove({dx, dy})`
+ * and `onDragEnd({dx, dy, velocity, cancelled})`, fired from the underlying pointer tracking
+ * as the finger goes down / drags / lifts. `wrap` lets the track wrap around at the ends
+ * (NuvioMobile hero edge-wrap) — drags past the last item land on the first and vice versa.
+ * `fractionThreshold` replaces the pager's default distance threshold (fraction of
+ * `itemWidth`), and `velocityThreshold` the default velocity gate (px/ms), so the hero can use
+ * the native values (0.16 / 300 px-s) without changing shared defaults.
  */
 export function attachPager(
   el,
-  { itemWidth = 0, onIndexChange, autoAdvanceMs = 0, getItemCount } = {}
+  {
+    itemWidth = 0,
+    onIndexChange,
+    autoAdvanceMs = 0,
+    getItemCount,
+    wrap = false,
+    fractionThreshold = DEFAULT_PAGER_DISTANCE_THRESHOLD,
+    velocityThreshold = DEFAULT_PAGER_VELOCITY_THRESHOLD,
+    onDragStart,
+    onDragMove,
+    onDragEnd
+  } = {}
 ) {
   if (!el) {
     return () => {};
@@ -361,15 +395,25 @@ export function attachPager(
 
   const detachSwipe = attachSwipe(el, {
     axis: "x",
-    onSwipeStart: clearAutoAdvance,
-    onSwipeEnd: ({ dx, velocity, cancelled }) => {
+    onSwipeStart: () => {
+      clearAutoAdvance();
+      onDragStart?.({ dx: 0, dy: 0 });
+    },
+    onSwipeMove: ({ dx, dy }) => {
+      onDragMove?.({ dx, dy });
+    },
+    onSwipeEnd: ({ dx, dy, velocity, cancelled }) => {
+      onDragEnd?.({ dx, dy, velocity, cancelled });
       if (!cancelled) {
         const nextIndex = computeSnapIndex({
           currentIndex,
           itemCount: resolveItemCount(),
           dx,
           itemWidth,
-          velocity
+          velocity,
+          distanceThreshold: fractionThreshold,
+          velocityThreshold,
+          wrap
         });
         if (nextIndex !== currentIndex) {
           currentIndex = nextIndex;

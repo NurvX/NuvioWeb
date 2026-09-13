@@ -765,9 +765,14 @@
 
 /* Hero pager — full-bleed banner, bottom-rounded corners, gradient fade into the page
    background, logo/title + meta line, a "View Details" pill, tappable dot indicators.
-   Slides are stacked absolutely and crossfaded (opacity) rather than translated on a
-   horizontal track; gestureEngine.attachPager still drives which slide is "active" from
-   both the auto-advance timer and a real swipe. */
+   Slides ride side-by-side on a horizontal track (#58): `bindHeroPager` translates each
+   slide (the page), its `.phone-hero-bg-wrap` at the background parallax rate and its
+   `.phone-hero-content` at the faster content parallax rate, with the track wrapping at the
+   ends. While `.dragging`/`.no-anim` the CSS transitions are disabled so drags and first
+   paint track the finger 1:1; settled index changes animate on the shared cinematic motion
+   token. `.phone-hero-bg` carries the scroll stretch/parallax transform (set inline by
+   `applyHeroScrollStretch`), scaled by the image's base 1.14 bleed so the lagging
+   background never reveals an edge. */
 .phone-hero {
   position: relative;
   width: 100%;
@@ -779,17 +784,37 @@
   touch-action: pan-y;
 }
 
-.phone-hero-slide {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity var(--phone-motion-cinematic) var(--phone-ease-standard);
-  pointer-events: none;
+.phone-hero-track {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  min-height: 100%;
+  flex-wrap: nowrap;
 }
 
-.phone-hero-slide.active {
-  opacity: 1;
-  pointer-events: auto;
+.phone-hero-slide {
+  position: relative;
+  flex: 0 0 100%;
+  min-width: 100%;
+  height: 100%;
+  will-change: transform;
+  transition: transform var(--phone-motion-cinematic) var(--phone-ease-standard);
+}
+
+/* `.active` on a slide now only marks identity for the dots/CTA (the visual "which page am
+   I on" signal); position on the track comes from the inline transform. */
+.phone-hero.dragging .phone-hero-slide,
+.phone-hero.dragging .phone-hero-bg-wrap,
+.phone-hero.no-anim .phone-hero-slide,
+.phone-hero.no-anim .phone-hero-bg-wrap {
+  transition: none;
+}
+
+.phone-hero-bg-wrap {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  transition: transform var(--phone-motion-cinematic) var(--phone-ease-standard);
 }
 
 .phone-hero-bg {
@@ -797,6 +822,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transform-origin: center;
 }
 
 .phone-hero-bg-empty {
@@ -824,6 +850,8 @@
   align-items: flex-start;
   gap: var(--phone-space-10);
   padding: 0 var(--phone-space-screen-h) var(--phone-space-24);
+  will-change: transform;
+  transition: transform var(--phone-motion-cinematic) var(--phone-ease-standard);
 }
 
 .phone-hero-logo {
