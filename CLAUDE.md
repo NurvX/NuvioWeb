@@ -54,6 +54,16 @@ the session there is already signed in, so no manual login is needed. Use the lo
 `npm run serve` build only when the change under test isn't deployed yet (Vercel
 auto-deploys `main`, so merge first, then verify on the URL above).
 
+Phone-parity walks must emulate a phone viewport over CDP before reloading — the
+debuggable Chrome window is desktop-sized, so the app boots in desktop mode and no
+`phone-*` components exist otherwise:
+`Emulation.setDeviceMetricsOverride {width: 390, height: 844, deviceScaleFactor: 2, mobile: true}`
+(plus `Emulation.setTouchEmulationEnabled`), then `Page.reload {ignoreCache: true}`.
+After a cache-busted reload the signed-in boot can exceed a fixed wait — poll for the
+screen-under-test's element (e.g. `[data-phone-hero]`) instead of sleeping. The 8s hero
+auto-advance also races multi-step walks: click a dot and re-read the active index before
+each drag step rather than assuming the previous step's index.
+
 Runtime config (Supabase URL/keys, TMDB/Trakt/Simkl/Premiumize credentials, proxy URLs, etc.)
 is sourced from `local.properties` (gitignored; see `local.example.properties` for the schema)
 and baked into `dist/nuvio.env.js` at build time by `scripts/envProperties.mjs`. `js/config.js`
