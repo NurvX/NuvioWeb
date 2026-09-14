@@ -337,6 +337,11 @@ export function computeSnapIndex({
  * `fractionThreshold` replaces the pager's default distance threshold (fraction of
  * `itemWidth`), and `velocityThreshold` the default velocity gate (px/ms), so the hero can use
  * the native values (0.16 / 300 px-s) without changing shared defaults.
+ *
+ * `getCurrentIndex` hands the pager an authoritative index source: settles and auto-advance
+ * ticks read it instead of the internally-tracked index, so externally-driven changes (the
+ * hero's dot navigation, a screen-driven reset) can never diverge from the next computed
+ * snap. When omitted, the pager keeps its own index as before.
  */
 export function attachPager(
   el,
@@ -348,6 +353,7 @@ export function attachPager(
     wrap = false,
     fractionThreshold = DEFAULT_PAGER_DISTANCE_THRESHOLD,
     velocityThreshold = DEFAULT_PAGER_VELOCITY_THRESHOLD,
+    getCurrentIndex,
     onDragStart,
     onDragMove,
     onDragEnd
@@ -363,6 +369,14 @@ export function attachPager(
   const resolveItemCount = () => {
     const count = typeof getItemCount === "function" ? Number(getItemCount()) : 0;
     return Number.isFinite(count) ? count : 0;
+  };
+
+  const resolveCurrentIndex = () => {
+    if (typeof getCurrentIndex === "function") {
+      const value = Number(getCurrentIndex());
+      return Number.isFinite(value) ? value : currentIndex;
+    }
+    return currentIndex;
   };
 
   const clearAutoAdvance = () => {
@@ -384,10 +398,11 @@ export function attachPager(
         scheduleAutoAdvance();
         return;
       }
-      const nextIndex = (currentIndex + 1) % nextCount;
-      if (nextIndex !== currentIndex) {
-        currentIndex = nextIndex;
-        onIndexChange?.(currentIndex);
+      const nextIndex = (resolveCurrentIndex() + 1) % nextCount;
+      const changed = nextIndex !== resolveCurrentIndex();
+      currentIndex = nextIndex;
+      if (changed) {
+        onIndexChange?.(nextIndex);
       }
       scheduleAutoAdvance();
     }, autoAdvanceMs);
@@ -406,7 +421,7 @@ export function attachPager(
       onDragEnd?.({ dx, dy, velocity, cancelled });
       if (!cancelled) {
         const nextIndex = computeSnapIndex({
-          currentIndex,
+          currentIndex: resolveCurrentIndex(),
           itemCount: resolveItemCount(),
           dx,
           itemWidth,
@@ -415,9 +430,9 @@ export function attachPager(
           velocityThreshold,
           wrap
         });
-        if (nextIndex !== currentIndex) {
+        if (nextIndex !== resolveCurrentIndex()) {
           currentIndex = nextIndex;
-          onIndexChange?.(currentIndex);
+          onIndexChange?.(nextIndex);
         }
       }
       scheduleAutoAdvance();

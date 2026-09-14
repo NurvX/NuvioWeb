@@ -333,6 +333,10 @@ function bindHeroPager(screen, container, heroItems, { viewportReservePx = 0 } =
     wrap: true,
     fractionThreshold: HERO_SWIPE_THRESHOLD_FRACTION,
     velocityThreshold: HERO_SWIPE_VELOCITY_THRESHOLD,
+    // The closure's activeIndex is authoritative (dot clicks and settle both go through
+    // goToIndex/onIndexChange): the pager reads it for every snap and auto-advance so
+    // externally-driven changes can never diverge from the next computed snap (#58).
+    getCurrentIndex: () => activeIndex,
     onDragStart: () => setDragging(true),
     onDragMove: ({ dx }) => {
       const fraction = Math.max(-dragMaxFraction, Math.min(dragMaxFraction, dx / width));

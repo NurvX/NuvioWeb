@@ -472,3 +472,32 @@ test("attachPager: onDragMove streams finger displacement and onDragEnd fires on
   detach();
   el.remove();
 });
+
+test("attachPager: getCurrentIndex keeps snaps relative to externally-driven index changes", () => {
+  const el = document.createElement("div");
+  document.body.appendChild(el);
+  let externalIndex = 0;
+  const seen = [];
+  const detach = attachPager(el, {
+    itemWidth: 300,
+    getItemCount: () => 3,
+    wrap: true,
+    getCurrentIndex: () => externalIndex,
+    onIndexChange: (index) => {
+      externalIndex = index; // the consumer stays authoritative (dot navigation does this)
+      seen.push(index);
+    }
+  });
+
+  // A dot-navigation-style jump the pager never saw: internal index would still say 0.
+  externalIndex = 5;
+
+  // Drag right: settles relative to the external 5 — wrapIndex(5-1, 3) = 1. A stale
+  // internal 0 would have wrapped to 2 instead.
+  dispatchPointer(el, "pointerdown", { x: 200, y: 0, pointerId: 8 });
+  dispatchPointer(el, "pointerup", { x: 320, y: 0, pointerId: 8 });
+  assert.deepEqual(seen, [1], "the snap read the external index, not the stale internal one");
+
+  detach();
+  el.remove();
+});
