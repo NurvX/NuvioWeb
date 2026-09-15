@@ -58,7 +58,17 @@ import { h } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { mountPreact } from "../../phone/mountPreact.js";
 import { attachLongPress } from "../../navigation/gestureEngine.js";
-import { openBottomSheet, closeActiveBottomSheet } from "../../components/bottomSheet.js";
+import { openModalSheet, closeActiveBottomSheet } from "../../components/bottomSheet.js";
+import { renderEmptyStateCard, bindStateCardEvents } from "../../components/phoneStateCards.js";
+import {
+  resolveStreamResumeState,
+  formatResumeBannerValue,
+  resolveStreamEmptyReason,
+  resolveStreamPlaybackAvailability,
+  filterStreamsByProvider,
+  buildStreamActionSheetModel,
+  STREAM_EMPTY_REASONS
+} from "./phoneStreamUi.js";
 
 const STREAM_BADGE_LIMIT = 9;
 // Number of rows on each side of the focused source to keep badge-hydrated.
@@ -1553,10 +1563,12 @@ export const StreamScreen = {
       return cache.result;
     }
     const orderedStreams = sortStreamsByAddonOrder(this.streams, this.sourceChips);
+    // Provider narrowing routed through the parity helper (#54) — same exact-match
+    // semantics as the previous inline filter, now asserted by phoneStreamUi tests.
     const result =
       filter === "all"
         ? DebridStreamPresentation.sortForDisplay(orderedStreams, DebridSettingsStore.get())
-        : orderedStreams.filter((stream) => stream.addonName === filter);
+        : filterStreamsByProvider(orderedStreams, filter);
     this._filteredStreamsCache = {
       streams: this.streams,
       chips: this.sourceChips,
@@ -2785,15 +2797,6 @@ function iconDownloadHtml() {
   return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>`;
 }
 
-function formatResumeClock(positionMs = 0) {
-  const totalSeconds = Math.max(0, Math.floor(Number(positionMs || 0) / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const pad = (value) => String(value).padStart(2, "0");
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
-}
-
 function PhoneHero({ screen }) {
   const { isSeries, title, subtitle, episodeLabel, detailLine } = screen.getHeaderMeta();
   const backdrop = screen.getBackdropUrl();
@@ -2844,7 +2847,31 @@ function PhoneResumePill({ screen, filtered, onPlay }) {
   if (!target?.id) {
     return null;
   }
-  const positionLabel = formatResumeClock(Number(screen.params?.resumePositionMs || 0));
+  // Native ResumeBanner contract (#54): percent when a progress fraction is known, else the
+  // playback clock — resolveStreamResumeState/formatResumeBannerValue (StreamsScreen.kt port).
+  const resumeState = resolveStreamResumeState({
+    progress: {
+      positionMs: Number(screen.params?.resumePositionMs || 0) || 0,
+      progressPercent: screen.params?.resumeProgressPercent ?? null,
+      durationMs: Number(screen.params?.resumeDurationMs || 0) || 0,
+      isResumable: true
+    },
+    startFromBeginning: Boolean(screen.params?.startFromBeginning)
+  });
+  const banner = formatResumeBannerValue(resumeState);
+  if (!banner) {
+    return null;
+  }
+  // The locale strings carry the whole "Resume from …" phrase (native ResumeBanner shows one
+  // label, not a label wrapping another label — the pre-#54 code double-prefixed here).
+  const positionLabel =
+    banner.kind === "percent"
+      ? phoneT(
+          "stream_resume_from_percent",
+          { percent: banner.percent },
+          `Resume from ${banner.percent}%`
+        )
+      : phoneT("stream_resume_from_time", { time: banner.clock }, `Resume from ${banner.clock}`);
   return (
     <button
       type="button"
@@ -2854,7 +2881,7 @@ function PhoneResumePill({ screen, filtered, onPlay }) {
       onClick={() => onPlay(target.id)}
     >
       <IconPlay />
-      <span>{phoneT("stream_resume_from", [positionLabel], `Resume from ${positionLabel}`)}</span>
+      <span>{positionLabel}</span>
     </button>
   );
 }
@@ -3119,12 +3146,57 @@ function PhoneFooterSpinner() {
   );
 }
 
-function PhoneEmptyState({ title, message }) {
+// Native StreamsScreen empty-state copy, keyed by the #54 reason vocabulary; strings are
+// routed through i18n with these as fallbacks. The wrapper's `data-stream-empty-reason`
+// mirrors the shared card's `data-state-reason` for behavior tests.
+const STREAM_EMPTY_STATE_COPY = {
+  [STREAM_EMPTY_REASONS.NO_ADDONS]: {
+    titleKey: "stream_no_addons_title",
+    title: "No addons installed",
+    messageKey: "stream_no_addons_message",
+    message: "Install a content addon in Settings to see sources here."
+  },
+  [STREAM_EMPTY_REASONS.NO_COMPATIBLE_ADDONS]: {
+    titleKey: "stream_no_compatible_title",
+    title: "No compatible addons",
+    messageKey: "stream_no_compatible_message",
+    message: "None of your installed addons support this title."
+  },
+  [STREAM_EMPTY_REASONS.FETCH_FAILED]: {
+    titleKey: "stream_fetch_failed_title",
+    title: "Couldn't load streams",
+    messageKey: "stream_fetch_failed_message",
+    message: "Try again in a moment."
+  },
+  [STREAM_EMPTY_REASONS.NO_STREAMS]: {
+    titleKey: "stream_no_streams_title",
+    title: "No sources found",
+    messageKey: "stream_no_streams_message",
+    message: "Try a different filter, or check back later."
+  }
+};
+
+function PhoneEmptyState({ reason, onRetry }) {
+  const containerRef = useRef(null);
+  const copy =
+    STREAM_EMPTY_STATE_COPY[reason] || STREAM_EMPTY_STATE_COPY[STREAM_EMPTY_REASONS.NO_STREAMS];
+  // Shared state card (#52): `reason` drives the built-in copy/retry contract and the
+  // `data-state-reason` behavior surface; this screen's i18n strings override the copy.
+  const markup = renderEmptyStateCard({
+    reason,
+    title: phoneT(copy.titleKey, {}, copy.title),
+    message: phoneT(copy.messageKey, {}, copy.message)
+  });
+  useEffect(() => {
+    bindStateCardEvents(containerRef.current, { onAction: () => onRetry?.() });
+  });
   return (
-    <div class="phone-stream-empty-state">
-      <div class="phone-stream-empty-title">{title}</div>
-      <div class="phone-stream-empty-message">{message}</div>
-    </div>
+    <div
+      ref={containerRef}
+      class="phone-stream-empty-state"
+      data-stream-empty-reason={reason}
+      dangerouslySetInnerHTML={{ __html: markup }}
+    />
   );
 }
 
@@ -3142,8 +3214,8 @@ function PhoneBody({
   if (screen.error) {
     return (
       <PhoneEmptyState
-        title={phoneT("stream_fetch_failed_title", {}, "Couldn't load streams")}
-        message={String(screen.error)}
+        reason={STREAM_EMPTY_REASONS.FETCH_FAILED}
+        onRetry={() => void screen.loadStreams()}
       />
     );
   }
@@ -3151,46 +3223,19 @@ function PhoneBody({
     return <PhoneFullListSpinner />;
   }
   if (!filtered.length) {
-    if (!hasAnyStreams && !screen.loading) {
-      const installedAddons = addonRepository.getCachedInstalledAddons() || [];
-      if (!installedAddons.length) {
-        return (
-          <PhoneEmptyState
-            title={phoneT("stream_no_addons_title", {}, "No addons installed")}
-            message={phoneT(
-              "stream_no_addons_message",
-              {},
-              "Install a content addon in Settings to see sources here."
-            )}
-          />
-        );
-      }
-      if (!screen.sourceChips.length) {
-        return (
-          <PhoneEmptyState
-            title={phoneT("stream_no_compatible_title", {}, "No compatible addons")}
-            message={phoneT(
-              "stream_no_compatible_message",
-              {},
-              "None of your installed addons support this title."
-            )}
-          />
-        );
-      }
-    }
-    if (hasPendingForFilter) {
+    // Granular empty reasons (#54): resolveStreamEmptyReason mirrors the native
+    // StreamsEmptyStateReason branching onto the #52 data-state-reason vocabulary; null
+    // means a spinner is still showing (initial or filter-pending source loads).
+    const reason = resolveStreamEmptyReason({
+      loading: false,
+      installedAddonCount: (addonRepository.getCachedInstalledAddons() || []).length,
+      sourceChipCount: screen.sourceChips.length,
+      hasPendingSourceLoads: hasPendingForFilter
+    });
+    if (!reason) {
       return <PhoneFullListSpinner />;
     }
-    return (
-      <PhoneEmptyState
-        title={phoneT("stream_no_streams_title", {}, "No sources found")}
-        message={phoneT(
-          "stream_no_streams_message",
-          {},
-          "Try a different filter, or check back later."
-        )}
-      />
-    );
+    return <PhoneEmptyState reason={reason} onRetry={() => void screen.loadStreams()} />;
   }
 
   const groups = buildPhoneGroups(screen, filtered);
@@ -3254,29 +3299,39 @@ async function downloadPhoneStream(screen, stream) {
 }
 
 function openPhoneStreamActionSheet(screen, stream) {
-  openBottomSheet({
-    items: [
-      {
-        icon: iconCopyHtml(),
-        title: phoneT("stream_action_copy_link", {}, "Copy Link"),
-        onSelect: () => void copyPhoneStreamLink(screen, stream)
-      },
-      {
-        icon: iconExternalHtml(),
-        title: phoneT("stream_action_open_external", {}, "Open in External Player"),
-        onSelect: () => void openPhoneStreamExternally(screen, stream)
-      },
-      {
-        icon: iconInternalHtml(),
-        title: phoneT("stream_action_open_internal", {}, "Open in Internal Player"),
-        onSelect: () => void screen.playStreamInternal(stream)
-      },
-      {
-        icon: iconDownloadHtml(),
-        title: phoneT("stream_action_download", {}, "Download as File"),
-        onSelect: () => void downloadPhoneStream(screen, stream)
-      }
-    ]
+  // Native StreamActionsSheet contract (#54): header (stream headline + subtitle) on the
+  // shared modal sheet, then the copy/open/download rows in native order, driven by
+  // buildStreamActionSheetModel so the row set/order stays in one testable place.
+  const model = buildStreamActionSheetModel({
+    headline: getStreamHeadline(stream),
+    subtitle: getStreamQuality(stream)
+  });
+  const rowByAction = {
+    copy: {
+      icon: iconCopyHtml(),
+      title: phoneT("stream_action_copy_link", {}, "Copy Link"),
+      onSelect: () => void copyPhoneStreamLink(screen, stream)
+    },
+    open_external: {
+      icon: iconExternalHtml(),
+      title: phoneT("stream_action_open_external", {}, "Open in External Player"),
+      onSelect: () => void openPhoneStreamExternally(screen, stream)
+    },
+    open_internal: {
+      icon: iconInternalHtml(),
+      title: phoneT("stream_action_open_internal", {}, "Open in Internal Player"),
+      onSelect: () => void screen.playStreamInternal(stream)
+    },
+    download: {
+      icon: iconDownloadHtml(),
+      title: phoneT("stream_action_download", {}, "Download as File"),
+      onSelect: () => void downloadPhoneStream(screen, stream)
+    }
+  };
+  openModalSheet({
+    title: model.title,
+    subtitle: model.subtitle,
+    items: model.actions.map((action) => rowByAction[action]).filter(Boolean)
   });
 }
 
@@ -3293,7 +3348,22 @@ function StreamScreenPhone({ screen }) {
   const streamBadgesEnabled = DebridSettingsStore.get().streamBadgesEnabled !== false;
   const selectedStreamId = String(screen.params?.preferredStreamId || "").trim();
 
+  // Native canPlay gate (#54): play is only live once at least one source exists; while
+  // sources are still resolving it stays busy (not blocked), and with none at all it is
+  // blocked so the screen never leads into a dead player.
+  const availability = resolveStreamPlaybackAvailability({
+    streamCount: filtered.length,
+    hasPendingSourceLoads: screen.autoResumeUiActive ? false : screen.hasPendingSourceLoads()
+  });
   const handlePlay = (streamId) => {
+    if (!availability.canPlay) {
+      screen.showStreamToast(
+        availability.blockedReason === "loading"
+          ? phoneT("stream_loading_sources", {}, "Finding sources…")
+          : phoneT("stream_no_sources_toast", {}, "No sources available yet")
+      );
+      return;
+    }
     void screen.playStream(streamId);
   };
   const handleSelectFilter = (addon) => {
