@@ -17,6 +17,12 @@ import {
   renderOfflineCard,
   bindStateCardEvents
 } from "../../components/phoneStateCards.js";
+import {
+  resolveSearchEmptyReason,
+  searchStatusIsRetryable,
+  SEARCH_EMPTY_REASONS,
+  SEARCH_SUGGESTION_ACTIONS
+} from "./phoneSearchStates.js";
 import { openModalSheet } from "../../components/bottomSheet.js";
 import { SearchHistoryStore } from "../../../data/local/searchHistoryStore.js";
 
@@ -686,16 +692,28 @@ function renderResultsBody(screen) {
       actionLabel: t("action_retry", {}, "Retry")
     });
   }
-  if (status === "no_addons") {
+  // Empty/failure reasons route through the #55 seam (phoneSearchStates.js — the native
+  // SearchScreen.kt reason set): null means a non-empty state owns the body; the retry
+  // decision comes from the seam too (retry only on RequestFailed).
+  const reason = resolveSearchEmptyReason({ status });
+  if (reason === SEARCH_EMPTY_REASONS.REQUEST_FAILED) {
     return renderEmptyStateCard({
-      reason: "no_addons",
+      reason,
+      title: t("phone_search_error_title", {}, "Something went wrong"),
+      message: t("phone_search_error_message", {}, "Your search couldn't be completed. Try again."),
+      actionLabel: searchStatusIsRetryable(status) ? t("action_retry", {}, "Retry") : ""
+    });
+  }
+  if (reason === "no_addons") {
+    return renderEmptyStateCard({
+      reason,
       title: t("phone_search_no_addons_title", {}, "No addons installed"),
       message: t("phone_search_no_addons_message", {}, "Install an addon to start searching.")
     });
   }
-  if (status === "no_catalogs") {
+  if (reason === "no_catalogs") {
     return renderEmptyStateCard({
-      reason: "no_catalogs",
+      reason,
       title: t("phone_search_no_catalogs_title", {}, "Search isn't available"),
       message: t(
         "phone_search_no_catalogs_message",
@@ -704,17 +722,9 @@ function renderResultsBody(screen) {
       )
     });
   }
-  if (status === "error") {
+  if (reason === "no_results") {
     return renderEmptyStateCard({
-      reason: "error",
-      title: t("phone_search_error_title", {}, "Something went wrong"),
-      message: t("phone_search_error_message", {}, "Your search couldn't be completed. Try again."),
-      actionLabel: t("action_retry", {}, "Retry")
-    });
-  }
-  if (status === "no_results") {
-    return renderEmptyStateCard({
-      reason: "no_results",
+      reason,
       title: t("search_no_results_title", {}, "No Results"),
       message: t("search_no_results_subtitle", {}, "Try searching with different keywords")
     });
@@ -724,8 +734,11 @@ function renderResultsBody(screen) {
 
 function renderRecentRow(term) {
   const safeTerm = escapeHtml(term);
+  // Native SearchRecentRow richness (#55): a chip-shaped row with the replay/remove action
+  // set carried on data attributes (SEARCH_SUGGESTION_ACTIONS is the behavior source).
+  const actions = SEARCH_SUGGESTION_ACTIONS.map((action) => `search-recent-${action}`).join(" ");
   return `
-    <div class="phone-search-recent-row focusable" data-phone-recent-row data-action="phoneSearchRecentTerm" data-term="${safeTerm}">
+    <div class="phone-search-recent-row focusable" data-phone-recent-row data-action="phoneSearchRecentTerm" data-recent-actions="${escapeHtml(actions)}" data-term="${safeTerm}">
       <svg class="phone-search-recent-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 8v5l3 3M12 3a9 9 0 1 0 9 9"/></svg>
       <span class="phone-search-recent-term">${safeTerm}</span>
       <button

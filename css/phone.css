@@ -1635,10 +1635,12 @@
   color: var(--phone-text-primary);
 }
 
-/* Recent searches — a tappable-row list (tap re-runs the search, trailing icon removes). */
+/* Recent searches — rich rows (#55, native SearchRecentRow): chip-shaped elevated rows
+   (tap re-runs the search, trailing icon removes). */
 .phone-search-recent-list {
   display: flex;
   flex-direction: column;
+  gap: var(--phone-space-8);
   padding: var(--phone-space-8) var(--phone-space-screen-h) 0;
 }
 
@@ -1646,18 +1648,27 @@
   display: flex;
   align-items: center;
   gap: var(--phone-space-12);
-  padding: var(--phone-space-10) 0;
-  border: none;
-  background: none;
+  padding: var(--phone-space-10) var(--phone-space-14);
+  border: 1px solid var(--phone-border-default);
+  border-radius: var(--phone-radius-full);
+  background: var(--phone-accent-bg-elevated);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.phone-search-recent-row:active {
+  background: var(--phone-accent-bg-card);
+  border-color: var(--phone-accent-secondary);
 }
 
 .phone-search-recent-icon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  color: var(--phone-text-muted);
+  color: var(--phone-accent-secondary);
 }
 
 .phone-search-recent-term {
